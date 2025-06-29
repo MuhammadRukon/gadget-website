@@ -10,7 +10,7 @@ import { HeaderButton } from '@/app/common/button/header-button';
 import { Container } from '@/app/components/container/container';
 import { Menu } from '@/app/components/menu/menu';
 import { menu } from '@/app/utils/dummy-data';
-import { removeOccur } from '@/app/utils/removeOccur';
+import { removeOccur } from '@/app/utils/helper';
 
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';

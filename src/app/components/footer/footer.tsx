@@ -4,9 +4,9 @@ import { Container } from '../container/container';
 
 export function Footer(): JSX.Element {
   return (
-    <footer className="text-xs sm:text-sm text-center md:text-left py-0 bg-main text-dim mt-20 pt-5 md:pt-6 xl:pt-[50px] w-full">
+    <footer className="bg-[#f9fafc] dark:bg-background text-xs sm:text-sm text-center md:text-left py-0 bg-main pt-5 md:pt-6 w-full">
       <Container>
-        <div className="md:flex justify-between md:space-x-2 w-full [&>div>h4]:text-[11px] [&>div>h4]:md:text-sm [&>div>h4]:tracking-[4px] [&>div>h4]:uppercase [&>div>h4]:mb-7 [&>div]:mb-12 px-4">
+        <div className="md:flex justify-between md:space-x-2 w-full [&>div>h4]:text-[11px] [&>div>h4]:md:text-sm [&>div>h4]:tracking-[4px] [&>div>h4]:uppercase [&>div>h4]:mb-7 [&>div]:mb-12">
           <div>
             <h4>Support</h4>
             <div className="flex flex-col whitespace-nowrap space-y-4">

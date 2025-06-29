@@ -1,3 +1,5 @@
+import SearchPage from '../../components/search-page/search-page';
+
 interface BrandPageProps {
   params: {
     category: string;
@@ -8,14 +10,7 @@ interface BrandPageProps {
 async function BrandPage({ params }: BrandPageProps) {
   const { category, brand } = params;
 
-  return (
-    <>
-      <h1 className="text-2xl font-bold mb-6">{brand.charAt(0).toUpperCase() + brand.slice(1)}</h1>
-      <p className="text-gray-600 mb-4">
-        Category: {category.charAt(0).toUpperCase() + category.slice(1)}
-      </p>
-    </>
-  );
+  return <SearchPage category={category} brand={brand} />;
 }
 
 export default BrandPage;

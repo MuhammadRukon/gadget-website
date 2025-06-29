@@ -1,3 +1,5 @@
+import SearchPage from '../components/search-page/search-page';
+
 interface CategoryPageProps {
   params: {
     category: string;
@@ -7,13 +9,7 @@ interface CategoryPageProps {
 async function CategoryPage({ params }: CategoryPageProps) {
   const { category } = params;
 
-  return (
-    <>
-      <h1 className="text-2xl font-bold mb-6">
-        {category.charAt(0).toUpperCase() + category.slice(1)}
-      </h1>
-    </>
-  );
+  return <SearchPage category={category} />;
 }
 
 export default CategoryPage;
