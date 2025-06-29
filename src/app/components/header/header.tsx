@@ -1,7 +1,7 @@
 'use client';
 
 import { Handshake, Percent, User } from 'lucide-react';
-import { JSX, useState } from 'react';
+import { JSX, useEffect, useState } from 'react';
 
 import { HeaderButtonsProps, HeaderSearchProps } from './header.types';
 import { IHeaderButton } from '@/app/interface';
@@ -14,9 +14,10 @@ import { removeOccur } from '@/app/utils/removeOccur';
 
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
+import { getSavedTheme, toggleTheme } from '@/app/utils/theme';
 
+import { applyTheme } from '@/app/utils/theme';
 import { Logo } from '@/app/common/logo/logo.atom';
-import { useTheme } from '@/app/providers/theme-provider';
 
 export function Header(): JSX.Element {
   return (
@@ -29,7 +30,12 @@ export function Header(): JSX.Element {
 
 Header.TopBar = function TopBar(): JSX.Element {
   const [search, setSearch] = useState('');
-  const { theme, setTheme } = useTheme();
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+
+  useEffect(() => {
+    applyTheme(getSavedTheme());
+    setTheme(getSavedTheme());
+  }, []);
 
   const headerButtons: IHeaderButton[] = [
     {
@@ -40,6 +46,7 @@ Header.TopBar = function TopBar(): JSX.Element {
     {
       href: '/offers',
       title: 'Offers',
+
       icon: <Percent size={14} />,
     },
     {
@@ -58,10 +65,7 @@ Header.TopBar = function TopBar(): JSX.Element {
 
         <Header.Buttons headerButtons={headerButtons} />
 
-        <Switch
-          checked={theme === 'dark'}
-          onCheckedChange={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-        />
+        <Switch checked={theme === 'dark'} onCheckedChange={() => setTheme(toggleTheme())} />
       </div>
     </Container>
   );

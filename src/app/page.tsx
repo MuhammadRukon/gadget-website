@@ -1,7 +1,7 @@
 export default function Home() {
   return (
     <div>
-      <h1>Gadget Daddy</h1>
+      <h1>Technologia</h1>
     </div>
   );
 }
