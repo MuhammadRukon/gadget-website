@@ -1,12 +1,17 @@
 import SearchPage from '../../components/search-page/search-page';
 
 interface BrandPageProps {
-  category: string;
-  brand: string;
+  params: Promise<{
+    category: string;
+    brand: string;
+  }>;
 }
 
-export default function BrandPage({ params }: { params: BrandPageProps }) {
-  const { category, brand } = params;
+async function BrandPage({ params }: BrandPageProps) {
+  const resolvedParams = await params;
+  const { category, brand } = resolvedParams;
 
   return <SearchPage category={category} brand={brand} />;
 }
+
+export default BrandPage;
