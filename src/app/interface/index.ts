@@ -1,3 +1,5 @@
+import { ReactNode } from 'react';
+
 export type Theme = 'light' | 'dark';
 export interface ICategory {
   id: string;
@@ -17,4 +19,10 @@ export interface IBrand {
 
 export interface IMenu extends ICategory {
   brands: IBrand[];
+}
+
+export interface IHeaderButton {
+  href: string;
+  title: string;
+  icon?: string | ReactNode;
 }
