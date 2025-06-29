@@ -58,7 +58,7 @@ Header.TopBar = function TopBar(): JSX.Element {
 
   return (
     <Container WrapperClassName="bg-[#f9fafc] dark:bg-background border-b border-gray-200 dark:border-[#222223]">
-      <div className="flex flex-col sm:flex-row items-center justify-between sm:h-10">
+      <div className="flex flex-col gap-y-2 sm:flex-row items-center justify-between sm:h-10">
         <Header.Logo />
 
         <Header.Search search={search} setSearch={setSearch} />

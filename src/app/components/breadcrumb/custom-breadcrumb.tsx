@@ -1,3 +1,4 @@
+import { uppercase } from '@/app/utils/helper';
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -19,7 +20,6 @@ interface BreadcrumbProps {
 }
 
 export function CustomBreadcrumb({ items }: BreadcrumbProps) {
-  console.log(items);
   return (
     <Breadcrumb>
       <BreadcrumbList>
@@ -27,9 +27,11 @@ export function CustomBreadcrumb({ items }: BreadcrumbProps) {
           <React.Fragment key={index}>
             <BreadcrumbItem>
               {index === items.length - 1 ? (
-                <BreadcrumbPage>{item.label}</BreadcrumbPage>
+                <BreadcrumbPage>{uppercase(item.label as string)}</BreadcrumbPage>
               ) : (
-                <BreadcrumbLink href={item.href ?? '#'}>{item.label}</BreadcrumbLink>
+                <BreadcrumbLink href={item.href ?? '#'}>
+                  {uppercase(item.label as string)}
+                </BreadcrumbLink>
               )}
             </BreadcrumbItem>
             {index < items.length - 1 && <BreadcrumbSeparator />}
