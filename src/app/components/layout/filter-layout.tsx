@@ -5,7 +5,7 @@ export function FilterLayout({ title, children }: { title: string; children: Rea
       <div className="space-y-4">
         <div>
           <p className="p-3">{title}</p>
-          <hr className="border-white" />
+          <hr className="border-white dark:border-black" />
 
           <div className="p-3 space-y-2">{children}</div>
         </div>
