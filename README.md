@@ -1,5 +1,3 @@
-Features: Categories, Brands, Products, User Authentication and Authorization, Cart, Checkout, Payment.
-
 ## Project Overview
 
 A simple e-commerce MVP for gadgets. Built to demonstrate end-to-end product catalog, cart, checkout, and payment flow.
