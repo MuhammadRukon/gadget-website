@@ -1,0 +1,199 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id         String   @id @default(uuid()) @map("id")
+  email      String   @unique @map("email")
+  password   String   @map("password")
+  firstName  String   @map("first_name")
+  middleName String?  @map("middle_name")
+  lastName   String   @map("last_name")
+  phone      String   @map("phone")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  addresses Address[]
+  orders    Order[]
+  cartItems CartItem[]
+}
+
+model Address {
+  id        String   @id @default(uuid()) @map("id")
+  userId    String   @map("user_id")
+  houseNo   String?  @map("house_no")
+  roadNo    String?  @map("road_no")
+  address   String   @map("address")
+  city      String   @map("city")
+  postal    String?  @map("postal")
+  country   String   @map("country")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  Order Order[]
+  user  User    @relation(fields: [userId], references: [id])
+}
+
+model Category {
+  id        String            @id @default(uuid()) @map("id")
+  slug      String            @unique @map("slug")
+  name      String            @unique @map("name")
+  status    Status            @default(ACTIVE) @map("status")
+  isPopular Boolean           @default(false) @map("is_popular")
+  createdAt DateTime          @default(now()) @map("created_at")
+  updatedAt DateTime          @updatedAt @map("updated_at")
+  products  ProductCategory[]
+}
+
+model Brand {
+  id        String         @id @default(uuid()) @map("id")
+  slug      String         @unique @map("slug")
+  name      String         @unique @map("name")
+  status    Status         @default(ACTIVE) @map("status")
+  isPopular Boolean        @default(false) @map("is_popular")
+  createdAt DateTime       @default(now()) @map("created_at")
+  updatedAt DateTime       @updatedAt @map("updated_at")
+  products  ProductBrand[]
+}
+
+model Product {
+  id                 String        @id @default(uuid()) @map("id")
+  slug               String        @unique @map("slug")
+  name               String        @map("name")
+  isPopular          Boolean       @default(false) @map("is_popular")
+  createdAt          DateTime      @default(now()) @map("created_at")
+  updatedAt          DateTime      @updatedAt @map("updated_at")
+  description        String?       @map("description")
+  priceCents         Int           @map("price_cents")
+  discountCents      Int           @default(0) @map("discount_cents")
+  discountPercentage Int           @default(0) @map("discount_percentage")
+  imageUrl           String?       @map("image_url")
+  stock              Int           @default(0) @map("stock")
+  status             ProductStatus @default(PREORDER) @map("status")
+
+  categories ProductCategory[]
+  brands     ProductBrand[]
+  cartItems  CartItem[]
+  orderItems OrderItem[]
+  //ADD validators for price_cents, discount_cents, discount_percentage, stock must be greater than 0 and discount_percentage must be less than or equal to 100
+}
+
+model ProductCategory {
+  productId  String @map("product_id")
+  categoryId String @map("category_id")
+
+  product  Product  @relation(fields: [productId], references: [id])
+  category Category @relation(fields: [categoryId], references: [id])
+
+  @@id([productId, categoryId])
+}
+
+model ProductBrand {
+  productId String  @map("product_id")
+  brandId   String  @map("brand_id")
+  product   Product @relation(fields: [productId], references: [id])
+  brand     Brand   @relation(fields: [brandId], references: [id])
+
+  @@id([productId, brandId])
+}
+
+model CartItem {
+  userId    String   @map("user_id")
+  productId String   @map("product_id")
+  quantity  Int      @default(1) @map("quantity") // should be more than 0
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user    User    @relation(fields: [userId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+
+  @@id([userId, productId])
+}
+
+model Order {
+  id         String      @id @default(uuid()) @map("id")
+  userId     String      @map("user_id")
+  status     OrderStatus @default(PENDING) @map("status")
+  addressId  String      @map("address_id")
+  totalCents Int         @map("total_cents") // should not be less than 0
+  createdAt  DateTime    @default(now()) @map("created_at")
+  updatedAt  DateTime    @updatedAt @map("updated_at")
+
+  user    User        @relation(fields: [userId], references: [id])
+  address Address     @relation(fields: [addressId], references: [id])
+  items   OrderItem[]
+  payment Payment[] // Could be multiple payments for one order, e.g. multiple payment methods, multiple attempts
+}
+
+model OrderItem {
+  orderId    String @map("order_id")
+  productId  String @map("product_id")
+  quantity   Int    @map("quantity") // should be more than 0
+  priceCents Int    @map("price_cents") // should not be less than 0
+
+  order   Order   @relation(fields: [orderId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+
+  @@id([orderId, productId])
+}
+
+model Payment {
+  id            String        @id @default(uuid()) @map("id")
+  orderId       String        @map("order_id")
+  status        PaymentStatus @default(PENDING) @map("status")
+  transactionId String?       @unique @map("transaction_id") //Should enforce check if payment type cash on delivery, then transaction id should be null, else its not null
+  amountCents   Int           @map("amount_cents")
+  type          PaymentType   @map("type")
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  order Order @relation(fields: [orderId], references: [id])
+}
+
+enum OrderStatus {
+  PENDING
+  SHIPPED
+  COMPLETED
+  CANCELED
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+enum Status {
+  ACTIVE
+  INACTIVE
+  ARCHIVED //soft delete
+}
+
+enum ProductStatus {
+  INACTIVE
+  ARCHIVED
+  IN_STOCK
+  OUT_OF_STOCK
+  PREORDER
+  DISCONTINUED
+}
+
+enum PaymentType {
+  CASH_ON_DELIVERY
+  BKASH
+  NAGAD
+  SSL_COMMERCE
+  CARD
+}

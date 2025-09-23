@@ -26,8 +26,8 @@ export default function AuthForm({
   const isLogin = type === 'login';
 
   return (
-    <div className="flex justify-center items-center mt-10 sm:mt-20">
-      <Card className="w-full max-w-sm rounded-none">
+    <div className="flex justify-center items-center my-10 md:my-20">
+      <Card className="w-full max-w-sm ">
         <CardHeader className="text-center">
           <CardTitle>{isLogin ? 'Login to your account' : 'Create an account'}</CardTitle>
           <CardDescription>

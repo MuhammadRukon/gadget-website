@@ -13,7 +13,7 @@ export function Footer(): JSX.Element {
               <p>
                 <span>Phone:</span>
                 <br />
-                <a href="mailto:muhammad.rukon242@gmail.com">+01815780053</a>
+                <a href="whatsapp://send?phone=+8801815780053">+01815780053</a>
               </p>
               <p>
                 <span>Email:</span>
@@ -26,7 +26,7 @@ export function Footer(): JSX.Element {
             <h4>About Us</h4>
             <ul className="flex flex-wrap justify-center [&>li]:pr-5 list-disc md:list-none md:grid grid-cols-2 xl:grid-cols-3 gap-2 md:gap-5">
               {[
-                ['EMI Terms', '/'],
+                // ['EMI Terms', '/'],
                 ['About Us', '/'],
                 ['Online Delivery', '/'],
                 ['Privacy Policy', '/'],

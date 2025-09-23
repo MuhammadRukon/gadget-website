@@ -87,7 +87,7 @@ Header.Search = function HeaderSearch({ search, setSearch }: HeaderSearchProps):
         placeholder="Search"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        className="dark:placeholder:text-white w-full h-7 placeholder:text-sm text-sm max-w-sm rounded-none"
+        className="dark:placeholder:text-white w-full h-7 placeholder:text-sm text-sm max-w-sm "
       />
     </div>
   );
