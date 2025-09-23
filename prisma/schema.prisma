@@ -44,6 +44,8 @@ model Address {
 
   Order Order[]
   user  User    @relation(fields: [userId], references: [id])
+
+  @@index([userId])
 }
 
 model Category {
@@ -55,6 +57,8 @@ model Category {
   createdAt DateTime          @default(now()) @map("created_at")
   updatedAt DateTime          @updatedAt @map("updated_at")
   products  ProductCategory[]
+
+  @@index([slug, name])
 }
 
 model Brand {
@@ -66,6 +70,8 @@ model Brand {
   createdAt DateTime       @default(now()) @map("created_at")
   updatedAt DateTime       @updatedAt @map("updated_at")
   products  ProductBrand[]
+
+  @@index([slug, name])
 }
 
 model Product {
@@ -88,6 +94,8 @@ model Product {
   cartItems  CartItem[]
   orderItems OrderItem[]
   //ADD validators for price_cents, discount_cents, discount_percentage, stock must be greater than 0 and discount_percentage must be less than or equal to 100
+
+  @@index([slug, name])
 }
 
 model ProductCategory {
@@ -135,6 +143,8 @@ model Order {
   address Address     @relation(fields: [addressId], references: [id])
   items   OrderItem[]
   payment Payment[] // Could be multiple payments for one order, e.g. multiple payment methods, multiple attempts
+
+  @@index([userId, addressId])
 }
 
 model OrderItem {
@@ -160,6 +170,8 @@ model Payment {
   updatedAt     DateTime      @updatedAt @map("updated_at")
 
   order Order @relation(fields: [orderId], references: [id])
+
+  @@index([orderId, id])
 }
 
 enum OrderStatus {
