@@ -13,6 +13,9 @@ const eslintConfig = [
   ...compat.extends('next/core-web-vitals', 'next/typescript'),
   {
     ignores: ['src/generated/**/*'], // ignores all files recursively in the generated folder
+    rules: {
+      'react/no-display-name': 'off',
+    },
   },
 ];
 

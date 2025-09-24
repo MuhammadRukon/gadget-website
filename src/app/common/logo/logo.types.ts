@@ -1,5 +1,5 @@
 export type LogoProps = {
-  src: string;
+  src?: string;
   alt?: string;
   width?: number;
   height?: number;
