@@ -4,13 +4,16 @@ A simple e-commerce MVP for gadgets. Built to demonstrate end-to-end product cat
 
 ### 1. Tech Stack
 
-- Next.js (Full Stack) + TypeScript
-- Styling: Tailwind CSS + Shadcn UI
-- Database & ORM: PostgreSQL + Prisma
-- Auth: NextAuth.js & OAuth
-- Version Control: Git & Github
-- Testing: Vitest
-- Deployment: Vercel
+- **Framework:** Next.js (Full Stack) + TypeScript
+- **Styling:** Tailwind CSS + Shadcn UI
+- **Database & ORM:** PostgreSQL + Prisma
+- **Auth:** NextAuth.js & OAuth
+- **State Management:** Zustand
+- **Version Control:** Git & Github
+- **Testing:** Vitest
+- **Form & Validation:** React Hook Form & Zod
+- **Others:** TanStack Query
+- **Deployment:** Vercel
 
 ### 2. Features (MVP)
 
@@ -51,8 +54,20 @@ A simple e-commerce MVP for gadgets. Built to demonstrate end-to-end product cat
 - Testing: Unit tests for business logic, integration tests for API endpoints, minimal UI tests.
 - Deployment: Hosted frontend + backend on Vercel, database on managed PostgreSQL
 
-6. Future Improvements
+### 6. Future Improvements
 
 - Analytics
 - Discount/coupon system
 - Warranty
+
+### 7. Folder Structure:
+
+```text
+src/
+  app/                # routes
+  (public)/           # All user facing routes
+  (dashboard)/        # All dashboard related routes
+  hooks/              # custom hooks
+  stores/             # zustand stores
+  actions/            # api service layer
+```
