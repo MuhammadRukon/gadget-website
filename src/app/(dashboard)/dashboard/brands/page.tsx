@@ -17,7 +17,6 @@ import { useForm } from 'react-hook-form';
 import z from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@/components/ui/button';
-import { Status } from '@/generated/prisma';
 import {
   Select,
   SelectContent,
@@ -25,6 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Status } from '@/enums';
 
 export default function Page() {
   const [showModal, setShowModal] = useState<boolean>(false);
