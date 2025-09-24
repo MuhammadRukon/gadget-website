@@ -1,7 +1,7 @@
 import { Carousel, CarouselContent, CarouselItem } from '@/components/ui/carousel';
 import Image from 'next/image';
 
-export default function Home() {
+export default function HomePage() {
   return (
     <div>
       <Carousel opts={{ loop: true }}>
