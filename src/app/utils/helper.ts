@@ -14,3 +14,7 @@ export const uppercase = (text: string, forAll: boolean = false): string => {
   }
   return textArray.join(' ');
 };
+
+export function slugify(value: string) {
+  return value.trim().replace(/\s+/g, '-');
+}

@@ -1,4 +1,4 @@
-import { IMenu } from '../interface';
+import { IMenu } from '@/interfaces';
 
 export const menu: IMenu[] = [
   {

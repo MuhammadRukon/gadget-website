@@ -1,3 +1,3 @@
-import { IMenu } from '@/app/interface';
+import { IMenu } from '@/interfaces';
 
 export type MenuItemProps = { category: IMenu };
