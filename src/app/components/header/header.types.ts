@@ -1,4 +1,4 @@
-import { IHeaderButton } from '@/app/interface';
+import { IHeaderButton } from '@/interfaces';
 
 export type HeaderSearchProps = {
   search: string;

@@ -4,7 +4,7 @@ import { Handshake, Percent, User } from 'lucide-react';
 import { JSX, useEffect, useState } from 'react';
 
 import { HeaderButtonsProps, HeaderSearchProps } from './header.types';
-import { IHeaderButton } from '@/app/interface';
+import { IHeaderButton } from '@/interfaces';
 
 import { HeaderButton } from '@/app/common/button/header-button';
 import { Container } from '@/app/components/container/container';

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 
-import { IBrand, IMenu } from '@/app/interface';
+import { IBrand, IMenu } from '@/interfaces';
 
 import {
   NavigationMenu,

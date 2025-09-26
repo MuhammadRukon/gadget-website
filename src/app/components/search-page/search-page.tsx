@@ -8,8 +8,9 @@ import { RANGE_MAX, RANGE_MIN, RANGE_STEP } from '@/app/constants';
 import { Range } from '../range/range';
 import { FilterLayout } from '../layout/filter-layout';
 import { CustomCheckbox } from '@/app/common/custom-checkbox/custom-checkbox';
-import { Availability } from '@/app/enums';
+
 import { removeOccur, uppercase } from '@/app/utils/helper';
+import { availabilityOptions } from '@/constants';
 
 export default function SearchPage({ category, brand }: { category: string; brand?: string }) {
   const breadcrumbItems = [{ label: 'Home', href: '/' }];
@@ -23,12 +24,6 @@ export default function SearchPage({ category, brand }: { category: string; bran
   const [priceRange, setPriceRange] = useState([RANGE_MIN, RANGE_MAX]);
 
   const [availability, setAvailability] = useState<string[]>([]);
-
-  const availabilityOptions = [
-    { id: Availability.IN_STOCK, label: Availability.IN_STOCK },
-    { id: Availability.UPCOMING, label: Availability.UPCOMING },
-    { id: Availability.PRE_ORDER, label: Availability.PRE_ORDER },
-  ];
 
   return (
     <>

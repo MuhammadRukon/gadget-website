@@ -5,16 +5,14 @@ import { Header } from '../components/header/header';
 
 export default function PublicLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body>
-        <Header />
-        <Container>
-          <main>
-            <SectionContainer>{children}</SectionContainer>
-          </main>
-        </Container>
-        <Footer />
-      </body>
-    </html>
+    <>
+      <Header />
+      <Container>
+        <main>
+          <SectionContainer>{children}</SectionContainer>
+        </main>
+      </Container>
+      <Footer />
+    </>
   );
 }
