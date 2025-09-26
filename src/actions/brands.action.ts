@@ -1,4 +1,4 @@
-import { Brand } from '@prisma/client';
+import type { Brand } from '@prisma/client';
 import { IBrandCreateEntity } from '@/interfaces';
 
 export const BrandsAction = {

@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { brandQueryKey } from './useBrand.query';
 import { BrandsAction } from '@/actions/brands.action';
-import { Brand } from '@prisma/client';
+import type { Brand } from '@prisma/client';
 import { IBrandCreateEntity } from '@/interfaces';
 
 export const useBrandMutation = () => {
