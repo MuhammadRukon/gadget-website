@@ -6,7 +6,6 @@
 
 generator client {
   provider = "prisma-client-js"
-  output   = "../src/generated/prisma"
 }
 
 datasource db {
@@ -62,14 +61,15 @@ model Category {
 }
 
 model Brand {
-  id        String         @id @default(uuid()) @map("id")
-  slug      String         @unique @map("slug")
-  name      String         @unique @map("name")
-  status    Status         @default(ACTIVE) @map("status")
-  isPopular Boolean        @default(false) @map("is_popular")
-  createdAt DateTime       @default(now()) @map("created_at")
-  updatedAt DateTime       @updatedAt @map("updated_at")
-  products  ProductBrand[]
+  id        String    @id @default(uuid()) @map("id")
+  slug      String    @unique @map("slug")
+  name      String    @unique @map("name")
+  status    Status    @default(ACTIVE) @map("status")
+  isPopular Boolean   @default(false) @map("is_popular")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  imageUrl  String    @map("image_url")
+  Product   Product[]
 
   @@index([slug, name])
 }
@@ -88,9 +88,10 @@ model Product {
   imageUrl           String?       @map("image_url")
   stock              Int           @default(0) @map("stock")
   status             ProductStatus @default(PREORDER) @map("status")
+  brandId            String        @map("brand_id")
 
+  brand      Brand             @relation(fields: [brandId], references: [id])
   categories ProductCategory[]
-  brands     ProductBrand[]
   cartItems  CartItem[]
   orderItems OrderItem[]
   //ADD validators for price_cents, discount_cents, discount_percentage, stock must be greater than 0 and discount_percentage must be less than or equal to 100
@@ -106,15 +107,6 @@ model ProductCategory {
   category Category @relation(fields: [categoryId], references: [id])
 
   @@id([productId, categoryId])
-}
-
-model ProductBrand {
-  productId String  @map("product_id")
-  brandId   String  @map("brand_id")
-  product   Product @relation(fields: [productId], references: [id])
-  brand     Brand   @relation(fields: [brandId], references: [id])
-
-  @@id([productId, brandId])
 }
 
 model CartItem {

@@ -1,5 +1,6 @@
-import { Carousel, CarouselContent, CarouselItem } from '@/components/ui/carousel';
 import Image from 'next/image';
+
+import { Carousel, CarouselContent, CarouselItem } from '@/components/ui/carousel';
 
 export default function HomePage() {
   return (
