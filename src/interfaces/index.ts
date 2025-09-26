@@ -1,5 +1,5 @@
 import { ReactNode } from 'react';
-import { Status, ProductStatus, Brand } from '@prisma/client';
+import { ProductStatus, Brand } from '@prisma/client';
 export type Theme = 'light' | 'dark';
 
 export interface IBaseEntity {
@@ -14,7 +14,7 @@ export interface IBaseNamedEntity extends IBaseEntity {
   slug: string;
 }
 
-//Remove this IBrand interface
+//TODO:Remove this IBrand interface
 export interface IBrand {
   id: string;
   name: string;
@@ -23,8 +23,13 @@ export interface IBrand {
   isPopular: boolean;
 }
 
-export interface ICategory extends IBaseNamedEntity {
-  status: Status;
+//TODO:Remove this ICategory interface
+export interface ICategory {
+  id: string;
+  name: string;
+  isActive: boolean;
+  isDeleted: boolean;
+  isPopular: boolean;
 }
 
 export interface IProduct extends IBaseNamedEntity {
@@ -38,7 +43,8 @@ export interface IProduct extends IBaseNamedEntity {
 }
 
 export interface IMenu extends ICategory {
-  brands: Brand[];
+  //TODO: Remove this IBrand interface and import from @prisma/client
+  brands: IBrand[];
 }
 
 export interface IHeaderButton {
