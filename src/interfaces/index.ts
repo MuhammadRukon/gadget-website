@@ -14,6 +14,15 @@ export interface IBaseNamedEntity extends IBaseEntity {
   slug: string;
 }
 
+//Remove this IBrand interface
+export interface IBrand {
+  id: string;
+  name: string;
+  isActive: boolean;
+  isDeleted: boolean;
+  isPopular: boolean;
+}
+
 export interface ICategory extends IBaseNamedEntity {
   status: Status;
 }
