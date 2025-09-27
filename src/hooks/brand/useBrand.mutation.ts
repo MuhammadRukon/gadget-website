@@ -1,38 +1,40 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
-import { brandQueryKey } from './useBrand.query';
-import { BrandsAction } from '@/actions/brands.action';
-import type { Brand } from '@prisma/client';
-import { IBrandCreateEntity } from '@/interfaces';
+import { BrandAction } from '@/actions/brand.action';
+
+import { IBrandCreateOrUpdateEntity } from '@/interfaces';
+import { brandQueryKey } from '@/constants/queryKeys';
+import { toast } from 'sonner';
 
 export const useBrandMutation = () => {
   const queryClient = useQueryClient();
 
-  function invalidateQueries() {
+  function invalidateQuery() {
     queryClient.invalidateQueries({ queryKey: brandQueryKey });
   }
 
   const createBrand = useMutation({
-    mutationFn: ({ brand }: { brand: IBrandCreateEntity }) => BrandsAction.create(brand),
-    onSuccess: () => alert('Brand created successfully'),
-    onError: () => alert('Error creating brand'),
-    onSettled: invalidateQueries,
+    mutationFn: ({ brand }: { brand: IBrandCreateOrUpdateEntity }) => BrandAction.create(brand),
+    // onMutate: () => {}, TODO: implement optimistic update
+    onSuccess: () => toast.success('Brand created successfully'),
+    onError: () => toast.error('Error creating brand'),
+    onSettled: invalidateQuery,
   });
 
   const updateBrand = useMutation({
-    mutationFn: ({ id, payload }: { id: string; payload: Brand }) => {
-      return BrandsAction.update(id, payload);
+    mutationFn: ({ id, payload }: { id: string; payload: IBrandCreateOrUpdateEntity }) => {
+      return BrandAction.update(id, payload);
     },
-    onSuccess: () => alert('Brand updated successfully'),
-    onError: () => alert('Error updating brand'),
-    onSettled: invalidateQueries,
+    onSuccess: () => toast.success('Brand updated successfully'),
+    onError: () => toast.error('Error updating brand'),
+    onSettled: invalidateQuery,
   });
 
   const removeBrand = useMutation({
-    mutationFn: (id: string) => BrandsAction.remove(id),
-    onSuccess: () => alert('Brand removed successfully'),
-    onError: () => alert('Error removing brand'),
-    onSettled: invalidateQueries,
+    mutationFn: (id: string) => BrandAction.remove(id),
+    onSuccess: () => toast.success('Brand removed successfully'),
+    onError: () => toast.error('Error removing brand'),
+    onSettled: invalidateQuery,
   });
 
   return {

@@ -3,6 +3,7 @@
 import { AppSidebar } from '@/components/app-sidebar';
 import { SiteHeader } from '@/components/site-header';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
+import { Toaster } from '@/components/ui/sonner';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 export default function PublicLayout({ children }: { children: React.ReactNode }) {
@@ -23,6 +24,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
           <SidebarInset>
             <SiteHeader />
             <div className="p-4 md:p-6 flex-1">{children}</div>
+            <Toaster duration={2000} />
           </SidebarInset>
         </SidebarProvider>
       </QueryClientProvider>
