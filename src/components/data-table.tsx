@@ -2,15 +2,11 @@
 
 import * as React from 'react';
 import {
-  IconArchiveFilled,
   IconChevronDown,
   IconChevronLeft,
   IconChevronRight,
   IconChevronsLeft,
   IconChevronsRight,
-  IconCircleCheckFilled,
-  IconCircleXFilled,
-  IconDotsVertical,
   IconLayoutColumns,
 } from '@tabler/icons-react';
 import {
@@ -23,16 +19,12 @@ import {
   useReactTable,
   VisibilityState,
 } from '@tanstack/react-table';
-import { z } from 'zod';
 
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Label } from '@/components/ui/label';
@@ -52,122 +44,25 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { PlusIcon } from 'lucide-react';
-import { Status } from '@prisma/client';
-import Image from 'next/image';
 
-interface DataTableProps {
-  data: z.infer<typeof schema>[];
-  OpenModal: () => void;
-  AddButtonText?: string;
+// Base entity type that all table data should extend
+export interface BaseEntity {
+  id: string;
 }
 
-export const schema = z.object({
-  id: z.string(),
-  slug: z.string(),
-  imageUrl: z.string(),
-  name: z.string(),
-  isPopular: z.boolean(),
-  status: z.enum(Status),
-  createdAt: z.date(),
-  updatedAt: z.date(),
-});
+interface DataTableProps<T extends BaseEntity> {
+  data: T[];
+  OpenModal: (id?: string) => void;
+  AddButtonText?: string;
+  columns: ColumnDef<T, unknown>[]; // second generic is cell value
+}
 
-const columns: ColumnDef<z.infer<typeof schema>>[] = [
-  {
-    accessorKey: 'imageUrl',
-    header: 'Image URL',
-    cell: ({ row }) => (
-      <div className="w-20 h-10">
-        <Image src={row.original.imageUrl} alt={row.original.name} width={100} height={100} />
-      </div>
-    ),
-  },
-  {
-    accessorKey: 'name',
-    header: 'Name (with slug)',
-    cell: ({ row }) => {
-      return (
-        <p className="flex flex-col gap-1">
-          <span>{row.original.name}</span>
-          <span className="text-muted-foreground">{row.original.slug}</span>
-        </p>
-      );
-    },
-    enableHiding: false,
-  },
-  {
-    accessorKey: 'isPopular',
-    header: 'Is Popular',
-    cell: ({ row }) => {
-      return (
-        <span className="text-foreground">
-          <Badge variant="outline" className="text-muted-foreground px-1.5">
-            {row.original.isPopular ? 'Yes' : 'No'}
-          </Badge>
-        </span>
-      );
-    },
-    enableHiding: false,
-  },
-  {
-    accessorKey: 'status',
-    header: 'Status',
-    cell: ({ row }) => (
-      <Badge variant="outline" className="text-muted-foreground px-1.5">
-        {row.original.status === Status.ACTIVE ? (
-          <IconCircleCheckFilled className="fill-green-500 dark:fill-green-400" />
-        ) : row.original.status === Status.INACTIVE ? (
-          <IconCircleXFilled className="fill-red-500 dark:fill-red-400" />
-        ) : (
-          <IconArchiveFilled className="fill-gray-500 dark:fill-gray-400" />
-        )}
-        {row.original.status}
-      </Badge>
-    ),
-  },
-  {
-    accessorKey: 'createdAt',
-    header: 'Created At',
-    cell: ({ row }) => (
-      <Badge variant="outline" className="text-muted-foreground px-1.5">
-        {new Date(row.original.createdAt).toLocaleDateString()}
-      </Badge>
-    ),
-  },
-  {
-    accessorKey: 'updatedAt',
-    header: 'Updated At',
-    cell: ({ row }) => (
-      <Badge variant="outline" className="text-muted-foreground px-1.5">
-        {new Date(row.original.updatedAt).toLocaleDateString()}
-      </Badge>
-    ),
-  },
-  {
-    id: 'actions',
-    cell: () => (
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            className="data-[state=open]:bg-muted text-muted-foreground flex size-8"
-            size="icon"
-          >
-            <IconDotsVertical />
-            <span className="sr-only">Open menu</span>
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-32">
-          <DropdownMenuItem>Edit</DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem variant="destructive">Delete</DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    ),
-  },
-];
-
-export function DataTable({ data, OpenModal, AddButtonText }: DataTableProps) {
+export function DataTable<T extends BaseEntity>({
+  data,
+  OpenModal,
+  AddButtonText,
+  columns,
+}: DataTableProps<T>) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [pagination, setPagination] = React.useState({
     pageIndex: 0,
@@ -224,7 +119,7 @@ export function DataTable({ data, OpenModal, AddButtonText }: DataTableProps) {
         </DropdownMenu>
 
         {AddButtonText && (
-          <Button onClick={OpenModal} variant="outline" size="sm">
+          <Button onClick={() => OpenModal()} variant="outline" size="sm">
             <PlusIcon /> {AddButtonText}
           </Button>
         )}

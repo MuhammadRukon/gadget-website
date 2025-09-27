@@ -53,4 +53,7 @@ export interface IHeaderButton {
   icon?: string | ReactNode;
 }
 
-export type IBrandCreateEntity = Omit<Brand, 'id' | 'createdAt' | 'updatedAt' | 'isPopular'>;
+export type IBrandCreateOrUpdateEntity = Omit<
+  Brand,
+  'id' | 'createdAt' | 'updatedAt' | 'isPopular'
+>;

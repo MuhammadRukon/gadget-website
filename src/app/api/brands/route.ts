@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { IBrandCreateEntity } from '@/interfaces';
+import { IBrandCreateOrUpdateEntity } from '@/interfaces';
 import { prisma } from '@/lib/prisma';
 import { Brand, Prisma, Status } from '@prisma/client';
 import { NextResponse } from 'next/server';
@@ -19,7 +19,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const body: IBrandCreateEntity = await request.json();
+  const body: IBrandCreateOrUpdateEntity = await request.json();
 
   const BrandSchema = z.object({
     name: z.string(),
@@ -62,5 +62,7 @@ export async function POST(request: Request) {
 }
 
 async function getBrands(): Promise<Brand[]> {
-  return prisma.brand.findMany();
+  return await prisma.brand.findMany({
+    orderBy: { createdAt: 'desc' },
+  });
 }

@@ -10,7 +10,7 @@ A simple e-commerce MVP for gadgets. Built to demonstrate end-to-end product cat
 - **Auth:** NextAuth.js & OAuth
 - **State Management:** Zustand
 - **Version Control:** Git & Github
-- **Testing:** Vitest
+- **Testing:** Vitest & React Testing Library
 - **Form & Validation:** React Hook Form & Zod
 - **Others:** TanStack Query
 - **Deployment:** Vercel
@@ -33,16 +33,16 @@ A simple e-commerce MVP for gadgets. Built to demonstrate end-to-end product cat
 
 #### Relations:
 
-- Users ↔ Orders (1:N)
-- Orders ↔ Products (via OrderItems M:N)
-- Categories ↔ Products (via ProductCategory) (M:N)
-- Brands ↔ Products (via ProductBrand) (M:N)
-- Users ↔ CartItems (1:N)
+- Users -> Orders (1:N)
+- Orders <-> Products (via OrderItems M:N)
+- Categories <-> Products (via ProductCategory) (M:N)
+- Brands -> Products (via ProductBrand) (1:N)
+- Users -> CartItems (1:N)
 
 ### 5. Development Approach
 
 - Planning: Defined MVP scope (features above)
-- Design: Created ERD + database schema
+- Design: Created ERD + database schema + Low Fidelity Wireframe
 - Development (TDD): Feature/Module wise (API -> UI -> Integration)
 - Version Control Management: GitHub Flow with feature branches, PR review, and merge dev to main
 
@@ -52,7 +52,51 @@ A simple e-commerce MVP for gadgets. Built to demonstrate end-to-end product cat
 - API routes (products, cart, checkout)
 - UI with Tailwind + Shadcn
 - Testing: Unit tests for business logic, integration tests for API endpoints, minimal UI tests.
-- Deployment: Hosted frontend + backend on Vercel, database on managed PostgreSQL
+- Deployment: Hosted frontend + backend on Vercel, database on managed PostgreSQL. Only the `main` branch is deployed.
+
+#### Git Flow:
+
+##### Branches:
+
+- **`main`** → Production branch. Always stable. Automatically deployed.
+- **`dev`** → Integration branch. Used to validate features before merging to production `main`.
+- **`feature/*`** → Feature/module branches created from `main`.
+
+##### Workflow:
+
+**Create a feature branch**
+
+```bash
+git switch main
+git pull origin main
+git checkout -b feature/<feature-name>
+```
+
+**Keep feature branch synced**
+
+```bash
+git checkout feature/<feature-name>
+git fetch origin
+git merge origin/main
+```
+
+**Open PR -> dev**
+
+- After feature/module is complete, open a Pull Request from your feature/\* branch into dev.
+- Validate on dev
+- Code review and QA happen in dev.
+- Fixed code is merged into dev
+- Once dev is stable, open a Pull Request from dev into main. This merges tested features into production.
+
+**Fix Issue**
+
+```bash
+git switch dev
+git pull origin dev
+git checkout -b feature/<feature-name>/hotfix
+```
+
+- Create a pull request to dev after fix.
 
 ### 6. Future Improvements
 
@@ -64,10 +108,10 @@ A simple e-commerce MVP for gadgets. Built to demonstrate end-to-end product cat
 
 ```text
 src/
-  app/                # routes
-  (public)/           # All user facing routes
-  (dashboard)/        # All dashboard related routes
-  hooks/              # custom hooks
-  stores/             # zustand stores
-  actions/            # api service layer
+    app/                # routes
+    (public)/           # All user facing routes
+    (dashboard)/        # All dashboard related routes
+    hooks/              # custom hooks
+    stores/             # zustand stores
+    actions/            # api service layer
 ```
