@@ -73,7 +73,7 @@ export function Footer(): JSX.Element {
       <hr />
 
       <p className="text-xs sm:text-sm text-center py-2 sm:py-3">
-        © {new Date().getFullYear()} Tecnologia Ltd | All rights reserved.
+        © 2025 Tecnologia Ltd | All rights reserved.
       </p>
     </footer>
   );

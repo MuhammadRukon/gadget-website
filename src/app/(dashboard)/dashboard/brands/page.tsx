@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import z from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -8,6 +8,9 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { StatusOptions } from '@/constants';
 
 import { slugify } from '@/app/utils/helper';
+
+import { useBrandMutation } from '@/hooks/brand/useBrand.mutation';
+import { useBrandStore } from '@/stores/useBrand.store';
 
 import { DataTable } from '@/components/data-table';
 import { Modal } from '@/app/components/modal/modal';
@@ -23,74 +26,113 @@ import {
 import { Button } from '@/components/ui/button';
 import SelectAtom from '@/app/components/select/select';
 import { useBrandQuery } from '@/hooks/brand/useBrand.query';
-import { Brand, Status } from '@prisma/client';
-import { useBrandMutation } from '@/hooks/brand/useBrand.mutation';
+import { ImageUpload } from '@/components/ui/image-upload';
+import { Alert } from '@/app/components/alert/alert';
+import { columns } from './table';
+import { brandFormSchema, defaultBrandFormValues } from '@/shared/schemas/brand-form';
 
 export default function Page() {
-  const [showModal, setShowModal] = useState<boolean>(false);
-
-  //TODO: get brands from zustand store instead of hook.
+  const { brands, setEditBrand, editBrand } = useBrandStore();
+  // NOTE: this is used to refetch the brands data when the page is mounted.
+  //eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { getBrands } = useBrandQuery();
-  const [brands, setBrands] = useState<Brand[]>([]);
-  useEffect(() => {
-    const fetchBrands = async () => {
-      try {
-        const res = getBrands.data;
-        if (!res) return;
-        setBrands(res || []);
-      } catch (error) {
-        console.error(error);
-      }
-    };
-    fetchBrands();
-  }, [getBrands]);
-  //
+  const { createBrand, updateBrand, removeBrand } = useBrandMutation();
 
-  const { createBrand } = useBrandMutation();
+  const form = useForm<z.infer<typeof brandFormSchema>>({
+    resolver: zodResolver(brandFormSchema),
+    defaultValues: defaultBrandFormValues,
+  });
 
-  function OpenModal() {
+  const [showModal, setShowModal] = useState<boolean>(false);
+  const [showDeleteAlert, setShowDeleteAlert] = useState<boolean>(false);
+  const [brandToDelete, setBrandToDelete] = useState<{ id: string; name: string } | null>(null);
+
+  function OpenModal(id?: string) {
+    if (id) {
+      //NOTE: Brands are limited comparatively very less. so can avoid an api call for now.
+      const brandToEdit = brands.find((b) => b.id === id);
+      if (!brandToEdit) return;
+
+      form.reset(brandToEdit);
+      setEditBrand(brandToEdit);
+    } else {
+      form.reset(defaultBrandFormValues);
+    }
+
     setShowModal(true);
   }
 
   function closeModal() {
     setShowModal(false);
-    form.reset();
+    if (editBrand != null) {
+      setEditBrand(null);
+    }
+    form.reset(defaultBrandFormValues);
   }
 
-  const formSchema = z.object({
-    name: z.string().min(2).max(50),
-    slug: z.string().min(2).max(50),
-    status: z.enum(Status),
-    imageUrl: z.string(),
-  });
-
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      name: '',
-      slug: '',
-      status: Status.ACTIVE,
-    },
-  });
-
-  async function onSubmit(values: z.infer<typeof formSchema>) {
-    //TODO: this is workaround to avoid image upload.
+  async function onSubmit(values: z.infer<typeof brandFormSchema>) {
+    // console.log('values', values);
+    // TODO: this is workaround to avoid image upload.
     //      Implement image upload later.
     values.imageUrl = '/banner.webp';
-    const response = await createBrand.mutateAsync({ brand: values });
+
+    let response: Response;
+    if (editBrand != null) {
+      response = await updateBrand.mutateAsync({
+        id: editBrand.id,
+        payload: {
+          imageUrl: values.imageUrl,
+          name: values.name,
+          slug: values.slug,
+          status: values.status,
+        },
+      });
+    } else {
+      response = await createBrand.mutateAsync({ brand: values });
+    }
 
     if (response.ok) {
       closeModal();
     }
   }
 
+  function handleDelete(id: string) {
+    const brand = brands.find((b) => b.id === id);
+    if (brand) {
+      setBrandToDelete({ id: brand.id, name: brand.name });
+      setShowDeleteAlert(true);
+    }
+  }
+
+  async function confirmDelete() {
+    if (!brandToDelete) return;
+
+    try {
+      await removeBrand.mutateAsync(brandToDelete.id);
+      setShowDeleteAlert(false);
+      setBrandToDelete(null);
+    } catch (error) {
+      console.error('Failed to delete brand:', error);
+    }
+  }
+
+  function cancelDelete() {
+    setShowDeleteAlert(false);
+    setBrandToDelete(null);
+  }
+
   return (
     <>
       {brands?.length > 0 && (
-        <DataTable OpenModal={OpenModal} data={brands} AddButtonText="Add Brand" />
+        <DataTable
+          OpenModal={OpenModal}
+          data={brands}
+          AddButtonText="Add Brand"
+          columns={columns(OpenModal, handleDelete)}
+        />
       )}
       <Modal
-        title="Add Brand"
+        title={editBrand != null ? 'Edit Brand' : 'Add Brand'}
         isOpen={showModal}
         onChange={(bool) => {
           if (!bool) closeModal();
@@ -148,19 +190,34 @@ export default function Page() {
               control={form.control}
               name="imageUrl"
               render={({ field }) => (
-                <FormItem className="flex flex-row items-center space-x-3 space-y-0">
-                  <FormLabel className="m-0">Image URL</FormLabel>
+                <FormItem>
                   <FormControl>
-                    <Input id="picture" type="file" {...field} />
+                    <ImageUpload
+                      value={field.value}
+                      onChange={field.onChange}
+                      label="Brand Image"
+                      maxSize={5}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
-            <Button type="submit">Add Brand</Button>
+            <Button type="submit"> {editBrand != null ? 'Edit Brand' : 'Add Brand'}</Button>
           </form>
         </Form>
       </Modal>
+      {/* NOTE: Delete should be done by super admin only */}
+      <Alert
+        onConfirm={confirmDelete}
+        open={showDeleteAlert}
+        setOpen={cancelDelete}
+        title="Delete Brand"
+        description={`Are you sure you want to delete "${brandToDelete?.name}"? This action cannot be undone and will remove the brand from your system.`}
+        confirmText="Delete Brand"
+        cancelText="Cancel"
+        isLoading={removeBrand.isPending}
+      />
     </>
   );
 }

@@ -1,9 +1,8 @@
-import { z } from 'zod';
-import { IBrandCreateEntity } from '@/interfaces';
 import { prisma } from '@/lib/prisma';
-import { Brand, Prisma, Status } from '@prisma/client';
+import { Brand, Prisma } from '@prisma/client';
 import { NextResponse } from 'next/server';
 import { ResponseStatus } from '@/enums';
+import { brandFormSchema } from '@/shared/schemas/brand-form';
 
 export async function GET() {
   try {
@@ -19,16 +18,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const body: IBrandCreateEntity = await request.json();
+  const body: unknown = await request.json();
 
-  const BrandSchema = z.object({
-    name: z.string(),
-    slug: z.string(),
-    status: z.enum(Status),
-    imageUrl: z.string(),
-  });
-
-  const parsed = BrandSchema.safeParse(body);
+  const parsed = brandFormSchema.safeParse(body);
 
   if (!parsed.success) {
     return NextResponse.json(
@@ -38,7 +30,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    await prisma.brand.create({ data: body });
+    await prisma.brand.create({ data: parsed.data });
 
     return NextResponse.json(
       { message: 'Brand created successfully' },
@@ -62,5 +54,7 @@ export async function POST(request: Request) {
 }
 
 async function getBrands(): Promise<Brand[]> {
-  return prisma.brand.findMany();
+  return await prisma.brand.findMany({
+    orderBy: { createdAt: 'desc' },
+  });
 }
