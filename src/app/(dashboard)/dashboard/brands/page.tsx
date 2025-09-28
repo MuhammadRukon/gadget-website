@@ -43,15 +43,32 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { ColumnDef } from '@tanstack/react-table';
+import { Alert } from '@/app/components/alert/alert';
 
 export default function Page() {
+  const defaultValues = { name: '', slug: '', status: Status.ACTIVE, imageUrl: '' };
+
   const { brands, setEditBrand, editBrand } = useBrandStore();
   // NOTE: this is used to refetch the brands data when the page is mounted.
   //eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { getBrands } = useBrandQuery();
-  const { createBrand, updateBrand } = useBrandMutation();
+  const { createBrand, updateBrand, removeBrand } = useBrandMutation();
+
+  const formSchema = z.object({
+    name: z.string().min(2).max(50),
+    slug: z.string().min(2).max(50),
+    status: z.enum(Status),
+    imageUrl: z.string().min(1), // NOTE: this is required as we are using typical Input component.
+  });
+
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: defaultValues,
+  });
 
   const [showModal, setShowModal] = useState<boolean>(false);
+  const [showDeleteAlert, setShowDeleteAlert] = useState<boolean>(false);
+  const [brandToDelete, setBrandToDelete] = useState<{ id: string; name: string } | null>(null);
 
   function OpenModal(id?: string) {
     if (id) {
@@ -62,7 +79,7 @@ export default function Page() {
       form.reset(brandToEdit);
       setEditBrand(brandToEdit);
     } else {
-      form.reset({ name: '', slug: '', status: Status.ACTIVE, imageUrl: '' });
+      form.reset(defaultValues);
     }
 
     setShowModal(true);
@@ -70,31 +87,19 @@ export default function Page() {
 
   function closeModal() {
     setShowModal(false);
-    form.reset();
+    if (editBrand != null) {
+      setEditBrand(null);
+    }
+    form.reset(defaultValues);
   }
-
-  const formSchema = z.object({
-    name: z.string().min(2).max(50),
-    slug: z.string().min(2).max(50),
-    status: z.enum(Status),
-    imageUrl: z.string().min(1), // NOTE: this is required as we are using image upload component typical Input component.
-  });
-
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      name: '',
-      slug: '',
-      status: Status.ACTIVE,
-      imageUrl: '',
-    },
-  });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     // console.log('values', values);
     // TODO: this is workaround to avoid image upload.
     //      Implement image upload later.
-    let response;
+    values.imageUrl = '/banner.webp';
+
+    let response: Response;
     if (editBrand != null) {
       response = await updateBrand.mutateAsync({
         id: editBrand.id,
@@ -106,13 +111,37 @@ export default function Page() {
         },
       });
     } else {
-      values.imageUrl = '/banner.webp';
       response = await createBrand.mutateAsync({ brand: values });
     }
 
     if (response.ok) {
       closeModal();
     }
+  }
+
+  function handleDelete(id: string) {
+    const brand = brands.find((b) => b.id === id);
+    if (brand) {
+      setBrandToDelete({ id: brand.id, name: brand.name });
+      setShowDeleteAlert(true);
+    }
+  }
+
+  async function confirmDelete() {
+    if (!brandToDelete) return;
+
+    try {
+      await removeBrand.mutateAsync(brandToDelete.id);
+      setShowDeleteAlert(false);
+      setBrandToDelete(null);
+    } catch (error) {
+      console.error('Failed to delete brand:', error);
+    }
+  }
+
+  function cancelDelete() {
+    setShowDeleteAlert(false);
+    setBrandToDelete(null);
   }
 
   ////NOTE: Table column, data, and schema. Need to think of better way to do this.
@@ -163,7 +192,6 @@ export default function Page() {
           </span>
         );
       },
-      enableHiding: false,
     },
     {
       accessorKey: 'status',
@@ -216,7 +244,9 @@ export default function Page() {
           <DropdownMenuContent align="end" className="w-32">
             <DropdownMenuItem onClick={() => OpenModal(row.original.id)}>Edit</DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem variant="destructive">Delete</DropdownMenuItem>
+            <DropdownMenuItem variant="destructive" onClick={() => handleDelete(row.original.id)}>
+              Delete
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       ),
@@ -234,7 +264,7 @@ export default function Page() {
         />
       )}
       <Modal
-        title={Boolean(editBrand) ? 'Edit Brand' : 'Add Brand'}
+        title={editBrand != null ? 'Edit Brand' : 'Add Brand'}
         isOpen={showModal}
         onChange={(bool) => {
           if (!bool) closeModal();
@@ -305,10 +335,21 @@ export default function Page() {
                 </FormItem>
               )}
             />
-            <Button type="submit"> {Boolean(editBrand) ? 'Edit Brand' : 'Add Brand'}</Button>
+            <Button type="submit"> {editBrand != null ? 'Edit Brand' : 'Add Brand'}</Button>
           </form>
         </Form>
       </Modal>
+      {/* NOTE: Delete should be done by super admin only */}
+      <Alert
+        onConfirm={confirmDelete}
+        open={showDeleteAlert}
+        setOpen={cancelDelete}
+        title="Delete Brand"
+        description={`Are you sure you want to delete "${brandToDelete?.name}"? This action cannot be undone and will remove the brand from your system.`}
+        confirmText="Delete Brand"
+        cancelText="Cancel"
+        isLoading={removeBrand.isPending}
+      />
     </>
   );
 }

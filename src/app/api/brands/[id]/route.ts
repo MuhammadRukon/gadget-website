@@ -27,9 +27,33 @@ export async function PUT(request: Request, { params }: IParams) {
   }
 }
 
+export async function DELETE(request: Request, { params }: IParams) {
+  const { id } = await params;
+  try {
+    const response = await deleteBrand(id);
+    if (response) {
+      return new NextResponse(null, { status: ResponseStatus.NoContent });
+    } else {
+      throw new Error('Brand not found or could not be deleted');
+    }
+  } catch (err: unknown) {
+    console.error(err);
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : 'An unknown error occurred' },
+      { status: ResponseStatus.InternalServerError },
+    );
+  }
+}
+
 async function updateBrand(id: string, body: IBrandCreateOrUpdateEntity) {
   return await prisma.brand.update({
     where: { id },
     data: body,
+  });
+}
+
+async function deleteBrand(id: string) {
+  return await prisma.brand.delete({
+    where: { id },
   });
 }
