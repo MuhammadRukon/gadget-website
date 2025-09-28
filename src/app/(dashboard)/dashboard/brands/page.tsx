@@ -24,7 +24,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Button } from '@/components/ui/button';
-import SelectAtom from '@/app/components/select/select';
+import { SelectAtom } from '@/app/components/select/select';
 import { useBrandQuery } from '@/hooks/brand/useBrand.query';
 import { ImageUpload } from '@/components/ui/image-upload';
 import { Alert } from '@/app/components/alert/alert';
@@ -123,14 +123,13 @@ export default function Page() {
 
   return (
     <>
-      {brands?.length > 0 && (
-        <DataTable
-          OpenModal={OpenModal}
-          data={brands}
-          AddButtonText="Add Brand"
-          columns={columns(OpenModal, handleDelete)}
-        />
-      )}
+      <DataTable
+        OpenModal={OpenModal}
+        data={brands}
+        AddButtonText="Add Brand"
+        columns={columns(OpenModal, handleDelete)}
+      />
+
       <Modal
         title={editBrand != null ? 'Edit Brand' : 'Add Brand'}
         isOpen={showModal}

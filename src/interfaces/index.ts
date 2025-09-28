@@ -1,5 +1,5 @@
 import { ReactNode } from 'react';
-import { ProductStatus, Brand } from '@prisma/client';
+import { ProductStatus, Brand, Category } from '@prisma/client';
 export type Theme = 'light' | 'dark';
 
 export interface IBaseEntity {
@@ -55,5 +55,10 @@ export interface IHeaderButton {
 
 export type IBrandCreateOrUpdateEntity = Omit<
   Brand,
+  'id' | 'createdAt' | 'updatedAt' | 'isPopular'
+>;
+
+export type ICategoryCreateOrUpdateEntity = Omit<
+  Category,
   'id' | 'createdAt' | 'updatedAt' | 'isPopular'
 >;

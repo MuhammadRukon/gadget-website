@@ -21,7 +21,6 @@ export const useBrandQuery = () => {
   });
 
   useEffect(() => {
-    console.log('change>>>');
     if (getBrands.isSuccess && getBrands.data) {
       useBrandStore.setState({ brands: getBrands.data });
     }
