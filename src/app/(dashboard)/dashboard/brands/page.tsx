@@ -6,7 +6,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 
 import { StatusOptions } from '@/constants';
-import { Status } from '@prisma/client';
+
 import { slugify } from '@/app/utils/helper';
 
 import { useBrandMutation } from '@/hooks/brand/useBrand.mutation';
@@ -26,44 +26,21 @@ import {
 import { Button } from '@/components/ui/button';
 import SelectAtom from '@/app/components/select/select';
 import { useBrandQuery } from '@/hooks/brand/useBrand.query';
-import { Badge } from '@/components/ui/badge';
 import { ImageUpload } from '@/components/ui/image-upload';
-import Image from 'next/image';
-import {
-  IconArchiveFilled,
-  IconCircleCheckFilled,
-  IconCircleXFilled,
-  IconDotsVertical,
-} from '@tabler/icons-react';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { ColumnDef } from '@tanstack/react-table';
 import { Alert } from '@/app/components/alert/alert';
+import { columns } from './table';
+import { brandFormSchema, defaultBrandFormValues } from '@/shared/schemas/brand-form';
 
 export default function Page() {
-  const defaultValues = { name: '', slug: '', status: Status.ACTIVE, imageUrl: '' };
-
   const { brands, setEditBrand, editBrand } = useBrandStore();
   // NOTE: this is used to refetch the brands data when the page is mounted.
   //eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { getBrands } = useBrandQuery();
   const { createBrand, updateBrand, removeBrand } = useBrandMutation();
 
-  const formSchema = z.object({
-    name: z.string().min(2).max(50),
-    slug: z.string().min(2).max(50),
-    status: z.enum(Status),
-    imageUrl: z.string().min(1), // NOTE: this is required as we are using typical Input component.
-  });
-
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
-    defaultValues: defaultValues,
+  const form = useForm<z.infer<typeof brandFormSchema>>({
+    resolver: zodResolver(brandFormSchema),
+    defaultValues: defaultBrandFormValues,
   });
 
   const [showModal, setShowModal] = useState<boolean>(false);
@@ -79,7 +56,7 @@ export default function Page() {
       form.reset(brandToEdit);
       setEditBrand(brandToEdit);
     } else {
-      form.reset(defaultValues);
+      form.reset(defaultBrandFormValues);
     }
 
     setShowModal(true);
@@ -90,10 +67,10 @@ export default function Page() {
     if (editBrand != null) {
       setEditBrand(null);
     }
-    form.reset(defaultValues);
+    form.reset(defaultBrandFormValues);
   }
 
-  async function onSubmit(values: z.infer<typeof formSchema>) {
+  async function onSubmit(values: z.infer<typeof brandFormSchema>) {
     // console.log('values', values);
     // TODO: this is workaround to avoid image upload.
     //      Implement image upload later.
@@ -144,115 +121,6 @@ export default function Page() {
     setBrandToDelete(null);
   }
 
-  ////NOTE: Table column, data, and schema. Need to think of better way to do this.
-
-  type BrandTableData = {
-    id: string;
-    slug: string;
-    imageUrl: string;
-    name: string;
-    isPopular: boolean;
-    status: Status;
-    createdAt: Date;
-    updatedAt: Date;
-  };
-
-  const columns: ColumnDef<BrandTableData>[] = [
-    {
-      accessorKey: 'imageUrl',
-      header: 'Image URL',
-      cell: ({ row }) => (
-        <div className="w-20 h-10">
-          <Image src={row.original.imageUrl} alt={row.original.name} width={100} height={100} />
-        </div>
-      ),
-    },
-    {
-      accessorKey: 'name',
-      header: 'Name (with slug)',
-      cell: ({ row }) => {
-        return (
-          <p className="flex flex-col gap-1">
-            <span>{row.original.name}</span>
-            <span className="text-muted-foreground">{row.original.slug}</span>
-          </p>
-        );
-      },
-      enableHiding: false,
-    },
-    {
-      accessorKey: 'isPopular',
-      header: 'Is Popular',
-      cell: ({ row }) => {
-        return (
-          <span className="text-foreground">
-            <Badge variant="outline" className="text-muted-foreground px-1.5">
-              {row.original.isPopular ? 'Yes' : 'No'}
-            </Badge>
-          </span>
-        );
-      },
-    },
-    {
-      accessorKey: 'status',
-      header: 'Status',
-      cell: ({ row }) => (
-        <Badge variant="outline" className="text-muted-foreground px-1.5">
-          {row.original.status === Status.ACTIVE ? (
-            <IconCircleCheckFilled className="fill-green-500 dark:fill-green-400" />
-          ) : row.original.status === Status.INACTIVE ? (
-            <IconCircleXFilled className="fill-red-500 dark:fill-red-400" />
-          ) : (
-            <IconArchiveFilled className="fill-gray-500 dark:fill-gray-400" />
-          )}
-          {row.original.status}
-        </Badge>
-      ),
-    },
-    {
-      accessorKey: 'createdAt',
-      header: 'Created At',
-      cell: ({ row }) => (
-        <Badge variant="outline" className="text-muted-foreground px-1.5">
-          {new Date(row.original.createdAt).toLocaleDateString()}
-        </Badge>
-      ),
-    },
-    {
-      accessorKey: 'updatedAt',
-      header: 'Updated At',
-      cell: ({ row }) => (
-        <Badge variant="outline" className="text-muted-foreground px-1.5">
-          {new Date(row.original.updatedAt).toLocaleDateString()}
-        </Badge>
-      ),
-    },
-    {
-      id: 'actions',
-      cell: ({ row }) => (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              className="data-[state=open]:bg-muted text-muted-foreground flex size-8"
-              size="icon"
-            >
-              <IconDotsVertical />
-              <span className="sr-only">Open menu</span>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-32">
-            <DropdownMenuItem onClick={() => OpenModal(row.original.id)}>Edit</DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem variant="destructive" onClick={() => handleDelete(row.original.id)}>
-              Delete
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      ),
-    },
-  ];
-
   return (
     <>
       {brands?.length > 0 && (
@@ -260,7 +128,7 @@ export default function Page() {
           OpenModal={OpenModal}
           data={brands}
           AddButtonText="Add Brand"
-          columns={columns}
+          columns={columns(OpenModal, handleDelete)}
         />
       )}
       <Modal

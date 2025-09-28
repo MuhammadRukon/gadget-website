@@ -1,6 +1,7 @@
 import { ResponseStatus } from '@/enums';
 import { IBrandCreateOrUpdateEntity } from '@/interfaces';
 import { prisma } from '@/lib/prisma';
+import { brandFormSchema } from '@/shared/schemas/brand-form';
 import { NextResponse } from 'next/server';
 
 interface IParams {
@@ -9,10 +10,20 @@ interface IParams {
 
 export async function PUT(request: Request, { params }: IParams) {
   const { id } = await params;
-  const body: IBrandCreateOrUpdateEntity = await request.json();
-  console.log(body, 'body');
+
+  const body: unknown = await request.json();
+
+  const parsed = brandFormSchema.safeParse(body);
+
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: parsed.error.message },
+      { status: ResponseStatus.BadRequest },
+    );
+  }
+
   try {
-    const response = await updateBrand(id, body);
+    const response = await updateBrand(id, parsed.data);
     if (response) {
       return new NextResponse(null, { status: ResponseStatus.NoContent });
     } else {
@@ -27,7 +38,7 @@ export async function PUT(request: Request, { params }: IParams) {
   }
 }
 
-export async function DELETE(request: Request, { params }: IParams) {
+export async function DELETE(_: Request, { params }: IParams) {
   const { id } = await params;
   try {
     const response = await deleteBrand(id);
