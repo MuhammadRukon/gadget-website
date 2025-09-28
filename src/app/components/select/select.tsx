@@ -14,7 +14,7 @@ interface SelectAtomProps {
   options: { value: string; label: string }[];
 }
 
-export default function SelectAtom({ field, options, placeholder = '' }: SelectAtomProps) {
+export function SelectAtom({ field, options, placeholder = '' }: SelectAtomProps) {
   return (
     <Select value={field.value} onValueChange={field.onChange}>
       <SelectTrigger>
