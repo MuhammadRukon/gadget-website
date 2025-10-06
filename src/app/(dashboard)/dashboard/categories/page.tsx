@@ -51,7 +51,7 @@ export default function Page() {
 
   function OpenModal(id?: string) {
     if (id) {
-      //NOTE: Brands are limited comparatively very less. so can avoid an api call for now.
+      //NOTE: categories are limited comparatively very less. so can avoid an api call for now.
       const categoryToEdit = categories.find((c) => c.id === id);
       if (!categoryToEdit) return;
 

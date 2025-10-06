@@ -6,7 +6,7 @@ import * as React from 'react';
 import { cn } from '@/lib/utils';
 
 const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<'input'>>(
-  ({ className, type, ...props }, ref) => {
+  ({ className, type, onChange, ...props }, ref) => {
     const [showPassword, setShowPassword] = React.useState(false);
 
     const isPasswordType = type === 'password';
@@ -26,6 +26,8 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<'input'>>(
             className,
           )}
           {...props}
+          onChange={onChange}
+
         />
         {isPasswordType && (
           <button

@@ -24,7 +24,7 @@ export function SelectAtom({
 }: SelectAtomProps) {
   return (
     <Select value={field.value} onValueChange={field.onChange}>
-      <SelectTrigger>
+      <SelectTrigger className=" w-full">
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>
@@ -51,7 +51,7 @@ export function SelectAtom({
           }
 
           return (
-            <SelectItem key={option.value} value={option.value}>
+            <SelectItem className="w-full" key={option.value} value={option.value}>
               {option.label}
             </SelectItem>
           );
