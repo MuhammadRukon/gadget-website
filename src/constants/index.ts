@@ -12,3 +12,8 @@ export const availabilityOptions = [
   { id: Availability.UPCOMING, label: Availability.UPCOMING },
   { id: Availability.PRE_ORDER, label: Availability.PRE_ORDER },
 ];
+
+export const IconOptions = [
+  { value: '/earphone.svg', label: 'Earphone' },
+  { value: '/smartwatch.svg', label: 'Smartwatch' },
+];

@@ -33,8 +33,8 @@ export function Footer(): JSX.Element {
                 ['Terms and Conditions', '/'],
                 ['Refund and Return Policy', '/'],
                 ['Blog', '/'],
-                ['Contact Us', '/'],
-                ['Brands', '/'],
+                // ['Contact Us', '/'],
+                // ['Brands', '/'],
                 ['Online Service Support', '/', 1],
                 ['Complain / Advice', '/', 1],
               ].map(([label, link, active = 0], index) => (
@@ -49,23 +49,23 @@ export function Footer(): JSX.Element {
               ))}
             </ul>
           </div>
-          <div className="md:max-w-xs [&>p]:leading-7">
+          <div className="md:max-w-xs ">
             <h4>Stay Connected</h4>
-            <p>
-              <span>Tecnologia Ltd</span>
-              <br />
-              Head Office: Tali Office Road, Hazaribagh, Dhaka-1209
-            </p>
-            <p>
-              <span>Email:</span>
-              <br />
-              <a
-                className="text-primary hover:text-primary hover:underline"
-                href="mailto:muhammad.rukon242@gmail.com"
-              >
-                muhammad.rukon242@gmail.com
-              </a>
-            </p>
+            <div className="space-y-2 md:space-y-5 [&>p]:leading-5">
+              <p>
+                Head Office: <br /> Tali Office Road, Hazaribagh, Dhaka-1209
+              </p>
+              <p>
+                <span>Email:</span>
+                <br />
+                <a
+                  className="text-primary hover:text-primary hover:underline"
+                  href="mailto:muhammad.rukon242@gmail.com"
+                >
+                  muhammad.rukon242@gmail.com
+                </a>
+              </p>
+            </div>
           </div>
         </div>
       </Container>

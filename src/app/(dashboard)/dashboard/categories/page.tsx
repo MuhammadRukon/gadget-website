@@ -5,7 +5,7 @@ import z from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 
-import { StatusOptions } from '@/constants';
+import { IconOptions, StatusOptions } from '@/constants';
 
 import { slugify } from '@/app/utils/helper';
 
@@ -73,8 +73,6 @@ export default function Page() {
   }
 
   async function onSubmit(values: z.infer<typeof categoryFormSchema>) {
-    // console.log('values', values)
-
     let response: Response;
     if (editCategory != null) {
       response = await updateCategory.mutateAsync({
@@ -83,6 +81,7 @@ export default function Page() {
           name: values.name,
           slug: values.slug,
           status: values.status,
+          icon: values.icon,
         },
       });
     } else {
@@ -182,10 +181,25 @@ export default function Page() {
                 </FormItem>
               )}
             />
-            <Button type="submit">
-              {' '}
-              {editCategory != null ? 'Edit Category' : 'Add Category'}
-            </Button>
+            <FormField
+              control={form.control}
+              name="icon"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Icon</FormLabel>
+                  <FormControl>
+                    <SelectAtom
+                      field={field}
+                      type="icon"
+                      options={IconOptions}
+                      placeholder="Select Icon"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <Button type="submit">{editCategory != null ? 'Edit Category' : 'Add Category'}</Button>
           </form>
         </Form>
       </Modal>
