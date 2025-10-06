@@ -9,8 +9,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider          = "postgresql"
+  url               = env("DATABASE_URL")
+  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
 }
 
 model User {
@@ -55,6 +56,7 @@ model Category {
   isPopular Boolean           @default(false) @map("is_popular")
   createdAt DateTime          @default(now()) @map("created_at")
   updatedAt DateTime          @updatedAt @map("updated_at")
+  icon      String            @map("icon")
   products  ProductCategory[]
 
   @@index([slug, name])
@@ -81,11 +83,11 @@ model Product {
   isPopular          Boolean       @default(false) @map("is_popular")
   createdAt          DateTime      @default(now()) @map("created_at")
   updatedAt          DateTime      @updatedAt @map("updated_at")
-  description        String?       @map("description")
+  description        String        @map("description")
   priceCents         Int           @map("price_cents")
   discountCents      Int           @default(0) @map("discount_cents")
   discountPercentage Int           @default(0) @map("discount_percentage")
-  imageUrl           String?       @map("image_url")
+  imageUrls          String[]      @map("image_urls")
   stock              Int           @default(0) @map("stock")
   status             ProductStatus @default(PREORDER) @map("status")
   brandId            String        @map("brand_id")
