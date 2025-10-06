@@ -15,6 +15,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
+import Image from 'next/image';
 
 export type CategoryTableData = {
   id: string;
@@ -24,6 +25,7 @@ export type CategoryTableData = {
   status: Status;
   createdAt: Date;
   updatedAt: Date;
+  icon: string;
 };
 
 export function columns(
@@ -31,6 +33,15 @@ export function columns(
   handleDelete: (id: string) => void,
 ): ColumnDef<CategoryTableData>[] {
   return [
+    {
+      accessorKey: 'icon',
+      header: 'Icon',
+      cell: ({ row }) => (
+        <div className="w-10 h-10">
+          <Image src={row.original.icon} alt={row.original.name} width={100} height={100} />
+        </div>
+      ),
+    },
     {
       accessorKey: 'name',
       header: 'Name (with slug)',
