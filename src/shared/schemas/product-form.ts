@@ -13,6 +13,7 @@ export const defaultProductFormValues = {
   stock: 0,
   status: ProductStatus.PRE_ORDER,
   brandId: '',
+  productCategories: [], //NOTE: to establish many to many relation with categories
 };
 
 export const productFormSchema = z.object({
@@ -27,13 +28,5 @@ export const productFormSchema = z.object({
   stock: z.number().min(1),
   status: z.enum(ProductStatus),
   brandId: z.string().min(2),
+  productCategories: z.array(z.string()).min(1), //NOTE: to establish many to many relation with categories
 });
-
-// model Product {
-//     brand      Brand             @relation(fields: [brandId], references: [id])
-//     categories ProductCategory[]
-//     cartItems  CartItem[]
-//     orderItems OrderItem[]
-
-//     @@index([slug, name])
-//   }

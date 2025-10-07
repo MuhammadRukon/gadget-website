@@ -77,12 +77,7 @@ export default function Page() {
     if (editCategory != null) {
       response = await updateCategory.mutateAsync({
         id: editCategory.id,
-        payload: {
-          name: values.name,
-          slug: values.slug,
-          status: values.status,
-          icon: values.icon,
-        },
+        payload: values,
       });
     } else {
       response = await createCategory.mutateAsync({ category: values });

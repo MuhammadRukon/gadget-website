@@ -10,6 +10,7 @@ export const BrandAction = {
   async create(brand: IBrandCreateOrUpdateEntity): Promise<Response> {
     return await fetch(this.api(), {
       method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(brand),
     });
   },
@@ -26,6 +27,7 @@ export const BrandAction = {
   async update(id: string, payload: IBrandCreateOrUpdateEntity): Promise<Response> {
     return await fetch(this.api(id), {
       method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
   },

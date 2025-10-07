@@ -30,10 +30,21 @@ export async function POST(request: Request) {
   }
 
   try {
-    await prisma.product.create({ data: parsed.data });
+    const { productCategories, ...productData } = parsed.data;
+
+    const product = await prisma.product.create({
+      data: {
+        ...productData,
+        productCategories: {
+          create: productCategories.map((categoryId: string) => ({
+            category: { connect: { id: categoryId } },
+          })),
+        },
+      },
+    });
 
     return NextResponse.json(
-      { message: 'Product created successfully' },
+      { message: 'Product created successfully', product },
       { status: ResponseStatus.Created },
     );
   } catch (err: unknown) {
@@ -55,6 +66,15 @@ export async function POST(request: Request) {
 
 async function getProducts(): Promise<Product[]> {
   return await prisma.product.findMany({
+    include: {
+      productCategories: {
+        select: {
+          category: {
+            select: { name: true, id: true },
+          },
+        },
+      },
+    },
     orderBy: { createdAt: 'desc' },
   });
 }

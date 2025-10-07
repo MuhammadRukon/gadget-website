@@ -80,12 +80,7 @@ export default function Page() {
     if (editBrand != null) {
       response = await updateBrand.mutateAsync({
         id: editBrand.id,
-        payload: {
-          imageUrl: values.imageUrl,
-          name: values.name,
-          slug: values.slug,
-          status: values.status,
-        },
+        payload: values,
       });
     } else {
       response = await createBrand.mutateAsync({ brand: values });

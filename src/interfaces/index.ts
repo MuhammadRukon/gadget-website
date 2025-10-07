@@ -40,6 +40,12 @@ export interface IProduct extends IBaseNamedEntity {
   discountPercentage: number;
   imageUrl?: string;
   stock: number;
+  productCategories?: {
+    category: {
+      id: string;
+      name: string;
+    };
+  }[];
 }
 
 export interface IMenu extends ICategory {
@@ -66,4 +72,6 @@ export type ICategoryCreateOrUpdateEntity = Omit<
 export type IProductCreateOrUpdateEntity = Omit<
   Product,
   'id' | 'createdAt' | 'updatedAt' | 'isPopular'
->;
+> & {
+  productCategories: string[];
+};

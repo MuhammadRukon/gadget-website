@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/form';
 import { Button } from '@/components/ui/button';
 import { SelectAtom } from '@/app/components/select/select';
+import { MultiSelect } from '@/app/components/multi-select/multi-select';
 
 import { Alert } from '@/app/components/alert/alert';
 
@@ -34,6 +35,7 @@ import { useBrandQuery } from '@/hooks/brand/useBrand.query';
 import { useBrandStore } from '@/stores/useBrand.store';
 import { useProductStore } from '@/stores/useProduct.store';
 import { useProductQuery } from '@/hooks/product/useProduct.query';
+import { ImageUpload } from '@/components/ui/image-upload';
 
 export default function Page() {
   const { categories } = useCategoryStore();
@@ -61,9 +63,15 @@ export default function Page() {
     if (id) {
       //TODO: Products are not limited so fix this ASAP.
       const productToEdit = products.find((c) => c.id === id);
+
       if (!productToEdit) return;
 
-      form.reset(productToEdit);
+      const productWithCategories = {
+        ...productToEdit,
+        productCategories: productToEdit.productCategories?.map((pc) => pc.category.id) || [],
+      };
+
+      form.reset(productWithCategories);
       setEditProduct(productToEdit);
     } else {
       form.reset(defaultProductFormValues);
@@ -82,21 +90,12 @@ export default function Page() {
 
   async function onSubmit(values: z.infer<typeof productFormSchema>) {
     let response: Response;
+    //TODO: Remove this after image upload is implemented
+    values.imageUrls = ['/banner.webp'];
     if (editProduct != null) {
       response = await updateProduct.mutateAsync({
         id: editProduct.id,
-        payload: {
-          name: values.name,
-          slug: values.slug,
-          status: values.status,
-          description: values.description,
-          priceCents: values.priceCents,
-          discountCents: values.discountCents,
-          discountPercentage: values.discountPercentage,
-          imageUrls: values.imageUrls,
-          stock: values.stock,
-          brandId: values.brandId,
-        },
+        payload: values,
       });
     } else {
       response = await createProduct.mutateAsync({ product: values });
@@ -137,7 +136,7 @@ export default function Page() {
         OpenModal={OpenModal}
         data={products}
         AddButtonText="Add Product"
-        columns={columns(OpenModal, handleDelete)}
+        columns={columns(OpenModal, handleDelete, brands)}
       />
 
       <Modal
@@ -243,7 +242,7 @@ export default function Page() {
                 name="priceCents"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Price</FormLabel>
+                    <FormLabel>Price in cents</FormLabel>
                     <FormControl>
                       <Input
                         type="number"
@@ -264,7 +263,7 @@ export default function Page() {
                 name="discountCents"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Discount</FormLabel>
+                    <FormLabel>Discount in cents</FormLabel>
                     <FormControl>
                       <Input
                         type="number"
@@ -303,47 +302,60 @@ export default function Page() {
               />
             </div>
 
-            <div className="flex gap-4">
-              <FormField
-                control={form.control}
-                name="brandId"
-                render={({ field }) => (
-                  <FormItem className="flex-1">
-                    <FormLabel>Brand</FormLabel>
-                    <FormControl>
-                      <SelectAtom
-                        field={field}
-                        options={brands.map((brand) => ({ value: brand.id, label: brand.name }))}
-                        placeholder="Select Brand"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              {/* TODO: Fix this type issue ASAP. */}
-              <FormField
-                control={form.control}
-                name="categoryId"
-                render={({ field }) => (
-                  <FormItem className="flex-1">
-                    <FormLabel>Category</FormLabel>
-                    <FormControl>
-                      <SelectAtom
-                        field={field}
-                        options={categories.map((category) => ({
-                          value: category.id,
-                          label: category.name,
-                        }))}
-                        placeholder="Select Category"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+            <FormField
+              control={form.control}
+              name="brandId"
+              render={({ field }) => (
+                <FormItem className="flex-1">
+                  <FormLabel>Brand</FormLabel>
+                  <FormControl>
+                    <SelectAtom
+                      field={field}
+                      options={brands.map((brand) => ({ value: brand.id, label: brand.name }))}
+                      placeholder="Select Brand"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="productCategories"
+              render={({ field }) => (
+                <FormItem className="flex-1">
+                  <FormLabel>Categories</FormLabel>
+                  <FormControl>
+                    <MultiSelect
+                      field={field}
+                      options={categories.map((category) => ({
+                        value: category.id,
+                        label: category.name,
+                      }))}
+                      placeholder="Select Categories"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
+            <FormField
+              control={form.control}
+              name="imageUrls"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Image URLs (comma-separated)</FormLabel>
+                  <FormControl>
+                    <ImageUpload
+                      onChange={(value) => field.onChange([...field.value, value])}
+                      value={field.value[0]}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             <Button type="submit">{editProduct != null ? 'Edit Product' : 'Add Product'}</Button>
           </form>
         </Form>

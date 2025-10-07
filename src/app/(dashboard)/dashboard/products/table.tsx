@@ -1,6 +1,6 @@
 'use client';
 
-import { ProductStatus } from '@prisma/client';
+import { Brand, ProductStatus } from '@prisma/client';
 import { ColumnDef } from '@tanstack/react-table';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -38,6 +38,7 @@ export type ProductTableData = {
 export function columns(
   OpenModal: (id: string) => void,
   handleDelete: (id: string) => void,
+  brands: Brand[],
 ): ColumnDef<ProductTableData>[] {
   return [
     {
@@ -159,8 +160,7 @@ export function columns(
       header: 'Brand',
       cell: ({ row }) => (
         <Badge variant="outline" className="text-muted-foreground px-1.5">
-          {/* TODO: Show brand name */}
-          {row.original.brandId}
+          {brands.find((b) => b.id === row.original.brandId)?.name}
         </Badge>
       ),
     },

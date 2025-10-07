@@ -10,6 +10,7 @@ export const ProductAction = {
   async create(product: IProductCreateOrUpdateEntity): Promise<Response> {
     return await fetch(this.api(), {
       method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(product),
     });
   },
@@ -26,6 +27,7 @@ export const ProductAction = {
   async update(id: string, payload: IProductCreateOrUpdateEntity): Promise<Response> {
     return await fetch(this.api(id), {
       method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
   },

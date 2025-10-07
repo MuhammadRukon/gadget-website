@@ -58,9 +58,19 @@ export async function DELETE(_: Request, { params }: IParams) {
 }
 
 async function updateProduct(id: string, body: IProductCreateOrUpdateEntity) {
+  const { productCategories, ...productData } = body;
+
   return await prisma.product.update({
     where: { id },
-    data: body,
+    data: {
+      ...productData,
+      productCategories: {
+        deleteMany: {},
+        create: productCategories.map((categoryId: string) => ({
+          category: { connect: { id: categoryId } },
+        })),
+      },
+    },
   });
 }
 

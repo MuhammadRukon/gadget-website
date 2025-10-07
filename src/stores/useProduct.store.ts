@@ -1,16 +1,22 @@
-import { Product } from '@prisma/client';
+import { Product, Category } from '@prisma/client';
 import { create } from 'zustand';
 
+type ProductWithCategories = Product & {
+  productCategories: {
+    category: Category;
+  }[];
+};
+
 interface State {
-  products: Product[];
+  products: ProductWithCategories[];
   isLoading: boolean;
-  editProduct: Product | null;
+  editProduct: ProductWithCategories | null;
 }
 
 interface Actions {
-  setProducts: (products: Product[]) => void;
+  setProducts: (products: ProductWithCategories[]) => void;
   setIsLoading: (isLoading: boolean) => void;
-  setEditProduct: (editProduct: Product | null) => void;
+  setEditProduct: (editProduct: ProductWithCategories | null) => void;
   reset: () => void;
 }
 

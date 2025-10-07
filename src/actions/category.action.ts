@@ -10,6 +10,7 @@ export const CategoryAction = {
   async create(category: ICategoryCreateOrUpdateEntity): Promise<Response> {
     return await fetch(this.api(), {
       method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(category),
     });
   },
@@ -26,6 +27,7 @@ export const CategoryAction = {
   async update(id: string, payload: ICategoryCreateOrUpdateEntity): Promise<Response> {
     return await fetch(this.api(id), {
       method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
   },
