@@ -1,17 +1,19 @@
 'use client';
 
 import { useState } from 'react';
-import z from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { ColumnDef } from '@tanstack/react-table';
+import { IconDotsVertical } from '@tabler/icons-react';
 
-import { IconOptions, StatusOptions } from '@/constants';
-
-import { slugify } from '@/app/utils/helper';
-
-import { DataTable } from '@/components/data-table';
-import { Modal } from '@/app/components/modal/modal';
-import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
   Form,
   FormControl,
@@ -20,116 +22,176 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { Button } from '@/components/ui/button';
-import { SelectAtom } from '@/app/components/select/select';
+import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
+import { DataTable } from '@/components/data-table';
+import { Modal } from '@/app/components/modal/modal';
 import { Alert } from '@/app/components/alert/alert';
+import {
+  AdminImageUploader,
+  type UploadedImage,
+} from '@/modules/admin/catalog/components/admin-image-uploader';
+import {
+  useAdminCategories,
+  useAdminCategoryMutations,
+} from '@/modules/admin/catalog/hooks';
+import {
+  categoryInputSchema,
+  type Category,
+  type CategoryInput,
+} from '@/contracts/catalog';
+import { slugify } from '@/server/common/slug';
 
-import { columns } from './table';
-import { useCategoryStore } from '@/stores/useCategory.store';
-import { useCategoryQuery } from '@/hooks/category/useCategory.query';
-import { useCategoryMutation } from '@/hooks/category/useCategory.mutation';
-import { categoryFormSchema, defaultCategoryFormValues } from '@/shared/schemas/category-form';
+const PUBLISH_OPTIONS = [
+  { value: 'PUBLISHED', label: 'Published' },
+  { value: 'DRAFT', label: 'Draft' },
+  { value: 'ARCHIVED', label: 'Archived' },
+] as const;
 
-export default function Page() {
-  const { categories, setEditCategory, editCategory } = useCategoryStore();
-  // NOTE: this is used to refetch the brands data when the page is mounted.
-  //eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { getCategories } = useCategoryQuery();
-  const { createCategory, updateCategory, removeCategory } = useCategoryMutation();
+const defaultValues: CategoryInput = {
+  name: '',
+  slug: '',
+  iconUrl: null,
+  parentId: null,
+  isPopular: false,
+  status: 'PUBLISHED',
+};
 
-  const form = useForm<z.infer<typeof categoryFormSchema>>({
-    resolver: zodResolver(categoryFormSchema),
-    defaultValues: defaultCategoryFormValues,
+const NO_PARENT = '__none__';
+
+export default function AdminCategoriesPage() {
+  const { data: categories = [], isLoading } = useAdminCategories();
+  const { create, update, remove } = useAdminCategoryMutations();
+
+  const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<Category | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<Category | null>(null);
+
+  const form = useForm<CategoryInput>({
+    resolver: zodResolver(categoryInputSchema),
+    defaultValues,
   });
 
-  const [showModal, setShowModal] = useState<boolean>(false);
-  const [showDeleteAlert, setShowDeleteAlert] = useState<boolean>(false);
-  const [categoryToDelete, setCategoryToDelete] = useState<{ id: string; name: string } | null>(
-    null,
-  );
-
-  function OpenModal(id?: string) {
-    if (id) {
-      //NOTE: categories are limited comparatively very less. so can avoid an api call for now.
-      const categoryToEdit = categories.find((c) => c.id === id);
-      if (!categoryToEdit) return;
-
-      form.reset(categoryToEdit);
-      setEditCategory(categoryToEdit);
-    } else {
-      form.reset(defaultCategoryFormValues);
-    }
-
-    setShowModal(true);
+  function openCreate() {
+    setEditing(null);
+    form.reset(defaultValues);
+    setOpen(true);
+  }
+  function openEdit(category: Category) {
+    setEditing(category);
+    form.reset({
+      name: category.name,
+      slug: category.slug,
+      iconUrl: category.iconUrl,
+      parentId: category.parentId,
+      isPopular: category.isPopular,
+      status: category.status,
+    });
+    setOpen(true);
   }
 
-  function closeModal() {
-    setShowModal(false);
-    if (editCategory != null) {
-      setEditCategory(null);
-    }
-    form.reset(defaultCategoryFormValues);
-  }
-
-  async function onSubmit(values: z.infer<typeof categoryFormSchema>) {
-    let response: Response;
-    if (editCategory != null) {
-      response = await updateCategory.mutateAsync({
-        id: editCategory.id,
-        payload: values,
-      });
-    } else {
-      response = await createCategory.mutateAsync({ category: values });
-    }
-
-    if (response.ok) {
-      closeModal();
-    }
-  }
-
-  function handleDelete(id: string) {
-    const category = categories.find((c) => c.id === id);
-    if (category) {
-      setCategoryToDelete({ id: category.id, name: category.name });
-      setShowDeleteAlert(true);
+  async function onSubmit(values: CategoryInput) {
+    try {
+      if (editing) {
+        await update.mutateAsync({ id: editing.id, input: values });
+      } else {
+        await create.mutateAsync(values);
+      }
+      setOpen(false);
+      setEditing(null);
+      form.reset(defaultValues);
+    } catch {
+      // Toast already shown by mutation onError.
     }
   }
 
   async function confirmDelete() {
-    if (!categoryToDelete) return;
-
+    if (!pendingDelete) return;
     try {
-      await removeCategory.mutateAsync(categoryToDelete.id);
-      setShowDeleteAlert(false);
-      setCategoryToDelete(null);
-    } catch (error) {
-      console.error('Failed to delete category:', error);
+      await remove.mutateAsync(pendingDelete.id);
+    } finally {
+      setPendingDelete(null);
     }
   }
 
-  function cancelDelete() {
-    setShowDeleteAlert(false);
-    setCategoryToDelete(null);
-  }
+  const columns: ColumnDef<Category>[] = [
+    {
+      accessorKey: 'name',
+      header: 'Name',
+      cell: ({ row }) => (
+        <div className="flex flex-col">
+          <span>{row.original.name}</span>
+          <span className="text-muted-foreground text-xs">{row.original.slug}</span>
+        </div>
+      ),
+    },
+    {
+      accessorKey: 'parentId',
+      header: 'Parent',
+      cell: ({ row }) => {
+        const parent = categories.find((c) => c.id === row.original.parentId);
+        return parent ? parent.name : <span className="text-muted-foreground">—</span>;
+      },
+    },
+    {
+      accessorKey: 'status',
+      header: 'Status',
+      cell: ({ row }) => <Badge variant="outline">{row.original.status}</Badge>,
+    },
+    {
+      accessorKey: 'isPopular',
+      header: 'Popular',
+      cell: ({ row }) => (row.original.isPopular ? 'Yes' : 'No'),
+    },
+    {
+      id: 'actions',
+      cell: ({ row }) => (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon">
+              <IconDotsVertical />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => openEdit(row.original)}>Edit</DropdownMenuItem>
+            <DropdownMenuItem variant="destructive" onClick={() => setPendingDelete(row.original)}>
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ),
+    },
+  ];
+
   return (
     <>
       <DataTable
-        OpenModal={OpenModal}
-        data={categories}
+        OpenModal={openCreate}
         AddButtonText="Add Category"
-        columns={columns(OpenModal, handleDelete)}
+        columns={columns}
+        data={isLoading ? [] : categories}
       />
 
       <Modal
-        title={editCategory != null ? 'Edit Category' : 'Add Category'}
-        isOpen={showModal}
-        onChange={(bool) => {
-          if (!bool) closeModal();
+        title={editing ? 'Edit Category' : 'Add Category'}
+        isOpen={open}
+        onChange={(b) => {
+          if (!b) {
+            setOpen(false);
+            setEditing(null);
+          }
         }}
       >
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField
               control={form.control}
               name="name"
@@ -138,7 +200,7 @@ export default function Page() {
                   <FormLabel>Category Name</FormLabel>
                   <FormControl>
                     <Input
-                      placeholder="Category Name"
+                      placeholder="Phones"
                       {...field}
                       onChange={(e) => {
                         field.onChange(e);
@@ -157,8 +219,38 @@ export default function Page() {
                 <FormItem>
                   <FormLabel>Slug</FormLabel>
                   <FormControl>
-                    <Input placeholder="slug" {...field} disabled={true} />
+                    <Input {...field} readOnly />
                   </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="parentId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Parent Category</FormLabel>
+                  <Select
+                    value={field.value ?? NO_PARENT}
+                    onValueChange={(v) => field.onChange(v === NO_PARENT ? null : v)}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="None" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value={NO_PARENT}>None</SelectItem>
+                      {categories
+                        .filter((c) => c.id !== editing?.id)
+                        .map((c) => (
+                          <SelectItem key={c.id} value={c.id}>
+                            {c.name}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
@@ -167,47 +259,81 @@ export default function Page() {
               control={form.control}
               name="status"
               render={({ field }) => (
-                <FormItem className="flex flex-row items-center space-x-3 space-y-0">
-                  <FormLabel className="m-0">Status</FormLabel>
-                  <FormControl>
-                    <SelectAtom field={field} options={StatusOptions} placeholder="Select Status" />
-                  </FormControl>
+                <FormItem>
+                  <FormLabel>Status</FormLabel>
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {PUBLISH_OPTIONS.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
             />
             <FormField
               control={form.control}
-              name="icon"
+              name="isPopular"
+              render={({ field }) => (
+                <FormItem className="flex items-center gap-3 space-y-0">
+                  <FormLabel className="m-0">Popular</FormLabel>
+                  <FormControl>
+                    <Switch checked={!!field.value} onCheckedChange={field.onChange} />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="iconUrl"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Icon</FormLabel>
                   <FormControl>
-                    <SelectAtom
-                      field={field}
-                      type="icon"
-                      options={IconOptions}
-                      placeholder="Select Icon"
+                    <AdminImageUploader
+                      single
+                      folder="categories"
+                      value={
+                        field.value
+                          ? [{ url: field.value, publicId: field.value }]
+                          : ([] as UploadedImage[])
+                      }
+                      onChange={(images) => field.onChange(images[0]?.url ?? null)}
                     />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
-            <Button type="submit">{editCategory != null ? 'Edit Category' : 'Add Category'}</Button>
+
+            <Button type="submit" disabled={create.isPending || update.isPending}>
+              {editing ? 'Save changes' : 'Create category'}
+            </Button>
           </form>
         </Form>
       </Modal>
-      {/* NOTE: Delete should be done by super admin only */}
+
       <Alert
-        onConfirm={confirmDelete}
-        open={showDeleteAlert}
-        setOpen={cancelDelete}
-        title="Delete Category"
-        description={`Are you sure you want to delete "${categoryToDelete?.name}"? This action cannot be undone and will remove the category from your system.`}
-        confirmText="Delete Category"
+        open={!!pendingDelete}
+        setOpen={(b) => !b && setPendingDelete(null)}
+        title="Delete category"
+        description={
+          pendingDelete
+            ? `Are you sure you want to delete "${pendingDelete.name}"?`
+            : ''
+        }
+        confirmText="Delete"
         cancelText="Cancel"
-        isLoading={removeCategory.isPending}
+        onConfirm={confirmDelete}
+        isLoading={remove.isPending}
       />
     </>
   );

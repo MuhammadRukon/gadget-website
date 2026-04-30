@@ -1,33 +1,46 @@
-'use client';
+import { redirect } from 'next/navigation';
 
+import { auth } from '@/auth';
 import { AppSidebar } from '@/components/app-sidebar';
 import { SiteHeader } from '@/components/site-header';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
-import { Toaster } from '@/components/ui/sonner';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
-export default function PublicLayout({ children }: { children: React.ReactNode }) {
-  const queryClient = new QueryClient();
+/**
+ * Admin shell. Middleware already enforces ADMIN role, but we re-check
+ * here so that:
+ * 1. The session is loaded once and passed down (no client `useSession`).
+ * 2. Defense in depth in case the matcher misses an edge case.
+ */
+export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const session = await auth();
+  if (!session?.user) {
+    redirect('/login?callbackUrl=/dashboard');
+  }
+  if (session.user.role !== 'ADMIN') {
+    redirect('/');
+  }
 
   return (
-    <main>
-      <QueryClientProvider client={queryClient}>
-        <SidebarProvider
-          style={
-            {
-              '--sidebar-width': 'calc(var(--spacing) * 72)',
-              '--header-height': 'calc(var(--spacing) * 12)',
-            } as React.CSSProperties
-          }
-        >
-          <AppSidebar variant="inset" />
-          <SidebarInset>
-            <SiteHeader />
-            <div className="p-4 md:p-6 flex-1">{children}</div>
-            <Toaster duration={2000} />
-          </SidebarInset>
-        </SidebarProvider>
-      </QueryClientProvider>
-    </main>
+    <SidebarProvider
+      style={
+        {
+          '--sidebar-width': 'calc(var(--spacing) * 72)',
+          '--header-height': 'calc(var(--spacing) * 12)',
+        } as React.CSSProperties
+      }
+    >
+      <AppSidebar
+        variant="inset"
+        user={{
+          name: session.user.name ?? 'Admin',
+          email: session.user.email ?? '',
+          image: session.user.image,
+        }}
+      />
+      <SidebarInset>
+        <SiteHeader />
+        <div className="p-4 md:p-6 flex-1">{children}</div>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }

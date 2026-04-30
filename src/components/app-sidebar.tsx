@@ -4,10 +4,15 @@ import * as React from 'react';
 import {
   IconBrandBooking,
   IconBrandProducthunt,
+  IconCash,
   IconCategory,
   IconDashboard,
+  IconDiscount,
+  IconReceipt,
   IconSettings,
+  IconShieldCheck,
   IconUsers,
+  type Icon,
 } from '@tabler/icons-react';
 
 import { NavMain } from '@/components/nav-main';
@@ -24,80 +29,51 @@ import {
 } from '@/components/ui/sidebar';
 import { Logo } from '@/app/common/logo/logo.atom';
 
-const data = {
-  user: {
-    name: 'shadcn',
-    email: 'm@example.com',
-    avatar: '/avatars/shadcn.jpg',
-  },
-  navMain: [
-    {
-      title: 'Dashboard',
-      url: '/dashboard',
-      icon: IconDashboard,
-    },
-    {
-      title: 'Categories',
-      url: '/dashboard/categories',
-      icon: IconCategory,
-    },
-    {
-      title: 'Brands',
-      url: '/dashboard/brands',
-      icon: IconBrandBooking,
-    },
-    { title: 'Products', url: '/dashboard/products', icon: IconBrandProducthunt },
-    { title: 'Users', url: '/dashboard/users', icon: IconUsers },
-  ],
-  navSecondary: [
-    {
-      title: 'Settings',
-      url: '/dashboard/settings',
-      icon: IconSettings,
-    },
-  ],
-};
+interface AppSidebarUser {
+  name: string;
+  email: string;
+  image?: string | null;
+}
 
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
+  user: AppSidebarUser;
+}
+
+const navMain: { title: string; url: string; icon: Icon }[] = [
+  { title: 'Dashboard', url: '/dashboard', icon: IconDashboard },
+  { title: 'Orders', url: '/dashboard/orders', icon: IconReceipt },
+  { title: 'Payments', url: '/dashboard/payments', icon: IconCash },
+  { title: 'Warranty', url: '/dashboard/warranty', icon: IconShieldCheck },
+  { title: 'Products', url: '/dashboard/products', icon: IconBrandProducthunt },
+  { title: 'Categories', url: '/dashboard/categories', icon: IconCategory },
+  { title: 'Brands', url: '/dashboard/brands', icon: IconBrandBooking },
+  { title: 'Coupons', url: '/dashboard/coupons', icon: IconDiscount },
+  { title: 'Users', url: '/dashboard/users', icon: IconUsers },
+];
+
+const navSecondary: { title: string; url: string; icon: Icon }[] = [
+  { title: 'Settings', url: '/dashboard/settings', icon: IconSettings },
+];
+
+export function AppSidebar({ user, ...props }: AppSidebarProps) {
   return (
     <Sidebar collapsible="offcanvas" {...props}>
-      <AppSidebar.Header />
-      <AppSidebar.Content data={data} />
-      <AppSidebar.Footer data={data} />
+      <SidebarHeader>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild className="data-[slot=sidebar-menu-button]:!p-1.5">
+              <Logo alt="logo" className="w-full h-12 object-contain" />
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarHeader>
+      <SidebarContent>
+        <NavMain items={navMain} />
+        <NavSecondary items={navSecondary} className="mt-auto" />
+      </SidebarContent>
+      <SidebarFooter>
+        <NavUser user={user} />
+      </SidebarFooter>
     </Sidebar>
   );
 }
-
-AppSidebar.Header = function AppSidebarHeader({ src }: { src?: string }) {
-  return (
-    <SidebarHeader>
-      <SidebarMenu>
-        <SidebarMenuItem>
-          <SidebarMenuButton asChild className="data-[slot=sidebar-menu-button]:!p-1.5">
-            <Logo alt="logo" className="w-full h-12 object-contain" src={src} />
-          </SidebarMenuButton>
-        </SidebarMenuItem>
-      </SidebarMenu>
-    </SidebarHeader>
-  );
-};
-//TODO: remove any
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-AppSidebar.Content = function AppSidebarContent({ data }: { data: any }) {
-  return (
-    <SidebarContent>
-      <NavMain items={data.navMain} />
-
-      <NavSecondary items={data.navSecondary} className="mt-auto" />
-    </SidebarContent>
-  );
-};
-//TODO: remove any
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-AppSidebar.Footer = function AppSidebarFooter({ data }: { data: any }) {
-  return (
-    <SidebarFooter>
-      <NavUser user={data.user} />
-    </SidebarFooter>
-  );
-};

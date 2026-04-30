@@ -1,58 +1,109 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
+import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { signIn } from 'next-auth/react';
+import { toast } from 'sonner';
 
-import AuthForm from '@/components/auth/auth-form';
+import { Button } from '@/components/ui/button';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { credentialsSchema, type CredentialsInput } from '@/contracts/auth';
+import { AuthCard } from '@/modules/auth/components/auth-card';
+import { GoogleButton } from '@/modules/auth/components/google-button';
+import { Loader } from '@/app/common/loader/loader';
 
 export default function LoginPage() {
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
+  const router = useRouter();
+  const params = useSearchParams();
+  const callbackUrl = params.get('callbackUrl') || '/';
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const form = useForm<CredentialsInput>({
+    resolver: zodResolver(credentialsSchema),
+    defaultValues: { email: '', password: '' },
   });
-  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setIsLoading(true);
+  async function onSubmit(values: CredentialsInput) {
+    setIsSubmitting(true);
+    const res = await signIn('credentials', {
+      email: values.email,
+      password: values.password,
+      redirect: false,
+    });
+    setIsSubmitting(false);
 
-    try {
-      // Add your login logic here
-      console.log('Login form submitted:', formData);
-    } catch (error) {
-      console.error('Login error:', error);
-    } finally {
-      setIsLoading(false);
+    if (!res || res.error) {
+      toast.error('Invalid email or password');
+      return;
     }
-  };
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
-
-  const handleGoogleLogin = async () => {
-    setIsLoading(true);
-    try {
-      // Add your Google login logic here
-      console.log('Google login clicked');
-    } catch (error) {
-      console.error('Google login error:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    toast.success('Signed in');
+    router.push(callbackUrl);
+    router.refresh();
+  }
 
   return (
-    <AuthForm
-      type="login"
-      formData={formData}
-      isLoading={isLoading}
-      onSubmit={handleSubmit}
-      onChange={handleChange}
-      onGoogleClick={handleGoogleLogin}
-    />
+    <AuthCard
+      title="Login to your account"
+      description="Enter your email below to sign in."
+      footer={
+        <p className="text-sm text-muted-foreground text-center">
+          Don&apos;t have an account?{' '}
+          <Link href="/signup" className="underline">
+            Sign up
+          </Link>
+        </p>
+      }
+    >
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <FormField
+            control={form.control}
+            name="email"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Email</FormLabel>
+                <FormControl>
+                  <Input type="email" autoComplete="email" placeholder="m@example.com" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="password"
+            render={({ field }) => (
+              <FormItem>
+                <div className="flex items-center justify-between">
+                  <FormLabel>Password</FormLabel>
+                  <Link href="/forgot-password" className="text-sm underline">
+                    Forgot?
+                  </Link>
+                </div>
+                <FormControl>
+                  <Input type="password" autoComplete="current-password" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <Button type="submit" className="w-full" disabled={isSubmitting}>
+            {isSubmitting ? <Loader /> : 'Login'}
+          </Button>
+        </form>
+      </Form>
+      <GoogleButton callbackUrl={callbackUrl} disabled={isSubmitting} />
+    </AuthCard>
   );
 }

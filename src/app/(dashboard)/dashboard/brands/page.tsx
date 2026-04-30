@@ -1,20 +1,20 @@
 'use client';
 
 import { useState } from 'react';
-import z from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { ColumnDef } from '@tanstack/react-table';
+import { Badge } from '@/components/ui/badge';
+import { IconDotsVertical } from '@tabler/icons-react';
+import Image from 'next/image';
 
-import { StatusOptions } from '@/constants';
-
-import { slugify } from '@/app/utils/helper';
-
-import { useBrandMutation } from '@/hooks/brand/useBrand.mutation';
-import { useBrandStore } from '@/stores/useBrand.store';
-
-import { DataTable } from '@/components/data-table';
-import { Modal } from '@/app/components/modal/modal';
-import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
   Form,
   FormControl,
@@ -23,117 +23,172 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { Button } from '@/components/ui/button';
-import { SelectAtom } from '@/app/components/select/select';
-import { useBrandQuery } from '@/hooks/brand/useBrand.query';
-import { ImageUpload } from '@/components/ui/image-upload';
+import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+
+import { DataTable } from '@/components/data-table';
+import { Modal } from '@/app/components/modal/modal';
 import { Alert } from '@/app/components/alert/alert';
-import { columns } from './table';
-import { brandFormSchema, defaultBrandFormValues } from '@/shared/schemas/brand-form';
+import {
+  AdminImageUploader,
+  type UploadedImage,
+} from '@/modules/admin/catalog/components/admin-image-uploader';
+import {
+  useAdminBrandMutations,
+  useAdminBrands,
+} from '@/modules/admin/catalog/hooks';
+import { brandInputSchema, type Brand, type BrandInput } from '@/contracts/catalog';
+import { slugify } from '@/server/common/slug';
 
-export default function Page() {
-  const { brands, setEditBrand, editBrand } = useBrandStore();
-  // NOTE: this is used to refetch the brands data when the page is mounted.
-  //eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { getBrands } = useBrandQuery();
-  const { createBrand, updateBrand, removeBrand } = useBrandMutation();
+const PUBLISH_OPTIONS = [
+  { value: 'PUBLISHED', label: 'Published' },
+  { value: 'DRAFT', label: 'Draft' },
+  { value: 'ARCHIVED', label: 'Archived' },
+] as const;
 
-  const form = useForm<z.infer<typeof brandFormSchema>>({
-    resolver: zodResolver(brandFormSchema),
-    defaultValues: defaultBrandFormValues,
+const defaultValues: BrandInput = {
+  name: '',
+  slug: '',
+  logoUrl: null,
+  isPopular: false,
+  status: 'PUBLISHED',
+};
+
+export default function AdminBrandsPage() {
+  const { data: brands = [], isLoading } = useAdminBrands();
+  const { create, update, remove } = useAdminBrandMutations();
+
+  const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<Brand | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<Brand | null>(null);
+
+  const form = useForm<BrandInput>({
+    resolver: zodResolver(brandInputSchema),
+    defaultValues,
   });
 
-  const [showModal, setShowModal] = useState<boolean>(false);
-  const [showDeleteAlert, setShowDeleteAlert] = useState<boolean>(false);
-  const [brandToDelete, setBrandToDelete] = useState<{ id: string; name: string } | null>(null);
-
-  function OpenModal(id?: string) {
-    if (id) {
-      //NOTE: Brands are limited comparatively very less. so can avoid an api call for now.
-      const brandToEdit = brands.find((b) => b.id === id);
-      if (!brandToEdit) return;
-
-      form.reset(brandToEdit);
-      setEditBrand(brandToEdit);
-    } else {
-      form.reset(defaultBrandFormValues);
-    }
-
-    setShowModal(true);
+  function openCreate() {
+    setEditing(null);
+    form.reset(defaultValues);
+    setOpen(true);
+  }
+  function openEdit(brand: Brand) {
+    setEditing(brand);
+    form.reset({
+      name: brand.name,
+      slug: brand.slug,
+      logoUrl: brand.logoUrl,
+      isPopular: brand.isPopular,
+      status: brand.status,
+    });
+    setOpen(true);
   }
 
-  function closeModal() {
-    setShowModal(false);
-    if (editBrand != null) {
-      setEditBrand(null);
-    }
-    form.reset(defaultBrandFormValues);
-  }
-
-  async function onSubmit(values: z.infer<typeof brandFormSchema>) {
-    // console.log('values', values);
-    // TODO: this is workaround to avoid image upload.
-    //      Implement image upload later.
-    values.imageUrl = '/banner.webp';
-
-    let response: Response;
-    if (editBrand != null) {
-      response = await updateBrand.mutateAsync({
-        id: editBrand.id,
-        payload: values,
-      });
-    } else {
-      response = await createBrand.mutateAsync({ brand: values });
-    }
-
-    if (response.ok) {
-      closeModal();
-    }
-  }
-
-  function handleDelete(id: string) {
-    const brand = brands.find((b) => b.id === id);
-    if (brand) {
-      setBrandToDelete({ id: brand.id, name: brand.name });
-      setShowDeleteAlert(true);
+  async function onSubmit(values: BrandInput) {
+    try {
+      if (editing) {
+        await update.mutateAsync({ id: editing.id, input: values });
+      } else {
+        await create.mutateAsync(values);
+      }
+      setOpen(false);
+      setEditing(null);
+      form.reset(defaultValues);
+    } catch {
+      // Toast already shown by mutation onError.
     }
   }
 
   async function confirmDelete() {
-    if (!brandToDelete) return;
-
+    if (!pendingDelete) return;
     try {
-      await removeBrand.mutateAsync(brandToDelete.id);
-      setShowDeleteAlert(false);
-      setBrandToDelete(null);
-    } catch (error) {
-      console.error('Failed to delete brand:', error);
+      await remove.mutateAsync(pendingDelete.id);
+    } finally {
+      setPendingDelete(null);
     }
   }
 
-  function cancelDelete() {
-    setShowDeleteAlert(false);
-    setBrandToDelete(null);
-  }
+  const columns: ColumnDef<Brand>[] = [
+    {
+      accessorKey: 'logoUrl',
+      header: 'Logo',
+      cell: ({ row }) =>
+        row.original.logoUrl ? (
+          <div className="w-10 h-10 relative rounded overflow-hidden bg-muted">
+            <Image src={row.original.logoUrl} alt={row.original.name} fill className="object-contain" />
+          </div>
+        ) : (
+          <span className="text-muted-foreground text-xs">No logo</span>
+        ),
+    },
+    {
+      accessorKey: 'name',
+      header: 'Name',
+      cell: ({ row }) => (
+        <div className="flex flex-col">
+          <span>{row.original.name}</span>
+          <span className="text-muted-foreground text-xs">{row.original.slug}</span>
+        </div>
+      ),
+    },
+    {
+      accessorKey: 'status',
+      header: 'Status',
+      cell: ({ row }) => <Badge variant="outline">{row.original.status}</Badge>,
+    },
+    {
+      accessorKey: 'isPopular',
+      header: 'Popular',
+      cell: ({ row }) => (row.original.isPopular ? 'Yes' : 'No'),
+    },
+    {
+      id: 'actions',
+      cell: ({ row }) => (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon">
+              <IconDotsVertical />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => openEdit(row.original)}>Edit</DropdownMenuItem>
+            <DropdownMenuItem variant="destructive" onClick={() => setPendingDelete(row.original)}>
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ),
+    },
+  ];
 
   return (
     <>
       <DataTable
-        OpenModal={OpenModal}
-        data={brands}
+        OpenModal={openCreate}
         AddButtonText="Add Brand"
-        columns={columns(OpenModal, handleDelete)}
+        columns={columns}
+        data={isLoading ? [] : brands}
       />
 
       <Modal
-        title={editBrand != null ? 'Edit Brand' : 'Add Brand'}
-        isOpen={showModal}
-        onChange={(bool) => {
-          if (!bool) closeModal();
+        title={editing ? 'Edit Brand' : 'Add Brand'}
+        isOpen={open}
+        onChange={(b) => {
+          if (!b) {
+            setOpen(false);
+            setEditing(null);
+          }
         }}
       >
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField
               control={form.control}
               name="name"
@@ -142,7 +197,7 @@ export default function Page() {
                   <FormLabel>Brand Name</FormLabel>
                   <FormControl>
                     <Input
-                      placeholder="Brand Name"
+                      placeholder="Apple"
                       {...field}
                       onChange={(e) => {
                         field.onChange(e);
@@ -161,7 +216,7 @@ export default function Page() {
                 <FormItem>
                   <FormLabel>Slug</FormLabel>
                   <FormControl>
-                    <Input placeholder="slug" {...field} disabled={true} />
+                    <Input {...field} readOnly />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -171,46 +226,79 @@ export default function Page() {
               control={form.control}
               name="status"
               render={({ field }) => (
-                <FormItem className="flex flex-row items-center space-x-3 space-y-0">
-                  <FormLabel className="m-0">Status</FormLabel>
-                  <FormControl>
-                    <SelectAtom field={field} options={StatusOptions} placeholder="Select Status" />
-                  </FormControl>
+                <FormItem>
+                  <FormLabel>Status</FormLabel>
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {PUBLISH_OPTIONS.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
             />
             <FormField
               control={form.control}
-              name="imageUrl"
+              name="isPopular"
+              render={({ field }) => (
+                <FormItem className="flex items-center gap-3 space-y-0">
+                  <FormLabel className="m-0">Popular</FormLabel>
+                  <FormControl>
+                    <Switch checked={!!field.value} onCheckedChange={field.onChange} />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="logoUrl"
               render={({ field }) => (
                 <FormItem>
+                  <FormLabel>Logo</FormLabel>
                   <FormControl>
-                    <ImageUpload
-                      value={field.value}
-                      onChange={field.onChange}
-                      label="Brand Image"
-                      maxSize={5}
+                    <AdminImageUploader
+                      single
+                      folder="brands"
+                      value={
+                        field.value ? [{ url: field.value, publicId: field.value }] : ([] as UploadedImage[])
+                      }
+                      onChange={(images) => field.onChange(images[0]?.url ?? null)}
                     />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
-            <Button type="submit"> {editBrand != null ? 'Edit Brand' : 'Add Brand'}</Button>
+
+            <Button type="submit" disabled={create.isPending || update.isPending}>
+              {editing ? 'Save changes' : 'Create brand'}
+            </Button>
           </form>
         </Form>
       </Modal>
-      {/* NOTE: Delete should be done by super admin only */}
+
       <Alert
-        onConfirm={confirmDelete}
-        open={showDeleteAlert}
-        setOpen={cancelDelete}
-        title="Delete Brand"
-        description={`Are you sure you want to delete "${brandToDelete?.name}"? This action cannot be undone and will remove the brand from your system.`}
-        confirmText="Delete Brand"
+        open={!!pendingDelete}
+        setOpen={(b) => !b && setPendingDelete(null)}
+        title="Delete brand"
+        description={
+          pendingDelete
+            ? `Are you sure you want to delete "${pendingDelete.name}"?`
+            : ''
+        }
+        confirmText="Delete"
         cancelText="Cancel"
-        isLoading={removeBrand.isPending}
+        onConfirm={confirmDelete}
+        isLoading={remove.isPending}
       />
     </>
   );

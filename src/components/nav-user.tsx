@@ -1,18 +1,11 @@
 'use client';
 
-import {
-  IconCreditCard,
-  IconDotsVertical,
-  IconLogout,
-  IconNotification,
-  IconUserCircle,
-} from '@tabler/icons-react';
+import { IconDotsVertical, IconLogout, IconUserCircle } from '@tabler/icons-react';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -24,29 +17,25 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from '@/components/ui/sidebar';
+import { logoutAction } from '@/modules/auth/actions';
 
 interface NavUserProps {
   user: {
     name: string;
     email: string;
-    avatar: string;
+    image?: string | null;
   };
 }
 
-const groupItems = [
-  {
-    title: 'Account',
-    icon: IconUserCircle,
-  },
-  {
-    title: 'Billing',
-    icon: IconCreditCard,
-  },
-  {
-    title: 'Notifications',
-    icon: IconNotification,
-  },
-];
+function initials(name: string): string {
+  const trimmed = name.trim();
+  if (!trimmed) return 'U';
+  return trimmed
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase() ?? '')
+    .join('');
+}
 
 export function NavUser({ user }: NavUserProps) {
   const { isMobile } = useSidebar();
@@ -61,8 +50,8 @@ export function NavUser({ user }: NavUserProps) {
               className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
               <Avatar className="h-8 w-8 rounded-lg grayscale">
-                <AvatarImage src={user.avatar} alt={user.name} />
-                <AvatarFallback className="rounded-lg">CN</AvatarFallback>
+                {user.image ? <AvatarImage src={user.image} alt={user.name} /> : null}
+                <AvatarFallback className="rounded-lg">{initials(user.name)}</AvatarFallback>
               </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-medium">{user.name}</span>
@@ -77,32 +66,38 @@ export function NavUser({ user }: NavUserProps) {
             align="end"
             sideOffset={4}
           >
-            <DropdownMenuLabel className="p-0 font-normal">
-              <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
+            <DropdownMenuLabel className="font-normal">
+              <div className="flex items-center gap-2 text-sm">
                 <Avatar className="h-8 w-8 rounded-lg">
-                  <AvatarImage src={user.avatar} alt={user.name} />
-                  <AvatarFallback className="rounded-lg">CN</AvatarFallback>
+                  {user.image ? <AvatarImage src={user.image} alt={user.name} /> : null}
+                  <AvatarFallback className="rounded-lg">{initials(user.name)}</AvatarFallback>
                 </Avatar>
-                <div className="grid flex-1 text-left text-sm leading-tight">
+                <div className="grid flex-1 text-left">
                   <span className="truncate font-medium">{user.name}</span>
                   <span className="text-muted-foreground truncate text-xs">{user.email}</span>
                 </div>
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuGroup>
-              {groupItems.map((item) => (
-                <DropdownMenuItem key={item.title}>
-                  {item.icon && <item.icon />}
-                  {item.title}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem>
-              <IconLogout />
-              Log out
+            <DropdownMenuItem disabled>
+              <IconUserCircle />
+              Account
             </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <form
+              action={async () => {
+                await logoutAction();
+              }}
+            >
+              <button type="submit" className="w-full">
+                <DropdownMenuItem asChild>
+                  <span className="flex w-full items-center gap-2">
+                    <IconLogout />
+                    Log out
+                  </span>
+                </DropdownMenuItem>
+              </button>
+            </form>
           </DropdownMenuContent>
         </DropdownMenu>
       </SidebarMenuItem>

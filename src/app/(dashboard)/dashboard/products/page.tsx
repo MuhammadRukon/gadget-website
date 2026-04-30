@@ -1,375 +1,161 @@
 'use client';
 
+import Image from 'next/image';
+import Link from 'next/link';
 import { useState } from 'react';
-import z from 'zod';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
+import { ColumnDef } from '@tanstack/react-table';
+import { IconAlertTriangle, IconDotsVertical } from '@tabler/icons-react';
 
-import { ProductStatusOptions } from '@/constants';
-
-import { slugify } from '@/app/utils/helper';
-
-import { DataTable } from '@/components/data-table';
-import { Modal } from '@/app/components/modal/modal';
-import { Input } from '@/components/ui/input';
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { SelectAtom } from '@/app/components/select/select';
-import { MultiSelect } from '@/app/components/multi-select/multi-select';
-
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { DataTable } from '@/components/data-table';
 import { Alert } from '@/app/components/alert/alert';
 
-import { columns } from './table';
-import { useCategoryStore } from '@/stores/useCategory.store';
-import { useCategoryQuery } from '@/hooks/category/useCategory.query';
-import { useProductMutation } from '@/hooks/product/useProduct.mutation';
-import { defaultProductFormValues, productFormSchema } from '@/shared/schemas/product-form';
-import { useBrandQuery } from '@/hooks/brand/useBrand.query';
-import { useBrandStore } from '@/stores/useBrand.store';
-import { useProductStore } from '@/stores/useProduct.store';
-import { useProductQuery } from '@/hooks/product/useProduct.query';
-import { ImageUpload } from '@/components/ui/image-upload';
+import { useAdminProductMutations, useAdminProducts } from '@/modules/admin/catalog/hooks';
+import { formatBDT } from '@/server/common/money';
+import type { AdminProductRow } from '@/server/catalog/catalog.repo';
+import { useRouter } from 'next/navigation';
 
-export default function Page() {
-  const { categories } = useCategoryStore();
-  const { brands } = useBrandStore();
-  const { products, setEditProduct, editProduct } = useProductStore();
-  // NOTE: these unused vars are used to refetch the brands, categories, products data when the page is mounted.
-  /* eslint-disable @typescript-eslint/no-unused-vars */
-  const { getCategories } = useCategoryQuery();
-  const { getBrands } = useBrandQuery();
-  const { getProducts } = useProductQuery();
-  /* eslint-enable @typescript-eslint/no-unused-vars */
+function variantSummary(row: AdminProductRow) {
+  const cheapest = row.variants
+    .filter((v) => v.isActive)
+    .sort((a, b) => a.sellingPriceCents - b.sellingPriceCents)[0];
+  const totalStock = row.variants.reduce((sum, v) => sum + v.stock, 0);
+  const lowStock = row.variants.some(
+    (v) => v.isActive && v.stock <= v.lowStockThreshold,
+  );
+  return { cheapest, totalStock, lowStock };
+}
 
-  const { createProduct, updateProduct, removeProduct } = useProductMutation();
-
-  const form = useForm<z.infer<typeof productFormSchema>>({
-    resolver: zodResolver(productFormSchema),
-    defaultValues: defaultProductFormValues,
-  });
-
-  const [showModal, setShowModal] = useState<boolean>(false);
-  const [showDeleteAlert, setShowDeleteAlert] = useState<boolean>(false);
-  const [productToDelete, setProductToDelete] = useState<{ id: string; name: string } | null>(null);
-
-  function OpenModal(id?: string) {
-    if (id) {
-      //TODO: Products are not limited so fix this ASAP.
-      const productToEdit = products.find((c) => c.id === id);
-
-      if (!productToEdit) return;
-
-      const productWithCategories = {
-        ...productToEdit,
-        productCategories: productToEdit.productCategories?.map((pc) => pc.category.id) || [],
-      };
-
-      form.reset(productWithCategories);
-      setEditProduct(productToEdit);
-    } else {
-      form.reset(defaultProductFormValues);
-    }
-
-    setShowModal(true);
-  }
-
-  function closeModal() {
-    setShowModal(false);
-    if (editProduct != null) {
-      setEditProduct(null);
-    }
-    form.reset(defaultProductFormValues);
-  }
-
-  async function onSubmit(values: z.infer<typeof productFormSchema>) {
-    let response: Response;
-    //TODO: Remove this after image upload is implemented
-    values.imageUrls = ['/banner.webp'];
-    if (editProduct != null) {
-      response = await updateProduct.mutateAsync({
-        id: editProduct.id,
-        payload: values,
-      });
-    } else {
-      response = await createProduct.mutateAsync({ product: values });
-    }
-
-    if (response.ok) {
-      closeModal();
-    }
-  }
-
-  function handleDelete(id: string) {
-    const product = products.find((p) => p.id === id);
-    if (product) {
-      setProductToDelete({ id: product.id, name: product.name });
-      setShowDeleteAlert(true);
-    }
-  }
+export default function AdminProductsPage() {
+  const router = useRouter();
+  const { data: products = [], isLoading } = useAdminProducts();
+  const { remove } = useAdminProductMutations();
+  const [pendingDelete, setPendingDelete] = useState<AdminProductRow | null>(null);
 
   async function confirmDelete() {
-    if (!productToDelete) return;
-
+    if (!pendingDelete) return;
     try {
-      await removeProduct.mutateAsync(productToDelete.id);
-      setShowDeleteAlert(false);
-      setProductToDelete(null);
-    } catch (error) {
-      console.error('Failed to delete product:', error);
+      await remove.mutateAsync(pendingDelete.id);
+    } finally {
+      setPendingDelete(null);
     }
   }
 
-  function cancelDelete() {
-    setShowDeleteAlert(false);
-    setProductToDelete(null);
-  }
+  const columns: ColumnDef<AdminProductRow>[] = [
+    {
+      accessorKey: 'image',
+      header: 'Image',
+      cell: ({ row }) => {
+        const img = row.original.images[0];
+        return img ? (
+          <div className="w-12 h-12 relative rounded overflow-hidden bg-muted">
+            <Image src={img.url} alt={row.original.name} fill className="object-cover" />
+          </div>
+        ) : (
+          <div className="w-12 h-12 rounded bg-muted" />
+        );
+      },
+    },
+    {
+      accessorKey: 'name',
+      header: 'Product',
+      cell: ({ row }) => (
+        <div className="flex flex-col">
+          <span className="font-medium">{row.original.name}</span>
+          <span className="text-muted-foreground text-xs">{row.original.slug}</span>
+        </div>
+      ),
+    },
+    {
+      accessorKey: 'brand',
+      header: 'Brand',
+      cell: ({ row }) => row.original.brand?.name ?? '-',
+    },
+    {
+      accessorKey: 'price',
+      header: 'Price',
+      cell: ({ row }) => {
+        const { cheapest } = variantSummary(row.original);
+        if (!cheapest) return '-';
+        return formatBDT(cheapest.sellingPriceCents);
+      },
+    },
+    {
+      accessorKey: 'stock',
+      header: 'Stock',
+      cell: ({ row }) => {
+        const { totalStock, lowStock } = variantSummary(row.original);
+        return (
+          <span
+            className={
+              lowStock ? 'flex items-center gap-1 text-amber-600 dark:text-amber-400' : ''
+            }
+          >
+            {lowStock ? <IconAlertTriangle className="h-4 w-4" /> : null}
+            {totalStock}
+          </span>
+        );
+      },
+    },
+    {
+      accessorKey: 'status',
+      header: 'Status',
+      cell: ({ row }) => <Badge variant="outline">{row.original.status}</Badge>,
+    },
+    {
+      id: 'actions',
+      cell: ({ row }) => (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon">
+              <IconDotsVertical />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem asChild>
+              <Link href={`/dashboard/products/${row.original.id}/edit`}>Edit</Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              variant="destructive"
+              onClick={() => setPendingDelete(row.original)}
+            >
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ),
+    },
+  ];
+
   return (
     <>
       <DataTable
-        OpenModal={OpenModal}
-        data={products}
+        OpenModal={() => router.push('/dashboard/products/new')}
         AddButtonText="Add Product"
-        columns={columns(OpenModal, handleDelete, brands)}
+        columns={columns}
+        data={isLoading ? [] : products}
       />
 
-      <Modal
-        title={editProduct != null ? 'Edit Product' : 'Add Product'}
-        isOpen={showModal}
-        onChange={(bool) => {
-          if (!bool) closeModal();
-        }}
-      >
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4">
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Product Name</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="Product Name"
-                      {...field}
-                      onChange={(e) => {
-                        field.onChange(e);
-                        form.setValue('slug', slugify(e.target.value));
-                      }}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="slug"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Slug</FormLabel>
-                  <FormControl>
-                    <Input placeholder="slug" {...field} disabled={true} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <div className="flex flex-row gap-4">
-              <FormField
-                control={form.control}
-                name="status"
-                render={({ field }) => (
-                  <FormItem className="flex-1">
-                    <FormLabel>Status</FormLabel>
-                    <FormControl>
-                      <SelectAtom
-                        field={field}
-                        options={ProductStatusOptions}
-                        placeholder="Select Status"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="stock"
-                render={({ field }) => (
-                  <FormItem className="flex-1">
-                    <FormLabel>Stock</FormLabel>
-
-                    <FormControl>
-                      <Input
-                        type="number"
-                        placeholder="Stock"
-                        {...field}
-                        onChange={(e) => {
-                          field.onChange(e);
-                          form.setValue('stock', Number(e.target.value));
-                        }}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Description</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Description" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="flex flex-row gap-4">
-              <FormField
-                control={form.control}
-                name="priceCents"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Price in cents</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        placeholder="Price in cents"
-                        {...field}
-                        onChange={(e) => {
-                          field.onChange(e);
-                          form.setValue('priceCents', Number(e.target.value));
-                        }}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="discountCents"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Discount in cents</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        placeholder="Discount in cents"
-                        {...field}
-                        onChange={(e) => {
-                          field.onChange(e);
-                          form.setValue('discountCents', Number(e.target.value));
-                        }}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="discountPercentage"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Discount (%)</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        placeholder="Discount in percentage"
-                        {...field}
-                        onChange={(e) => {
-                          field.onChange(e);
-                          form.setValue('discountPercentage', Number(e.target.value));
-                        }}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <FormField
-              control={form.control}
-              name="brandId"
-              render={({ field }) => (
-                <FormItem className="flex-1">
-                  <FormLabel>Brand</FormLabel>
-                  <FormControl>
-                    <SelectAtom
-                      field={field}
-                      options={brands.map((brand) => ({ value: brand.id, label: brand.name }))}
-                      placeholder="Select Brand"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="productCategories"
-              render={({ field }) => (
-                <FormItem className="flex-1">
-                  <FormLabel>Categories</FormLabel>
-                  <FormControl>
-                    <MultiSelect
-                      field={field}
-                      options={categories.map((category) => ({
-                        value: category.id,
-                        label: category.name,
-                      }))}
-                      placeholder="Select Categories"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="imageUrls"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Image URLs (comma-separated)</FormLabel>
-                  <FormControl>
-                    <ImageUpload
-                      onChange={(value) => field.onChange([...field.value, value])}
-                      value={field.value[0]}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <Button type="submit">{editProduct != null ? 'Edit Product' : 'Add Product'}</Button>
-          </form>
-        </Form>
-      </Modal>
-      {/* NOTE: Delete should be done by super admin only */}
       <Alert
-        onConfirm={confirmDelete}
-        open={showDeleteAlert}
-        setOpen={cancelDelete}
-        title="Delete Product"
-        description={`Are you sure you want to delete "${productToDelete?.name}"? This action cannot be undone and will remove the product from your system.`}
-        confirmText="Delete Product"
+        open={!!pendingDelete}
+        setOpen={(b) => !b && setPendingDelete(null)}
+        title="Delete product"
+        description={
+          pendingDelete
+            ? `Are you sure you want to delete "${pendingDelete.name}"? Products that have been ordered are archived instead of deleted.`
+            : ''
+        }
+        confirmText="Delete"
         cancelText="Cancel"
-        isLoading={removeProduct.isPending}
+        onConfirm={confirmDelete}
+        isLoading={remove.isPending}
       />
     </>
   );
