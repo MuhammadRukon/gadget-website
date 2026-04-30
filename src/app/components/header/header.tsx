@@ -1,7 +1,9 @@
 'use client';
 
-import { Handshake, Percent, User } from 'lucide-react';
+import { Handshake, Moon, Percent, Sun } from 'lucide-react';
 import { JSX, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useTheme } from 'next-themes';
 
 import { HeaderButtonsProps, HeaderSearchProps } from './header.types';
 import { IHeaderButton } from '@/interfaces';
@@ -9,51 +11,48 @@ import { IHeaderButton } from '@/interfaces';
 import { HeaderButton } from '@/app/common/button/header-button';
 import { Container } from '@/app/components/container/container';
 import { Menu } from '@/app/components/menu/menu';
-import { menu } from '@/app/utils/dummy-data';
+import { HeaderAccount } from '@/app/components/header/header-account';
+import type { MenuCategory } from '@/app/components/menu/menu.types';
 import { removeOccur } from '@/app/utils/helper';
 
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
-import { getSavedTheme, toggleTheme } from '@/app/utils/theme';
-
-import { applyTheme } from '@/app/utils/theme';
 import { Logo } from '@/app/common/logo/logo.atom';
 
-export function Header(): JSX.Element {
+export interface HeaderProps {
+  menu: MenuCategory[];
+}
+
+export function Header({ menu }: HeaderProps): JSX.Element {
   return (
     <>
       <Header.TopBar />
-      <Header.Menu />
+      <Header.Menu menu={menu} />
     </>
   );
 }
 
 Header.TopBar = function TopBar(): JSX.Element {
+  const router = useRouter();
   const [search, setSearch] = useState('');
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const { resolvedTheme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    applyTheme(getSavedTheme());
-    setTheme(getSavedTheme());
+    setMounted(true);
   }, []);
 
-  const headerButtons: IHeaderButton[] = [
-    {
-      href: '/deals',
-      title: 'PC Deals',
-      icon: <Handshake size={14} />,
-    },
-    {
-      href: '/offers',
-      title: 'Offers',
+  const isDark = mounted && resolvedTheme === 'dark';
 
-      icon: <Percent size={14} />,
-    },
-    {
-      href: '/login',
-      title: 'Login',
-      icon: <User size={14} />,
-    },
+  function submitSearch(e: React.FormEvent) {
+    e.preventDefault();
+    const trimmed = search.trim();
+    router.push(trimmed ? `/products?q=${encodeURIComponent(trimmed)}` : '/products');
+  }
+
+  const headerButtons: IHeaderButton[] = [
+    { href: '/deals', title: 'PC Deals', icon: <Handshake size={14} /> },
+    { href: '/offers', title: 'Offers', icon: <Percent size={14} /> },
   ];
 
   return (
@@ -61,11 +60,21 @@ Header.TopBar = function TopBar(): JSX.Element {
       <div className="flex flex-col gap-y-2 sm:flex-row items-center justify-between sm:h-10">
         <Header.Logo />
 
-        <Header.Search search={search} setSearch={setSearch} />
+        <Header.Search search={search} setSearch={setSearch} onSubmit={submitSearch} />
 
         <Header.Buttons headerButtons={headerButtons} />
 
-        <Switch checked={theme === 'dark'} onCheckedChange={() => setTheme(toggleTheme())} />
+        <HeaderAccount />
+
+        <div className="flex items-center gap-1.5">
+          <Sun size={14} className="text-muted-foreground" aria-hidden />
+          <Switch
+            checked={isDark}
+            onCheckedChange={(checked) => setTheme(checked ? 'dark' : 'light')}
+            aria-label="Toggle dark mode"
+          />
+          <Moon size={14} className="text-muted-foreground" aria-hidden />
+        </div>
       </div>
     </Container>
   );
@@ -79,17 +88,25 @@ Header.Logo = function HeaderLogo(): JSX.Element {
   );
 };
 
-Header.Search = function HeaderSearch({ search, setSearch }: HeaderSearchProps): JSX.Element {
+interface HeaderSearchPropsWithSubmit extends HeaderSearchProps {
+  onSubmit: (e: React.FormEvent) => void;
+}
+
+Header.Search = function HeaderSearch({
+  search,
+  setSearch,
+  onSubmit,
+}: HeaderSearchPropsWithSubmit): JSX.Element {
   return (
-    <div className="flex-1 sm:mr-4 md:mr-10">
+    <form className="flex-1 sm:mr-4 md:mr-10" onSubmit={onSubmit}>
       <Input
-        type="text"
-        placeholder="Search"
+        type="search"
+        placeholder="Search products"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        className="dark:placeholder:text-white w-full h-7 placeholder:text-sm text-sm max-w-sm "
+        className="dark:placeholder:text-white w-full h-7 placeholder:text-sm text-sm max-w-sm"
       />
-    </div>
+    </form>
   );
 };
 
@@ -103,7 +120,7 @@ Header.Buttons = function HeaderButtons({ headerButtons }: HeaderButtonsProps): 
   );
 };
 
-Header.Menu = function HeaderMenu(): JSX.Element {
+Header.Menu = function HeaderMenu({ menu }: { menu: MenuCategory[] }): JSX.Element {
   return (
     <Container WrapperClassName="border-b border-gray-200 dark:border-[#222223]">
       <Menu menu={menu} />

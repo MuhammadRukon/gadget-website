@@ -1,5 +1,3 @@
-export const THEME_KEY = 'theme';
-
 export const COLORS = {};
 
 export const RANGE_MIN = 0;
