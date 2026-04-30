@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { signIn } from 'next-auth/react';
@@ -23,7 +23,7 @@ import { AuthCard } from '@/modules/auth/components/auth-card';
 import { GoogleButton } from '@/modules/auth/components/google-button';
 import { Loader } from '@/app/common/loader/loader';
 
-export default function LoginPage() {
+function LoginContent() {
   const router = useRouter();
   const params = useSearchParams();
   const callbackUrl = params.get('callbackUrl') || '/';
@@ -105,5 +105,13 @@ export default function LoginPage() {
       </Form>
       <GoogleButton callbackUrl={callbackUrl} disabled={isSubmitting} />
     </AuthCard>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="py-8 text-center text-sm text-muted-foreground">Loading...</div>}>
+      <LoginContent />
+    </Suspense>
   );
 }

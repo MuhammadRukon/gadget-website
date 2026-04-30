@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
@@ -22,7 +22,7 @@ import { resetPasswordAction } from '@/modules/auth/actions';
 import { AuthCard } from '@/modules/auth/components/auth-card';
 import { Loader } from '@/app/common/loader/loader';
 
-export default function ResetPasswordPage() {
+function ResetPasswordContent() {
   const router = useRouter();
   const params = useSearchParams();
   const token = params.get('token') ?? '';
@@ -92,5 +92,13 @@ export default function ResetPasswordPage() {
         </Form>
       )}
     </AuthCard>
+  );
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={<div className="py-8 text-center text-sm text-muted-foreground">Loading...</div>}>
+      <ResetPasswordContent />
+    </Suspense>
   );
 }

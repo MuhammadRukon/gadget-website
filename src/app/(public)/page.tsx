@@ -11,6 +11,8 @@ export const metadata = {
   description: 'Discover the latest gadgets, laptops, phones and accessories.',
 };
 
+export const revalidate = 120;
+
 export default async function HomePage() {
   const featured = await catalogService.listPublicProducts({ sort: 'newest', limit: 8 });
 

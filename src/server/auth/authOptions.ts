@@ -26,6 +26,7 @@ const useGoogle = !!process.env.GOOGLE_CLIENT_ID && !!process.env.GOOGLE_CLIENT_
 
 export const authOptions: NextAuthConfig = {
   session: { strategy: 'jwt' },
+  trustHost: process.env.AUTH_TRUST_HOST === 'true' || process.env.NODE_ENV !== 'production',
   pages: {
     signIn: '/login',
   },

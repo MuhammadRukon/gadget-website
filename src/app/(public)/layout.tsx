@@ -6,6 +6,8 @@ import type { MenuCategory } from '../components/menu/menu.types';
 
 import { catalogService } from '@/server/catalog/catalog.service';
 
+// export const dynamic = 'force-dynamic';
+
 /**
  * Public storefront shell. Loads navigation data (categories, brands)
  * server-side so the header is rendered with real menu links and is
