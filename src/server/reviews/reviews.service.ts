@@ -59,7 +59,7 @@ export const reviewsService = {
     const items = await prisma.orderItem.findMany({
       where: {
         order: { userId, status: OrderStatus.DELIVERED },
-        reviews: { none: {} },
+        reviews: { is: null },
         productId: { not: null },
       },
       include: {
