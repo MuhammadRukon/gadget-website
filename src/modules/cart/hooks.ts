@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 
 import { apiFetch } from '@/lib/fetcher';
 import { queryKeys } from '@/constants/queryKeys';
-import type { CartSnapshot } from '@/contracts/cart';
+import type { CartSnapshot, CartSummary } from '@/contracts/cart';
 import { useGuestCart } from './guest-cart';
 
 const CART_URL = '/api/cart';
@@ -17,11 +17,20 @@ function explainError(err: unknown, fallback: string): string {
   return fallback;
 }
 
-export function useServerCart() {
+export function useServerCart(view: 'full'): ReturnType<typeof useQuery<CartSnapshot>>;
+export function useServerCart(view: 'summary'): ReturnType<typeof useQuery<CartSummary>>;
+export function useServerCart(
+  view: 'full' | 'summary' = 'full',
+): ReturnType<typeof useQuery<CartSnapshot | CartSummary>> {
   const { status } = useSession();
   return useQuery({
-    queryKey: queryKeys.cart,
-    queryFn: () => apiFetch<CartSnapshot>(CART_URL),
+    queryKey: view === 'summary' ? queryKeys.cartSummary : queryKeys.cart,
+    queryFn: async () => {
+      if (view === 'summary') {
+        return apiFetch<CartSummary>(`${CART_URL}?view=summary`);
+      }
+      return apiFetch<CartSnapshot>(CART_URL);
+    },
     enabled: status === 'authenticated',
   });
 }
@@ -30,7 +39,15 @@ export function useCartMutations() {
   const qc = useQueryClient();
   const { status } = useSession();
   const guest = useGuestCart();
-  const invalidate = () => qc.invalidateQueries({ queryKey: queryKeys.cart });
+  const syncCartCache = (snapshot: CartSnapshot | null) => {
+    if (!snapshot) return;
+    qc.setQueryData(queryKeys.cart, snapshot);
+    qc.setQueryData(queryKeys.cartSummary, {
+      subtotalCents: snapshot.subtotalCents,
+      itemCount: snapshot.itemCount,
+      hasIssues: snapshot.lines.some((line) => !line.isActive || line.quantity > line.stock),
+    } satisfies CartSummary);
+  };
 
   const addItem = useMutation({
     mutationFn: async (input: { variantId: string; quantity: number }) => {
@@ -40,9 +57,11 @@ export function useCartMutations() {
       }
       return apiFetch<CartSnapshot>(CART_URL, { method: 'POST', body: input });
     },
-    onSuccess: () => toast.success('Added to cart'),
+    onSuccess: (snapshot) => {
+      syncCartCache(snapshot);
+      toast.success('Added to cart');
+    },
     onError: (err) => toast.error(explainError(err, 'Could not add to cart')),
-    onSettled: invalidate,
   });
 
   const updateItem = useMutation({
@@ -60,8 +79,8 @@ export function useCartMutations() {
         body: { quantity: input.quantity },
       });
     },
+    onSuccess: (snapshot) => syncCartCache(snapshot),
     onError: (err) => toast.error(explainError(err, 'Could not update quantity')),
-    onSettled: invalidate,
   });
 
   const removeItem = useMutation({
@@ -72,8 +91,8 @@ export function useCartMutations() {
       }
       return apiFetch<CartSnapshot>(`${CART_URL}/${input.itemId}`, { method: 'DELETE' });
     },
+    onSuccess: (snapshot) => syncCartCache(snapshot),
     onError: (err) => toast.error(explainError(err, 'Could not remove item')),
-    onSettled: invalidate,
   });
 
   return { addItem, updateItem, removeItem };
@@ -99,6 +118,7 @@ export function useGuestCartMerge() {
       .then(() => {
         clear();
         qc.invalidateQueries({ queryKey: queryKeys.cart });
+        qc.invalidateQueries({ queryKey: queryKeys.cartSummary });
       })
       .catch(() => {
         // We swallow the error so the login flow is never blocked by

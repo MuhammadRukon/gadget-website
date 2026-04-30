@@ -10,6 +10,7 @@ export const queryKeys = {
     ['product', 'list', params ?? {}] as const,
   productBySlug: (slug: string) => ['product', 'slug', slug] as const,
   cart: ['cart'] as const,
+  cartSummary: ['cart', 'summary'] as const,
   orders: ['orders'] as const,
   orderById: (id: string) => ['orders', id] as const,
 };

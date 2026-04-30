@@ -29,6 +29,12 @@ export interface CartSnapshot {
   itemCount: number;
 }
 
+export interface CartSummary {
+  subtotalCents: number;
+  itemCount: number;
+  hasIssues: boolean;
+}
+
 export const guestCartLineSchema = z.object({
   variantId: z.string(),
   quantity: z.number().int().min(1).max(99),

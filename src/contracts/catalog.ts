@@ -161,3 +161,11 @@ export interface PublicProductDetail {
   images: { url: string; alt: string | null }[];
   variants: PublicProductVariant[];
 }
+
+export interface PublicProductMetadata {
+  slug: string;
+  name: string;
+  metaTitle: string | null;
+  metaDescription: string | null;
+  imageUrl: string | null;
+}

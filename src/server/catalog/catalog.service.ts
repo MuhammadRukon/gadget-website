@@ -7,6 +7,7 @@ import {
   ProductInput,
   ProductListQuery,
   PublicProductDetail,
+  PublicProductMetadata,
   PublicProductPage,
   PublicProductSummary,
   PublicProductVariant,
@@ -35,19 +36,6 @@ function pricingFromVariant(v: {
     originalPriceCents: v.sellingPriceCents,
     inStock: v.isActive && v.stock > 0,
   };
-}
-
-function lowestActivePricing(
-  variants: { sellingPriceCents: number; discountCents: number; stock: number; isActive: boolean }[],
-): VariantPricing {
-  const active = variants.filter((v) => v.isActive);
-  const candidates = active.length > 0 ? active : variants;
-  let best: VariantPricing | null = null;
-  for (const v of candidates) {
-    const p = pricingFromVariant(v);
-    if (!best || p.priceCents < best.priceCents) best = p;
-  }
-  return best ?? { priceCents: 0, originalPriceCents: 0, inStock: false };
 }
 
 function ensureUniqueSkus(variants: VariantInput[]) {
@@ -454,34 +442,54 @@ export const catalogService = {
 
     const where = this.buildPublicProductWhere(query);
 
-    const orderBy: Prisma.ProductOrderByWithRelationInput =
-      sort === 'newest'
-        ? { createdAt: 'desc' }
-        : sort === 'price_asc'
-          ? { name: 'asc' }
-          : { name: 'desc' };
+    if (query.minPrice !== undefined || query.maxPrice !== undefined) {
+      where.variants = {
+        ...(where.variants ?? {}),
+        some: {
+          ...(typeof where.variants === 'object' && where.variants && 'some' in where.variants
+            ? where.variants.some
+            : {}),
+          isActive: true,
+          ...(query.minPrice !== undefined ? { sellingPriceCents: { gte: query.minPrice } } : {}),
+          ...(query.maxPrice !== undefined ? { sellingPriceCents: { lte: query.maxPrice } } : {}),
+        },
+      };
+    }
 
-    // For price sorting we need to inspect variants; we fetch a wider
-    // slice and sort in memory to avoid raw SQL. For typical catalog
-    // sizes this is fast and keeps the pipeline portable.
-    const isPriceSort = sort === 'price_asc' || sort === 'price_desc';
-    const fetchAll = isPriceSort;
+    const orderBy: Prisma.ProductOrderByWithRelationInput[] = [{ createdAt: 'desc' }];
 
     const [rows, total] = await Promise.all([
       prisma.product.findMany({
         where,
         orderBy,
-        skip: fetchAll ? undefined : skip,
-        take: fetchAll ? undefined : pageSize,
-        include: {
+        skip,
+        take: pageSize,
+        select: {
+          id: true,
+          createdAt: true,
+          slug: true,
+          name: true,
+          isPopular: true,
           brand: { select: { id: true, name: true, slug: true } },
           images: { orderBy: { sortOrder: 'asc' }, take: 1 },
           variants: {
+            where: { isActive: true },
+            orderBy: { sellingPriceCents: 'asc' },
+            take: 1,
             select: {
               sellingPriceCents: true,
               discountCents: true,
               stock: true,
-              isActive: true,
+            },
+          },
+          _count: {
+            select: {
+              variants: {
+                where: {
+                  isActive: true,
+                  stock: { gt: 0 },
+                },
+              },
             },
           },
         },
@@ -489,8 +497,30 @@ export const catalogService = {
       prisma.product.count({ where }),
     ]);
 
-    let items: PublicProductSummary[] = rows.map((p) => {
-      const pricing = lowestActivePricing(p.variants);
+    const sortedRows =
+      sort === 'newest'
+        ? rows
+        : [...rows].sort((a, b) => {
+            const aPrice = a.variants[0]?.sellingPriceCents ?? Number.POSITIVE_INFINITY;
+            const bPrice = b.variants[0]?.sellingPriceCents ?? Number.POSITIVE_INFINITY;
+
+            if (aPrice === bPrice) {
+              return b.createdAt.getTime() - a.createdAt.getTime();
+            }
+
+            return sort === 'price_asc' ? aPrice - bPrice : bPrice - aPrice;
+          });
+
+    const items: PublicProductSummary[] = sortedRows.map((p) => {
+      const variant = p.variants[0];
+      const pricing = variant
+        ? pricingFromVariant({
+            sellingPriceCents: variant.sellingPriceCents,
+            discountCents: variant.discountCents,
+            stock: variant.stock,
+            isActive: true,
+          })
+        : { priceCents: 0, originalPriceCents: 0, inStock: false };
       return {
         id: p.id,
         slug: p.slug,
@@ -499,47 +529,58 @@ export const catalogService = {
         imageUrl: p.images[0]?.url ?? null,
         priceCents: pricing.priceCents,
         originalPriceCents: pricing.originalPriceCents,
-        inStock: pricing.inStock,
+        inStock: p._count.variants > 0,
         isPopular: p.isPopular,
       };
     });
-
-    if (query.minPrice !== undefined) {
-      items = items.filter((it) => it.priceCents >= query.minPrice!);
-    }
-    if (query.maxPrice !== undefined) {
-      items = items.filter((it) => it.priceCents <= query.maxPrice!);
-    }
-
-    if (isPriceSort) {
-      items = items.slice().sort((a, b) =>
-        sort === 'price_asc' ? a.priceCents - b.priceCents : b.priceCents - a.priceCents,
-      );
-      const startIdx = skip;
-      items = items.slice(startIdx, startIdx + pageSize);
-    }
 
     return { items, total, page, pageSize };
   },
 
   async getPublicProductBySlug(slug: string): Promise<PublicProductDetail> {
-    const product = await prisma.product.findUnique({
-      where: { slug },
-      include: {
+    const product = await prisma.product.findFirst({
+      where: { slug, status: PublishStatus.PUBLISHED },
+      select: {
+        id: true,
+        slug: true,
+        name: true,
+        description: true,
+        warrantyMonths: true,
+        metaTitle: true,
+        metaDescription: true,
         brand: { select: { id: true, name: true, slug: true } },
         categories: {
-          include: { category: { select: { id: true, name: true, slug: true } } },
+          select: {
+            category: {
+              select: { id: true, name: true, slug: true },
+            },
+          },
         },
-        images: { orderBy: { sortOrder: 'asc' } },
-        variants: { orderBy: { createdAt: 'asc' } },
+        images: {
+          orderBy: { sortOrder: 'asc' },
+          select: { url: true, alt: true },
+        },
+        variants: {
+          where: { isActive: true },
+          orderBy: { createdAt: 'asc' },
+          select: {
+            id: true,
+            sku: true,
+            name: true,
+            attributes: true,
+            sellingPriceCents: true,
+            discountCents: true,
+            stock: true,
+            isActive: true,
+          },
+        },
       },
     });
-    if (!product || product.status !== PublishStatus.PUBLISHED) {
+    if (!product) {
       throw new NotFoundError('Product');
     }
 
     const variants: PublicProductVariant[] = product.variants
-      .filter((v) => v.isActive)
       .map((v) => {
         const p = pricingFromVariant(v);
         return {
@@ -565,6 +606,35 @@ export const catalogService = {
       categories: product.categories.map((c) => c.category),
       images: product.images.map((i) => ({ url: i.url, alt: i.alt })),
       variants,
+    };
+  },
+
+  async getPublicProductMetadataBySlug(slug: string): Promise<PublicProductMetadata> {
+    const product = await prisma.product.findUnique({
+      where: { slug },
+      select: {
+        slug: true,
+        name: true,
+        metaTitle: true,
+        metaDescription: true,
+        status: true,
+        images: {
+          orderBy: { sortOrder: 'asc' },
+          take: 1,
+          select: { url: true },
+        },
+      },
+    });
+    if (!product || product.status !== PublishStatus.PUBLISHED) {
+      throw new NotFoundError('Product');
+    }
+
+    return {
+      slug: product.slug,
+      name: product.name,
+      metaTitle: product.metaTitle,
+      metaDescription: product.metaDescription,
+      imageUrl: product.images[0]?.url ?? null,
     };
   },
 

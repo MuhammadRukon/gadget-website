@@ -3,6 +3,8 @@ import { NextResponse } from 'next/server';
 import { catalogService } from '@/server/catalog/catalog.service';
 import { jsonError } from '@/server/common/http';
 
+export const revalidate = 120;
+
 interface Ctx {
   params: Promise<{ slug: string }>;
 }

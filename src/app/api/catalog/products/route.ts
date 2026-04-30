@@ -4,6 +4,8 @@ import { productListQuerySchema } from '@/contracts/catalog';
 import { catalogService } from '@/server/catalog/catalog.service';
 import { jsonError } from '@/server/common/http';
 
+export const revalidate = 60;
+
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);

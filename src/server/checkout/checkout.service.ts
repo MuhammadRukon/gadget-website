@@ -37,6 +37,14 @@ interface ResolvedCartLine {
   quantity: number;
 }
 
+function groupQtyByVariantId(lines: Pick<ResolvedCartLine, 'variantId' | 'quantity'>[]) {
+  const byVariantId = new Map<string, number>();
+  for (const line of lines) {
+    byVariantId.set(line.variantId, (byVariantId.get(line.variantId) ?? 0) + line.quantity);
+  }
+  return byVariantId;
+}
+
 async function loadAddressOrThrow(userId: string, addressId: string) {
   const address = await prisma.address.findFirst({ where: { id: addressId, userId } });
   if (!address) throw new NotFoundError('Address');
@@ -195,7 +203,18 @@ export const checkoutService = {
       });
       const totalCents = Math.max(0, subtotalCents - discountCents) + shippingCents;
 
-      // 3. Create order with snapshotted address + items.
+      // 3. Re-check grouped stock totals to avoid oversell when the same
+      // variant appears multiple times (defensive) and to support grouped
+      // decrement updates below.
+      const qtyByVariantId = groupQtyByVariantId(lines);
+      for (const [variantId, requiredQty] of qtyByVariantId.entries()) {
+        const variant = cartItems.find((item) => item.variant.id === variantId)?.variant;
+        if (!variant || variant.stock < requiredQty) {
+          throw new ValidationError('Not enough stock to complete checkout', { variantId });
+        }
+      }
+
+      // 4. Create order with snapshotted address + items.
       const order = await tx.order.create({
         data: {
           orderNumber: generateOrderNumber(),
@@ -233,15 +252,15 @@ export const checkoutService = {
         },
       });
 
-      // 4. Decrement stock per variant.
-      for (const l of lines) {
+      // 5. Decrement stock per variant (grouped, fewer writes).
+      for (const [variantId, quantity] of qtyByVariantId.entries()) {
         await tx.productVariant.update({
-          where: { id: l.variantId },
-          data: { stock: { decrement: l.quantity } },
+          where: { id: variantId },
+          data: { stock: { decrement: quantity } },
         });
       }
 
-      // 5. Increment coupon usage atomically.
+      // 6. Increment coupon usage atomically.
       if (couponId) {
         await tx.coupon.update({
           where: { id: couponId },
@@ -249,7 +268,7 @@ export const checkoutService = {
         });
       }
 
-      // 6. Create payment record.
+      // 7. Create payment record.
       const isCod = input.paymentMethod === PaymentMethod.COD;
       const payment = await tx.payment.create({
         data: {
@@ -260,7 +279,7 @@ export const checkoutService = {
         },
       });
 
-      // 7. Clear cart and audit.
+      // 8. Clear cart and audit.
       await tx.cartItem.deleteMany({ where: { cart: { userId } } });
       await tx.orderEvent.create({
         data: { orderId: order.id, status: OrderStatus.PENDING, note: 'Order placed', actorId: userId },

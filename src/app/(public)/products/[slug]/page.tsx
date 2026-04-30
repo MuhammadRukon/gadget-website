@@ -8,19 +8,19 @@ import { ProductDetail } from '@/modules/storefront/components/product-detail';
 interface PageProps {
   params: Promise<{ slug: string }>;
 }
+export const revalidate = 120;
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
   try {
-    const product = await catalogService.getPublicProductBySlug(slug);
+    const product = await catalogService.getPublicProductMetadataBySlug(slug);
     return {
       title: product.metaTitle ?? product.name,
-      description:
-        product.metaDescription ?? product.description.slice(0, 200),
+      description: product.metaDescription ?? undefined,
       openGraph: {
         title: product.metaTitle ?? product.name,
-        description: product.metaDescription ?? product.description.slice(0, 200),
-        images: product.images.slice(0, 1).map((img) => ({ url: img.url })),
+        description: product.metaDescription ?? undefined,
+        images: product.imageUrl ? [{ url: product.imageUrl }] : [],
       },
     };
   } catch (err) {

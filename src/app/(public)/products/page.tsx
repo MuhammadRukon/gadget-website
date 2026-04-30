@@ -10,6 +10,7 @@ export const metadata: Metadata = {
   title: 'All products',
   description: 'Browse all gadgets and electronics in the catalog.',
 };
+export const revalidate = 60;
 
 interface PageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;

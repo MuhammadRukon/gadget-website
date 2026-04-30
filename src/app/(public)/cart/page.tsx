@@ -19,7 +19,7 @@ export default function CartPage() {
   const { status } = useSession();
   useGuestCartMerge();
 
-  const serverCart = useServerCart();
+  const serverCart = useServerCart('full');
   const guestLines = useGuestCart((s) => s.lines);
   const [guestSnapshot, setGuestSnapshot] = useState<CartSnapshot | null>(null);
   const [hydratingGuest, setHydratingGuest] = useState(false);
