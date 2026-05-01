@@ -104,9 +104,7 @@ export const catalogService = {
     } catch (err) {
       if (err instanceof Prisma.PrismaClientKnownRequestError) {
         if (err.code === 'P2002') {
-          throw new ConflictError(
-            `A brand with this ${uniqueConstraintField(err)} already exists`,
-          );
+          throw new ConflictError(`A brand with this ${uniqueConstraintField(err)} already exists`);
         }
         if (err.code === 'P2025') throw new NotFoundError('Brand');
       }
@@ -166,9 +164,7 @@ export const catalogService = {
         iconUrl: input.iconUrl ?? null,
         isPopular: input.isPopular ?? false,
         status: categoryStatusOrDefault(input),
-        parent: input.parentId
-          ? { connect: { id: input.parentId } }
-          : { disconnect: true },
+        parent: input.parentId ? { connect: { id: input.parentId } } : { disconnect: true },
       });
     } catch (err) {
       if (err instanceof Prisma.PrismaClientKnownRequestError) {
@@ -580,19 +576,18 @@ export const catalogService = {
       throw new NotFoundError('Product');
     }
 
-    const variants: PublicProductVariant[] = product.variants
-      .map((v) => {
-        const p = pricingFromVariant(v);
-        return {
-          id: v.id,
-          sku: v.sku,
-          name: v.name,
-          attributes: (v.attributes as Record<string, string>) ?? {},
-          priceCents: p.priceCents,
-          originalPriceCents: p.originalPriceCents,
-          inStock: p.inStock,
-        };
-      });
+    const variants: PublicProductVariant[] = product.variants.map((v) => {
+      const p = pricingFromVariant(v);
+      return {
+        id: v.id,
+        sku: v.sku,
+        name: v.name,
+        attributes: (v.attributes as Record<string, string>) ?? {},
+        priceCents: p.priceCents,
+        originalPriceCents: p.originalPriceCents,
+        inStock: p.inStock,
+      };
+    });
 
     return {
       id: product.id,
@@ -609,34 +604,34 @@ export const catalogService = {
     };
   },
 
-  async getPublicProductMetadataBySlug(slug: string): Promise<PublicProductMetadata> {
-    const product = await prisma.product.findUnique({
-      where: { slug },
-      select: {
-        slug: true,
-        name: true,
-        metaTitle: true,
-        metaDescription: true,
-        status: true,
-        images: {
-          orderBy: { sortOrder: 'asc' },
-          take: 1,
-          select: { url: true },
-        },
-      },
-    });
-    if (!product || product.status !== PublishStatus.PUBLISHED) {
-      throw new NotFoundError('Product');
-    }
+  // async getPublicProductMetadataBySlug(slug: string): Promise<PublicProductMetadata> {
+  //   const product = await prisma.product.findUnique({
+  //     where: { slug },
+  //     select: {
+  //       slug: true,
+  //       name: true,
+  //       metaTitle: true,
+  //       metaDescription: true,
+  //       status: true,
+  //       images: {
+  //         orderBy: { sortOrder: 'asc' },
+  //         take: 1,
+  //         select: { url: true },
+  //       },
+  //     },
+  //   });
+  //   if (!product || product.status !== PublishStatus.PUBLISHED) {
+  //     throw new NotFoundError('Product');
+  //   }
 
-    return {
-      slug: product.slug,
-      name: product.name,
-      metaTitle: product.metaTitle,
-      metaDescription: product.metaDescription,
-      imageUrl: product.images[0]?.url ?? null,
-    };
-  },
+  //   return {
+  //     slug: product.slug,
+  //     name: product.name,
+  //     metaTitle: product.metaTitle,
+  //     metaDescription: product.metaDescription,
+  //     imageUrl: product.images[0]?.url ?? null,
+  //   };
+  // },
 
   /**
    * Delete only when the product has never been part of an order. Otherwise

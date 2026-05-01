@@ -24,6 +24,7 @@ export default async function HomePage() {
             <Image
               className="w-full max-h-96 object-cover rounded"
               src="/banner.webp"
+              loading="eager"
               alt="Storefront banner"
               width={1600}
               height={500}

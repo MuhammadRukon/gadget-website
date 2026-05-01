@@ -7,6 +7,7 @@ import { ProductFilters } from '@/modules/storefront/components/product-filters'
 import { ProductGrid } from '@/modules/storefront/components/product-grid';
 import { StorefrontPagination } from '@/modules/storefront/components/storefront-pagination';
 import { prisma } from '@/lib/prisma';
+import { cache } from 'react';
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -14,25 +15,34 @@ interface PageProps {
 }
 export const revalidate = 60;
 
+const getCategoryBySlug = cache(async (slug: string) => {
+  return prisma.category.findUnique({
+    where: { slug },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      status: true,
+    },
+  });
+});
+
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
-  const cat = await prisma.category.findUnique({ where: { slug } });
+  const cat = await getCategoryBySlug(slug);
   if (!cat) return { title: 'Category not found' };
   return {
-    title: cat.name,
-    description: `Browse all ${cat.name} products in our catalog.`,
+    title: cat.name ?? '',
+    description: `Browse all ${cat.name ?? ''} products in our catalog.`,
   };
 }
 
-export default async function CategoryPage({ params, searchParams }: PageProps) {
+export default async function CategoryPage({ params, searchParams }: Readonly<PageProps>) {
   const { slug } = await params;
   const sp = await searchParams;
 
-  const category = await prisma.category.findUnique({
-    where: { slug },
-    select: { id: true, name: true, slug: true, status: true },
-  });
-  if (!category || category.status !== 'PUBLISHED') notFound();
+  const category = await getCategoryBySlug(slug);
+  if (category?.status !== 'PUBLISHED') notFound();
 
   const query = productListQuerySchema.parse({ ...sp, categorySlug: slug });
 
