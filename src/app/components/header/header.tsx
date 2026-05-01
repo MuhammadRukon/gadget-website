@@ -1,12 +1,11 @@
 'use client';
 
-import { Handshake, Moon, Percent, Sun } from 'lucide-react';
+import { Moon, Sun } from 'lucide-react';
 import { JSX, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTheme } from 'next-themes';
 
 import { HeaderButtonsProps, HeaderSearchProps } from './header.types';
-import { IHeaderButton } from '@/interfaces';
 
 import { HeaderButton } from '@/app/common/button/header-button';
 import { Container } from '@/app/components/container/container';
@@ -23,7 +22,7 @@ export interface HeaderProps {
   menu: MenuCategory[];
 }
 
-export function Header({ menu }: HeaderProps): JSX.Element {
+export function Header({ menu }: Readonly<HeaderProps>): JSX.Element {
   return (
     <>
       <Header.TopBar />
@@ -50,19 +49,12 @@ Header.TopBar = function TopBar(): JSX.Element {
     router.push(trimmed ? `/products?q=${encodeURIComponent(trimmed)}` : '/products');
   }
 
-  const headerButtons: IHeaderButton[] = [
-    { href: '/deals', title: 'PC Deals', icon: <Handshake size={14} /> },
-    { href: '/offers', title: 'Offers', icon: <Percent size={14} /> },
-  ];
-
   return (
     <Container WrapperClassName="bg-[#f9fafc] dark:bg-background border-b border-gray-200 dark:border-[#222223]">
       <div className="flex flex-col gap-y-2 sm:flex-row items-center justify-between sm:h-10">
         <Header.Logo />
 
         <Header.Search search={search} setSearch={setSearch} onSubmit={submitSearch} />
-
-        <Header.Buttons headerButtons={headerButtons} />
 
         <HeaderAccount />
 

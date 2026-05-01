@@ -31,7 +31,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 }
 
-export default async function ProductDetailPage({ params }: PageProps) {
+export default async function ProductDetailPage({ params }: Readonly<PageProps>) {
   const { slug } = await params;
   let product;
   try {
@@ -42,6 +42,5 @@ export default async function ProductDetailPage({ params }: PageProps) {
     }
     throw err;
   }
-
   return <ProductDetail product={product} />;
 }

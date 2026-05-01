@@ -7,7 +7,7 @@ import { catalogService } from '@/server/catalog/catalog.service';
 import { ProductGrid } from '@/modules/storefront/components/product-grid';
 
 export const metadata = {
-  title: 'Tecnologia - gadgets & electronics',
+  title: 'Techavaly - gadgets & electronics',
   description: 'Discover the latest gadgets, laptops, phones and accessories.',
 };
 

@@ -10,7 +10,7 @@ interface ProductDetailProps {
   product: PublicProductDetail;
 }
 
-export function ProductDetail({ product }: ProductDetailProps) {
+export function ProductDetail({ product }: Readonly<ProductDetailProps>) {
   const initialVariant = product.variants.find((v) => v.inStock) ?? product.variants[0] ?? null;
   const ldJson = buildJsonLd(product, initialVariant);
 
@@ -28,14 +28,20 @@ export function ProductDetail({ product }: ProductDetailProps) {
       <section className="space-y-4">
         <div className="space-y-1">
           <p className="text-sm text-muted-foreground">
-            <Link className="underline-offset-2 hover:underline" href={`/brand/${product.brand.slug}`}>
+            <Link
+              className="underline-offset-2 hover:underline"
+              href={`/brand/${product.brand.slug}`}
+            >
               {product.brand.name}
             </Link>
           </p>
           <h1 className="text-2xl md:text-3xl font-semibold">{product.name}</h1>
         </div>
 
-        <ProductDetailPurchasePanel variants={product.variants} warrantyMonths={product.warrantyMonths} />
+        <ProductDetailPurchasePanel
+          variants={product.variants}
+          warrantyMonths={product.warrantyMonths}
+        />
 
         <Card>
           <CardContent className="prose prose-sm dark:prose-invert max-w-none p-4 whitespace-pre-line">
@@ -65,13 +71,18 @@ export function ProductDetail({ product }: ProductDetailProps) {
   );
 }
 
-function buildJsonLd(product: PublicProductDetail, variant: PublicProductDetail['variants'][number] | null) {
+function buildJsonLd(
+  product: PublicProductDetail,
+  variant: PublicProductDetail['variants'][number] | null,
+) {
   const offers = variant
     ? {
         '@type': 'Offer',
         priceCurrency: 'BDT',
         price: (variant.priceCents / 100).toFixed(2),
-        availability: variant.inStock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+        availability: variant.inStock
+          ? 'https://schema.org/InStock'
+          : 'https://schema.org/OutOfStock',
         sku: variant.sku,
       }
     : undefined;

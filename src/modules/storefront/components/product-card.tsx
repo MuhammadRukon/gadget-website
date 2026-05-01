@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { formatBDT } from '@/server/common/money';
 import type { PublicProductSummary } from '@/contracts/catalog';
 
-export function ProductCard({ product }: { product: PublicProductSummary }) {
+export function ProductCard({ product }: Readonly<{ product: PublicProductSummary }>) {
   const hasDiscount = product.priceCents < product.originalPriceCents;
 
   return (

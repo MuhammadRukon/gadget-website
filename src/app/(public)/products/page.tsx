@@ -16,7 +16,7 @@ interface PageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
-export default async function ProductsPage({ searchParams }: PageProps) {
+export default async function ProductsPage({ searchParams }: Readonly<PageProps>) {
   const sp = await searchParams;
   const query = productListQuerySchema.parse(sp);
 
