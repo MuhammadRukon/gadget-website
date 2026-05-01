@@ -41,7 +41,7 @@ export function ProductFilters({
   categories,
   lockedCategorySlug,
   lockedBrandSlug,
-}: Props) {
+}: Readonly<Props>) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -69,7 +69,7 @@ export function ProductFilters({
 
   return (
     <div className="space-y-4">
-      <div className="space-y-2">
+      {/* <div className="space-y-2">
         <Label htmlFor="q">Search</Label>
         <Input
           id="q"
@@ -82,64 +82,64 @@ export function ProductFilters({
             }
           }}
         />
-      </div>
+      </div> */}
 
-      {!lockedCategorySlug ? (
-        <div className="space-y-2">
-          <Label>Category</Label>
-          <Select
-            value={categorySlug || ANY}
-            onValueChange={(v) => setParam('categorySlug', v === ANY ? null : v)}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Any" />
+      <div className="flex gap-2">
+        {!lockedCategorySlug ? (
+          <div className="space-y-2 flex-1">
+            <Label>Category</Label>
+            <Select
+              value={categorySlug || ANY}
+              onValueChange={(v) => setParam('categorySlug', v === ANY ? null : v)}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Any" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ANY}>Any</SelectItem>
+                {categories.map((c) => (
+                  <SelectItem key={c.id} value={c.slug}>
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        ) : null}
+        {!lockedBrandSlug ? (
+          <div className="space-y-2 flex-1">
+            <Label>Brand</Label>
+            <Select
+              value={brandSlug || ANY}
+              onValueChange={(v) => setParam('brandSlug', v === ANY ? null : v)}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Any" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ANY}>Any</SelectItem>
+                {brands.map((b) => (
+                  <SelectItem key={b.id} value={b.slug}>
+                    {b.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        ) : null}
+        <div className="space-y-2 flex-1">
+          <Label>Sort</Label>
+          <Select value={sort} onValueChange={(v) => setParam('sort', v === 'newest' ? null : v)}>
+            <SelectTrigger className="w-full">
+              <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={ANY}>Any</SelectItem>
-              {categories.map((c) => (
-                <SelectItem key={c.id} value={c.slug}>
-                  {c.name}
-                </SelectItem>
-              ))}
+              <SelectItem value="newest">Newest</SelectItem>
+              <SelectItem value="price_asc">Price (low to high)</SelectItem>
+              <SelectItem value="price_desc">Price (high to low)</SelectItem>
             </SelectContent>
           </Select>
         </div>
-      ) : null}
-
-      {!lockedBrandSlug ? (
-        <div className="space-y-2">
-          <Label>Brand</Label>
-          <Select
-            value={brandSlug || ANY}
-            onValueChange={(v) => setParam('brandSlug', v === ANY ? null : v)}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Any" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ANY}>Any</SelectItem>
-              {brands.map((b) => (
-                <SelectItem key={b.id} value={b.slug}>
-                  {b.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      ) : null}
-
-      <div className="space-y-2">
-        <Label>Sort</Label>
-        <Select value={sort} onValueChange={(v) => setParam('sort', v === 'newest' ? null : v)}>
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="newest">Newest</SelectItem>
-            <SelectItem value="price_asc">Price (low to high)</SelectItem>
-            <SelectItem value="price_desc">Price (high to low)</SelectItem>
-          </SelectContent>
-        </Select>
       </div>
 
       <div className="grid grid-cols-2 gap-2">

@@ -19,7 +19,7 @@ interface BreadcrumbProps {
   items: BreadcrumbItem[];
 }
 
-export function CustomBreadcrumb({ items }: BreadcrumbProps) {
+export function CustomBreadcrumb({ items }: Readonly<BreadcrumbProps>) {
   return (
     <Breadcrumb>
       <BreadcrumbList>

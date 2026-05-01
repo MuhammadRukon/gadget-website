@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { LogOut, User as UserIcon } from 'lucide-react';
+import { Moon, Sun, LogOut, User as UserIcon } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 import { useSession } from 'next-auth/react';
 
 import { logoutAction } from '@/modules/auth/actions';
@@ -13,6 +14,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { useEffect, useState } from 'react';
+import { useTheme } from 'next-themes';
 
 /**
  * Header authentication slot. Shows a Login link when signed out,
@@ -20,6 +23,14 @@ import {
  */
 export function HeaderAccount() {
   const { data, status } = useSession();
+  const { resolvedTheme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const isDark = mounted && resolvedTheme === 'dark';
 
   if (status === 'loading') {
     return <div className="h-6 w-20 animate-pulse rounded bg-muted" aria-hidden />;
@@ -42,9 +53,9 @@ export function HeaderAccount() {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger className="flex items-center gap-1.5 px-3 h-full transition-all duration-200 hover:bg-gray-100 dark:hover:bg-accent outline-none">
+      <DropdownMenuTrigger className="flex items-center  gap-1.5 px-3 py-3 h-full transition-all duration-200 hover:bg-gray-100 dark:hover:bg-accent outline-none">
         <UserIcon size={14} />
-        <span className="text-sm font-medium text-foreground text-nowrap max-w-32 truncate">
+        <span className="text-sm font-medium h-fit text-foreground text-nowrap max-w-32 truncate">
           {name}
         </span>
       </DropdownMenuTrigger>
@@ -59,6 +70,16 @@ export function HeaderAccount() {
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
           <Link href="/account/reviews">Write a review</Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <button
+            type="button"
+            className="w-full"
+            onClick={() => setTheme(isDark ? 'light' : 'dark')}
+          >
+            Switch to {isDark ? 'light' : 'dark'} mode{' '}
+            {isDark ? <Sun size={14} /> : <Moon size={14} />}
+          </button>
         </DropdownMenuItem>
         {isAdmin ? (
           <DropdownMenuItem asChild>

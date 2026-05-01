@@ -4,8 +4,8 @@ import { Providers } from '@/components/providers';
 
 export const metadata: Metadata = {
   title: {
-    default: 'Tecnologia',
-    template: '%s | Tecnologia',
+    default: 'Techavaly',
+    template: '%s | Techavaly',
   },
   description: 'Modern gadgets and electronics ecommerce platform.',
 };

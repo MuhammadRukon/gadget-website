@@ -21,11 +21,11 @@ function brandHref(brand: MenuBrand): string {
   return `/brand/${brand.slug ?? slugify(brand.name)}`;
 }
 
-export function Menu({ menu }: { menu: MenuCategory[] }) {
+export function Menu({ menu }: Readonly<{ menu: MenuCategory[] }>) {
   if (menu.length === 0) return null;
   return (
     <NavigationMenu viewport={false}>
-      <NavigationMenuList className="w-full flex flex-wrap justify-start">
+      <NavigationMenuList className="w-full h-full flex flex-wrap justify-start">
         {menu.map((category) =>
           category.brands.length > 0 ? (
             <Menu.ItemWithBrand key={category.id} category={category} />
@@ -51,7 +51,7 @@ Menu.Item = function MenuItem({ category }: MenuItemProps) {
 Menu.ItemWithBrand = function MenuItemWithBrand({ category }: MenuItemProps) {
   return (
     <NavigationMenuItem>
-      <NavigationMenuTrigger className="p-2.5 h-8" asChild>
+      <NavigationMenuTrigger className="p-2.5 px-3.5 h-full" asChild>
         <Link href={categoryHref(category)}>{category.name}</Link>
       </NavigationMenuTrigger>
       <NavigationMenuContent className="absolute p-0 z-50">
@@ -65,10 +65,10 @@ Menu.ItemWithBrand = function MenuItemWithBrand({ category }: MenuItemProps) {
   );
 };
 
-function ListItem({ brand }: { brand: MenuBrand }) {
+function ListItem({ brand }: Readonly<{ brand: MenuBrand }>) {
   return (
     <li>
-      <NavigationMenuLink className="pl-3 pr-4 py-1.5" asChild>
+      <NavigationMenuLink className="py-2 px-4 h-full" asChild>
         <Link href={brandHref(brand)}>{brand.name}</Link>
       </NavigationMenuLink>
     </li>

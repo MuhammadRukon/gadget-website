@@ -8,6 +8,7 @@ import { ProductGrid } from '@/modules/storefront/components/product-grid';
 import { StorefrontPagination } from '@/modules/storefront/components/storefront-pagination';
 import { prisma } from '@/lib/prisma';
 import { cache } from 'react';
+import { CustomBreadcrumb } from '@/app/components/breadcrumb/custom-breadcrumb';
 
 interface PageProps {
   params: Promise<{ slug: string }>;

@@ -1,5 +1,5 @@
 /**
- * Dev seed for Tecnologia ecommerce.
+ * Dev seed for Techavaly ecommerce.
  *
  * - Creates an admin and a regular customer (passwords from env or fallback).
  * - Creates a small set of categories + brands + published products with
@@ -13,9 +13,9 @@ import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
-const ADMIN_EMAIL = process.env.SEED_ADMIN_EMAIL ?? 'admin@tecnologia.test';
+const ADMIN_EMAIL = process.env.SEED_ADMIN_EMAIL ?? 'admin@Techavaly.test';
 const ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD ?? 'admin12345';
-const CUSTOMER_EMAIL = process.env.SEED_CUSTOMER_EMAIL ?? 'customer@tecnologia.test';
+const CUSTOMER_EMAIL = process.env.SEED_CUSTOMER_EMAIL ?? 'customer@Techavaly.test';
 const CUSTOMER_PASSWORD = process.env.SEED_CUSTOMER_PASSWORD ?? 'customer12345';
 
 async function upsertUser(email: string, name: string, password: string, role: UserRole) {

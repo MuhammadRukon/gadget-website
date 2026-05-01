@@ -43,16 +43,14 @@ export const useGuestCart = create<GuestCartState>()(
           lines:
             quantity <= 0
               ? state.lines.filter((l) => l.variantId !== variantId)
-              : state.lines.map((l) =>
-                  l.variantId === variantId ? { ...l, quantity } : l,
-                ),
+              : state.lines.map((l) => (l.variantId === variantId ? { ...l, quantity } : l)),
         })),
       remove: (variantId) =>
         set((state) => ({ lines: state.lines.filter((l) => l.variantId !== variantId) })),
       clear: () => set({ lines: [] }),
     }),
     {
-      name: 'tecnologia.guestCart',
+      name: 'Techavaly.guestCart',
       storage: createJSONStorage(() => localStorage),
     },
   ),

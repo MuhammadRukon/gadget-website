@@ -1,9 +1,7 @@
 'use client';
 
-import { Moon, Sun } from 'lucide-react';
-import { JSX, useEffect, useState } from 'react';
+import { JSX, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useTheme } from 'next-themes';
 
 import { HeaderButtonsProps, HeaderSearchProps } from './header.types';
 
@@ -15,7 +13,6 @@ import type { MenuCategory } from '@/app/components/menu/menu.types';
 import { removeOccur } from '@/app/utils/helper';
 
 import { Input } from '@/components/ui/input';
-import { Switch } from '@/components/ui/switch';
 import { Logo } from '@/app/common/logo/logo.atom';
 
 export interface HeaderProps {
@@ -34,14 +31,6 @@ export function Header({ menu }: Readonly<HeaderProps>): JSX.Element {
 Header.TopBar = function TopBar(): JSX.Element {
   const router = useRouter();
   const [search, setSearch] = useState('');
-  const { resolvedTheme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  const isDark = mounted && resolvedTheme === 'dark';
 
   function submitSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -51,21 +40,12 @@ Header.TopBar = function TopBar(): JSX.Element {
 
   return (
     <Container WrapperClassName="bg-[#f9fafc] dark:bg-background border-b border-gray-200 dark:border-[#222223]">
-      <div className="flex flex-col gap-y-2 sm:flex-row items-center justify-between sm:h-10">
+      <div className="grid grid-cols-2 xs:grid-cols-3 gap-y-2 items-center justify-between xs:h-14">
         <Header.Logo />
 
         <Header.Search search={search} setSearch={setSearch} onSubmit={submitSearch} />
-
-        <HeaderAccount />
-
-        <div className="flex items-center gap-1.5">
-          <Sun size={14} className="text-muted-foreground" aria-hidden />
-          <Switch
-            checked={isDark}
-            onCheckedChange={(checked) => setTheme(checked ? 'dark' : 'light')}
-            aria-label="Toggle dark mode"
-          />
-          <Moon size={14} className="text-muted-foreground" aria-hidden />
+        <div className="flex h-full items-center gap-1 justify-end order-2 xs:order-none">
+          <HeaderAccount />
         </div>
       </div>
     </Container>
@@ -74,7 +54,7 @@ Header.TopBar = function TopBar(): JSX.Element {
 
 Header.Logo = function HeaderLogo(): JSX.Element {
   return (
-    <div className="sm:w-24">
+    <div className="xs:w-18 order-1 xs:order-none">
       <Logo src="/logo.png" alt="logo" className="w-10 h-10" />
     </div>
   );
@@ -90,13 +70,16 @@ Header.Search = function HeaderSearch({
   onSubmit,
 }: HeaderSearchPropsWithSubmit): JSX.Element {
   return (
-    <form className="flex-1 sm:mr-4 md:mr-10" onSubmit={onSubmit}>
+    <form
+      className="flex-1 col-span-2 w-full xs:col-span-1 order-3 xs:order-none mb-2 xs:mb-0"
+      onSubmit={onSubmit}
+    >
       <Input
         type="search"
         placeholder="Search products"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        className="dark:placeholder:text-white w-full h-7 placeholder:text-sm text-sm max-w-sm"
+        className="dark:placeholder:text-white w-full h-8 placeholder:text-sm text-sm"
       />
     </form>
   );
