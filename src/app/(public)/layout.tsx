@@ -1,12 +1,9 @@
-import { SectionContainer } from '../components/container/section-container';
 import { Container } from '../components/container/container';
 import { Footer } from '../components/footer/footer';
 import { Header } from '../components/header/header';
 import type { MenuCategory } from '../components/menu/menu.types';
 
 import { catalogService } from '@/server/catalog/catalog.service';
-
-// export const dynamic = 'force-dynamic';
 
 /**
  * Public storefront shell. Loads navigation data (categories, brands)
@@ -33,16 +30,12 @@ async function loadMenu(): Promise<MenuCategory[]> {
   }));
 }
 
-export default async function PublicLayout({ children }: { children: React.ReactNode }) {
+export default async function PublicLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const menu = await loadMenu();
   return (
     <>
       <Header menu={menu} />
-      <Container>
-        <main>
-          <SectionContainer>{children}</SectionContainer>
-        </main>
-      </Container>
+      <Container>{children}</Container>
       <Footer />
     </>
   );

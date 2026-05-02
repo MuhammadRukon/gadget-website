@@ -7,7 +7,7 @@ import { catalogService } from '@/server/catalog/catalog.service';
 import { ProductGrid } from '@/modules/storefront/components/product-grid';
 
 export const metadata = {
-  title: 'Techavaly - gadgets & electronics',
+  title: 'Cryptech - gadgets & electronics',
   description: 'Discover the latest gadgets, laptops, phones and accessories.',
 };
 
@@ -38,6 +38,8 @@ export default async function HomePage() {
               alt="Storefront banner"
               width={1600}
               height={500}
+              loading="eager"
+              priority
             />
           </CarouselItem>
         </CarouselContent>

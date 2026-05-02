@@ -73,7 +73,7 @@ export function Footer(): JSX.Element {
       <hr />
 
       <p className="text-xs sm:text-sm text-center py-2 sm:py-3">
-        © 2025 Techavaly Ltd | All rights reserved.
+        © 2025 Cryptech Ltd | All rights reserved.
       </p>
     </footer>
   );

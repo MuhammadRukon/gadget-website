@@ -3,12 +3,9 @@ import { notFound } from 'next/navigation';
 
 import { catalogService } from '@/server/catalog/catalog.service';
 import { productListQuerySchema } from '@/contracts/catalog';
-import { ProductFilters } from '@/modules/storefront/components/product-filters';
-import { ProductGrid } from '@/modules/storefront/components/product-grid';
-import { StorefrontPagination } from '@/modules/storefront/components/storefront-pagination';
 import { prisma } from '@/lib/prisma';
 import { cache } from 'react';
-import { CustomBreadcrumb } from '@/app/components/breadcrumb/custom-breadcrumb';
+import CommonListPage from '@/app/components/common-listpage';
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -54,19 +51,12 @@ export default async function CategoryPage({ params, searchParams }: Readonly<Pa
   ]);
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-[260px_1fr] gap-6 py-6">
-      <aside className="md:sticky md:top-4 md:self-start">
-        <ProductFilters
-          brands={brands}
-          categories={categories}
-          lockedCategorySlug={category.slug}
-        />
-      </aside>
-      <section>
-        <h1 className="text-2xl font-semibold mb-4">{category.name}</h1>
-        <ProductGrid products={page.items} />
-        <StorefrontPagination page={page.page} pageSize={page.pageSize} total={page.total} />
-      </section>
-    </div>
+    <CommonListPage
+      brands={brands}
+      categories={categories}
+      brand={category}
+      page={page}
+      title={category.name}
+    />
   );
 }

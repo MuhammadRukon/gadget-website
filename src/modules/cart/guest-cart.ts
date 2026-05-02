@@ -50,7 +50,7 @@ export const useGuestCart = create<GuestCartState>()(
       clear: () => set({ lines: [] }),
     }),
     {
-      name: 'Techavaly.guestCart',
+      name: 'Cryptech.guestCart',
       storage: createJSONStorage(() => localStorage),
     },
   ),

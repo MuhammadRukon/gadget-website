@@ -1,6 +1,11 @@
-import React, { JSX } from 'react';
+import { JSX } from 'react';
+import { cn } from '@/lib/utils';
 
-import { ContainerProps } from './container.types';
+export interface ContainerProps {
+  children: React.ReactNode;
+  className?: string;
+  WrapperClassName?: string;
+}
 
 export function Container({
   children,
@@ -8,8 +13,8 @@ export function Container({
   WrapperClassName = '',
 }: Readonly<ContainerProps>): JSX.Element {
   return (
-    <div className={`w-full ${WrapperClassName}`}>
-      <div className={`container mx-auto px-4 ${className}`}>{children}</div>
-    </div>
+    <main className={cn('w-full', WrapperClassName)}>
+      <div className={cn('max-w-7xl mx-auto px-4 sm:px-14', className)}>{children}</div>
+    </main>
   );
 }

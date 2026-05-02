@@ -17,3 +17,14 @@ export interface IHeaderButton {
   title: string;
   icon?: string | ReactNode;
 }
+
+export interface IBrandOption {
+  id: string;
+  name: string;
+  slug: string;
+}
+export interface ICategoryOption {
+  id: string;
+  name: string;
+  slug: string;
+}

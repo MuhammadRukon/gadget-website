@@ -1,7 +1,7 @@
 import { ProductCard } from './product-card';
 import type { PublicProductSummary } from '@/contracts/catalog';
 
-export function ProductGrid({ products }: { products: PublicProductSummary[] }) {
+export function ProductGrid({ products }: Readonly<{ products: PublicProductSummary[] }>) {
   if (products.length === 0) {
     return (
       <div className="rounded border border-dashed p-12 text-center text-sm text-muted-foreground">

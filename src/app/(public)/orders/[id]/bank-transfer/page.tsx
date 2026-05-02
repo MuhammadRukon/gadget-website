@@ -17,7 +17,7 @@ import { useOrderDetail } from '@/modules/orders/hooks';
 const BANK_DETAILS = {
   bank: 'Brac Bank Limited',
   branch: 'Gulshan Branch',
-  accountName: 'Gadget Techavaly Ltd.',
+  accountName: 'Gadget Cryptech Ltd.',
   accountNumber: '1501-201-XXXX-001',
   routing: '060272836',
 };

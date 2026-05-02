@@ -48,56 +48,59 @@ export default function CartPage() {
     };
   }, [status, guestLines]);
 
-  const cart =
-    status === 'authenticated' ? serverCart.data : guestSnapshot ?? null;
+  const cart = status === 'authenticated' ? serverCart.data : guestSnapshot ?? null;
   const isLoading =
     status === 'loading' ||
     (status === 'authenticated' && serverCart.isLoading) ||
     (status === 'unauthenticated' && hydratingGuest);
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 py-6">
-      <section className="space-y-4">
-        <h1 className="text-2xl font-semibold">Your cart</h1>
-        {isLoading ? (
-          <div className="flex justify-center py-10">
-            <Loader />
-          </div>
-        ) : !cart || cart.lines.length === 0 ? (
-          <Card>
-            <CardContent className="p-8 text-center text-muted-foreground">
-              Your cart is empty.{' '}
-              <Link href="/products" className="underline">
-                Browse products
-              </Link>
-              .
-            </CardContent>
-          </Card>
-        ) : (
-          <ul className="space-y-3">
-            {cart.lines.map((line) => (
-              <CartRow key={line.itemId} line={line} />
-            ))}
-          </ul>
-        )}
-      </section>
+    <section className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 py-6">
+      <h1 className="text-2xl font-semibold lg:col-span-2 ">Your cart</h1>
+      {isLoading ? (
+        <div className="flex justify-center py-10">
+          <Loader />
+        </div>
+      ) : !cart || cart.lines.length === 0 ? (
+        <Card>
+          <CardContent className="p-8 text-center text-muted-foreground">
+            Your cart is empty.{' '}
+            <Link href="/products" className="underline">
+              Browse products
+            </Link>
+            .
+          </CardContent>
+        </Card>
+      ) : (
+        <ul className="space-y-3">
+          {cart.lines.map((line) => (
+            <CartRow key={line.itemId} line={line} />
+          ))}
+        </ul>
+      )}
 
       <aside className="lg:sticky lg:top-4 lg:self-start">
         <CartSummary cart={cart} authenticated={status === 'authenticated'} />
       </aside>
-    </div>
+    </section>
   );
 }
 
-function CartRow({ line }: { line: CartSnapshot['lines'][number] }) {
+function CartRow({ line }: Readonly<{ line: CartSnapshot['lines'][number] }>) {
   const { updateItem, removeItem } = useCartMutations();
   return (
     <li>
       <Card>
         <CardContent className="flex gap-4 p-4">
-          <div className="relative w-20 h-20 bg-muted rounded overflow-hidden shrink-0">
+          <div className="relative w-20 h-20 bg-muted overflow-hidden shrink-0">
             {line.imageUrl ? (
-              <Image src={line.imageUrl} alt={line.productName} fill className="object-cover" />
+              <Image
+                src={line.imageUrl}
+                alt={line.productName}
+                fill
+                className="object-cover"
+                sizes="(max-width: 200px) 100vw, 50vw"
+              />
             ) : null}
           </div>
           <div className="flex-1 min-w-0">
@@ -139,9 +142,7 @@ function CartRow({ line }: { line: CartSnapshot['lines'][number] }) {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() =>
-                removeItem.mutate({ itemId: line.itemId, variantId: line.variantId })
-              }
+              onClick={() => removeItem.mutate({ itemId: line.itemId, variantId: line.variantId })}
             >
               Remove
             </Button>
@@ -175,9 +176,7 @@ function CartSummary({
           <span>Subtotal</span>
           <span>{formatBDT(subtotal)}</span>
         </div>
-        <p className="text-xs text-muted-foreground">
-          Shipping & coupons calculated at checkout.
-        </p>
+        <p className="text-xs text-muted-foreground">Shipping & coupons calculated at checkout.</p>
         <Button className="w-full" disabled={itemCount === 0 || hasInactive} asChild>
           {authenticated ? (
             <Link href="/checkout">Proceed to checkout</Link>

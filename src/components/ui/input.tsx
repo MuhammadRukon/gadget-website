@@ -13,7 +13,7 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<'input'>>(
     const inputType = isPasswordType ? (showPassword ? 'text' : 'password') : type;
 
     return (
-      <div className="relative">
+      <div className="relative h-full w-full">
         <input
           type={inputType}
           data-slot="input"
@@ -27,7 +27,6 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<'input'>>(
           )}
           {...props}
           onChange={onChange}
-
         />
         {isPasswordType && (
           <button

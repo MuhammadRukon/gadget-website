@@ -1,10 +1,9 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
-
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --font-sans: var(--font-geist-sans, Arial, Helvetica, sans-serif);
+  --font-sans: var(--font-google-sans, Arial, Helvetica, sans-serif);
   --font-mono: var(--font-geist-mono, monospace);
   --radius: 0.625rem;
   --background: oklch(1 0 0);
@@ -81,7 +80,7 @@
 
 body {
   background-color: var(--background);
-  font-family: var(--font-sans);
+  font-family: var(--font-google-sans);
   transition: background 0.3s, color 0.3s;
 }
 

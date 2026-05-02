@@ -17,6 +17,7 @@ import {
 import { useEffect, useState } from 'react';
 import { useTheme } from 'next-themes';
 import Logout from '@/components/common/logout';
+import { cn } from '@/lib/utils';
 
 /**
  * Header authentication slot. Shows a Login link when signed out,
@@ -41,24 +42,26 @@ export function HeaderAccount() {
     return (
       <Link
         href="/login"
-        className="flex items-center gap-1.5 px-3 h-full transition-all duration-200 hover:bg-gray-100 dark:hover:bg-accent"
+        className={`flex items-center gap-1.5 px-3  h-full transition-all duration-200 hover:bg-gray-100 dark:hover:bg-accent`}
       >
-        <UserIcon size={14} />
+        <UserIcon size={18} />
         <span className="text-sm font-medium text-foreground text-nowrap">Login</span>
       </Link>
     );
   }
 
-  const name = data.user.name ?? data.user.email ?? 'Account';
   const isAdmin = data.user.role === 'ADMIN';
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger className="flex items-center  gap-1.5 px-3 py-3 h-full transition-all duration-200 hover:bg-gray-100 dark:hover:bg-accent outline-none">
-        <UserIcon size={14} />
-        <span className="text-sm font-medium h-fit text-foreground text-nowrap max-w-32 truncate">
-          {name}
-        </span>
+      <DropdownMenuTrigger
+        className={cn(
+          'flex items-center  gap-1.5 $ h-full transition-all cursor-pointer duration-200  outline-none',
+          !data?.user && 'bg-gray-100 dark:bg-input/30 px-3 md:px-4',
+        )}
+      >
+        <UserIcon size={18} />
+        {!data?.user && 'Login'}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuLabel className="truncate">{data.user.email}</DropdownMenuLabel>

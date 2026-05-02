@@ -25,7 +25,7 @@ export function Menu({ menu }: Readonly<{ menu: MenuCategory[] }>) {
   if (menu.length === 0) return null;
   return (
     <NavigationMenu viewport={false}>
-      <NavigationMenuList className="w-full h-full flex flex-wrap justify-start">
+      <NavigationMenuList>
         {menu.map((category) =>
           category.brands.length > 0 ? (
             <Menu.ItemWithBrand key={category.id} category={category} />
@@ -54,8 +54,8 @@ Menu.ItemWithBrand = function MenuItemWithBrand({ category }: MenuItemProps) {
       <NavigationMenuTrigger className="p-2.5 px-3.5 h-full" asChild>
         <Link href={categoryHref(category)}>{category.name}</Link>
       </NavigationMenuTrigger>
-      <NavigationMenuContent className="absolute p-0 z-50">
-        <ul>
+      <NavigationMenuContent className="absolute p-0 z-50 bg-background min-w-fit ">
+        <ul className="min-w-fit sm:min-w-[150px]">
           {category.brands.map((brand) => (
             <ListItem key={brand.id} brand={brand} />
           ))}
