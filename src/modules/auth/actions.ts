@@ -4,11 +4,7 @@ import { ZodError } from 'zod';
 
 import { authService } from '@/server/auth/auth.service';
 import { signOut as authSignOut } from '@/auth';
-import {
-  forgotPasswordSchema,
-  resetPasswordSchema,
-  signupSchema,
-} from '@/contracts/auth';
+import { forgotPasswordSchema, resetPasswordSchema, signupSchema } from '@/contracts/auth';
 import { AppError, toJsonError } from '@/server/common/errors';
 import { log } from '@/server/common/logger';
 
@@ -92,5 +88,5 @@ export async function resetPasswordAction(input: unknown): Promise<ActionResult>
 }
 
 export async function logoutAction(): Promise<void> {
-  await authSignOut({ redirectTo: '/' });
+  await authSignOut();
 }

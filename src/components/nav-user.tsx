@@ -18,6 +18,8 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar';
 import { logoutAction } from '@/modules/auth/actions';
+import { LogOut } from 'lucide-react';
+import Logout from './common/logout';
 
 interface NavUserProps {
   user: {
@@ -37,7 +39,7 @@ function initials(name: string): string {
     .join('');
 }
 
-export function NavUser({ user }: NavUserProps) {
+export function NavUser({ user }: Readonly<NavUserProps>) {
   const { isMobile } = useSidebar();
 
   return (
@@ -84,20 +86,8 @@ export function NavUser({ user }: NavUserProps) {
               Account
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <form
-              action={async () => {
-                await logoutAction();
-              }}
-            >
-              <button type="submit" className="w-full">
-                <DropdownMenuItem asChild>
-                  <span className="flex w-full items-center gap-2">
-                    <IconLogout />
-                    Log out
-                  </span>
-                </DropdownMenuItem>
-              </button>
-            </form>
+
+            <Logout />
           </DropdownMenuContent>
         </DropdownMenu>
       </SidebarMenuItem>

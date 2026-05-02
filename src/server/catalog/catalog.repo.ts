@@ -83,6 +83,10 @@ export type AdminProductRow = Prisma.PromiseReturnType<
   typeof catalogRepo.listProductsAdmin
 >[number];
 
-export type AdminProduct = NonNullable<
-  Prisma.PromiseReturnType<typeof catalogRepo.findProduct>
->;
+export type AdminProduct = NonNullable<Prisma.PromiseReturnType<typeof catalogRepo.findProduct>>;
+
+export function findUser(id: string) {
+  return prisma.user.findUnique({ where: { id } });
+}
+
+export type AdminUser = NonNullable<Prisma.PromiseReturnType<typeof findUser>>;

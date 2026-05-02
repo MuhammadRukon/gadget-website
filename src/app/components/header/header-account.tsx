@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useEffect, useState } from 'react';
 import { useTheme } from 'next-themes';
+import Logout from '@/components/common/logout';
 
 /**
  * Header authentication slot. Shows a Login link when signed out,
@@ -87,16 +88,7 @@ export function HeaderAccount() {
           </DropdownMenuItem>
         ) : null}
         <DropdownMenuSeparator />
-        <form action={logoutAction}>
-          <button type="submit" className="w-full">
-            <DropdownMenuItem asChild>
-              <span className="flex w-full items-center gap-2">
-                <LogOut size={14} />
-                Log out
-              </span>
-            </DropdownMenuItem>
-          </button>
-        </form>
+        <Logout />
       </DropdownMenuContent>
     </DropdownMenu>
   );
