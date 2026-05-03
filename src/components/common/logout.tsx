@@ -5,14 +5,19 @@ import { useRouter } from 'next/navigation';
 import { DropdownMenuItem } from '../ui/dropdown-menu';
 import { toast } from 'sonner';
 import { signOut } from 'next-auth/react';
+import { queryKeys } from '@/constants/queryKeys';
+import { useQueryClient } from '@tanstack/react-query';
 
 export default function Logout() {
   const router = useRouter();
+
+  const qc = useQueryClient();
 
   async function onLogout() {
     try {
       await signOut({ redirect: false });
       toast.success('Logged out successfully');
+      qc.resetQueries({ queryKey: queryKeys.cart });
       router.refresh();
     } catch (error) {
       toast.error('Failed to logout');

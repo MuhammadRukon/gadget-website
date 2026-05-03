@@ -1,3 +1,5 @@
+import type { GuestCartLine } from '@/contracts/cart';
+
 /**
  * Centralized React Query keys. Keeping them in one place avoids
  * subtle cache misses caused by tuple/string drift between hooks.
@@ -10,6 +12,7 @@ export const queryKeys = {
   productBySlug: (slug: string) => ['product', 'slug', slug] as const,
   cart: ['cart'] as const,
   cartSummary: ['cart', 'summary'] as const,
+  cartGuest: (lines: GuestCartLine[]) => ['cart', 'guest', lines] as const,
   orders: ['orders'] as const,
   orderById: (id: string) => ['orders', id] as const,
   user: ['user'] as const,

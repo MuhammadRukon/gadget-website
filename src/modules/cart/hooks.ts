@@ -35,6 +35,59 @@ export function useServerCart(
   });
 }
 
+const EMPTY_SNAPSHOT: CartSnapshot = { lines: [], subtotalCents: 0, itemCount: 0 };
+
+/**
+ * Hydrates the guest cart against the catalog so the UI can show
+ * names, prices, and images while the user is signed out. Lives in
+ * the query cache so every consumer (page, panel, header) shares it
+ * via React Query's automatic deduplication.
+ */
+export function useGuestSnapshot(): ReturnType<typeof useQuery<CartSnapshot>> {
+  const { status } = useSession();
+  const lines = useGuestCart((s) => s.lines);
+  const isUnauthenticated = status === 'unauthenticated';
+
+  return useQuery({
+    queryKey: queryKeys.cartGuest(lines),
+    queryFn: async () => {
+      if (lines.length === 0) return EMPTY_SNAPSHOT;
+      return apiFetch<CartSnapshot>('/api/cart/hydrate', {
+        method: 'POST',
+        body: { lines },
+      });
+    },
+    enabled: isUnauthenticated,
+    placeholderData: (prev) => prev,
+  });
+}
+
+/**
+ * Single consumer hook for hydrated cart state. Branches on session
+ * status so the same component code works for guests and signed-in
+ * users. Both branches are TanStack queries, so calling this hook
+ * from multiple components in the tree (page, panel, header) results
+ * in a single network request per cache key.
+ */
+export function useCart(): {
+  cart: CartSnapshot | null | undefined;
+  isLoading: boolean;
+  isAuthenticated: boolean;
+} {
+  const { status } = useSession();
+  const server = useServerCart('full');
+  const guest = useGuestSnapshot();
+  const isAuthenticated = status === 'authenticated';
+
+  return {
+    cart: isAuthenticated ? server.data : guest.data,
+    isLoading:
+      status === 'loading' ||
+      (isAuthenticated ? server.isLoading : guest.isLoading),
+    isAuthenticated,
+  };
+}
+
 export function useCartMutations() {
   const qc = useQueryClient();
   const { status } = useSession();

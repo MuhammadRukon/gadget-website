@@ -16,6 +16,7 @@ import { Logo } from '@/app/common/logo/logo.atom';
 import { SearchIcon, ShoppingCart } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
+import { CartPanel } from '../cart-panel/cart-panel';
 
 export interface HeaderProps {
   menu: MenuCategory[];
@@ -64,9 +65,7 @@ Header.TopBar = function TopBar(): JSX.Element {
           showSearchBar={showSearchBar}
         />
         <div className="flex h-full items-center gap-6 justify-end order-2  sm:order-none">
-          <Link href="/cart">
-            <ShoppingCart size={18} />
-          </Link>
+          <CartPanel />
           <SearchIcon
             size={18}
             className="sm:hidden"

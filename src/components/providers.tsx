@@ -6,6 +6,18 @@ import { ThemeProvider } from 'next-themes';
 import { SessionProvider } from 'next-auth/react';
 import { Toaster } from '@/components/ui/sonner';
 import { makeQueryClient } from '@/lib/queryClient';
+import { useGuestCartMerge } from '@/modules/cart/hooks';
+
+/**
+ * Mounts the one-time effect that merges any persisted guest cart
+ * into the server cart immediately after sign-in. Lives here so no
+ * individual cart consumer (page, panel, header) has to remember to
+ * mount it themselves.
+ */
+function CartBootstrap(): null {
+  useGuestCartMerge();
+  return null;
+}
 
 /**
  * Root client providers. Mounted once in the app root layout so that
@@ -19,6 +31,7 @@ export function Providers({ children }: { children: ReactNode }) {
     <SessionProvider refetchOnWindowFocus={false} refetchWhenOffline={false} refetchInterval={0}>
       <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
         <QueryClientProvider client={queryClient}>
+          <CartBootstrap />
           {children}
           <Toaster duration={2000} />
         </QueryClientProvider>

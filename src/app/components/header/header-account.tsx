@@ -1,11 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { Moon, Sun, LogOut, User as UserIcon } from 'lucide-react';
-import { Switch } from '@/components/ui/switch';
+import { Moon, Sun, User as UserIcon } from 'lucide-react';
+
 import { useSession } from 'next-auth/react';
 
-import { logoutAction } from '@/modules/auth/actions';
 import {
   DropdownMenu,
   DropdownMenuContent,
