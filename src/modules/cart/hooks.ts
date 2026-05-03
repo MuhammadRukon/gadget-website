@@ -81,9 +81,7 @@ export function useCart(): {
 
   return {
     cart: isAuthenticated ? server.data : guest.data,
-    isLoading:
-      status === 'loading' ||
-      (isAuthenticated ? server.isLoading : guest.isLoading),
+    isLoading: status === 'loading' || (isAuthenticated ? server.isLoading : guest.isLoading),
     isAuthenticated,
   };
 }
@@ -118,11 +116,7 @@ export function useCartMutations() {
   });
 
   const updateItem = useMutation({
-    mutationFn: async (input: {
-      itemId: string;
-      variantId: string;
-      quantity: number;
-    }) => {
+    mutationFn: async (input: { itemId: string; variantId: string; quantity: number }) => {
       if (status !== 'authenticated') {
         guest.setQuantity(input.variantId, input.quantity);
         return null;

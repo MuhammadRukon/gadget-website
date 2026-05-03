@@ -44,9 +44,11 @@ export function CartPanel() {
           ) : isEmpty ? (
             <p className="py-10 text-center text-sm text-muted-foreground">
               Your cart is empty.{' '}
-              <Link href="/products" className="underline">
-                Browse products
-              </Link>
+              <SheetClose asChild>
+                <Link href="/products" className="underline">
+                  Browse products
+                </Link>
+              </SheetClose>
               .
             </p>
           ) : (
@@ -62,16 +64,18 @@ export function CartPanel() {
 
         <SheetFooter className="gap-3">
           {isEmpty ? null : <CartSummary cart={cart} authenticated={isAuthenticated} isPanel />}
-          <SheetClose asChild>
-            <div className="flex gap-2 w-full">
-              <Button asChild className="flex-1" disabled={isEmpty}>
+          <div className="flex gap-2 w-full">
+            <SheetClose asChild>
+              <Button className="flex-1" disabled={isEmpty}>
                 <Link href="/checkout">Proceed to checkout</Link>
               </Button>
-              <Button asChild className="flex-1" variant="outline">
+            </SheetClose>
+            <SheetClose asChild>
+              <Button className="flex-1" variant="outline" disabled={isEmpty}>
                 <Link href="/cart">View cart</Link>
               </Button>
-            </div>
-          </SheetClose>
+            </SheetClose>
+          </div>
         </SheetFooter>
       </SheetContent>
     </Sheet>
