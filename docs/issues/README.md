@@ -4,6 +4,7 @@ Findings from a full codebase review (2026-07-11). Organized by area; each file 
 
 | File | Scope |
 | --- | --- |
+| [00-fix-scope.md](./00-fix-scope.md) | **Current fix pass** — what's in scope now vs. deferred, and why |
 | [01-security.md](./01-security.md) | Exploitable vulnerabilities and auth weaknesses |
 | [02-correctness.md](./02-correctness.md) | Race conditions, data-integrity bugs, logic errors |
 | [03-architecture.md](./03-architecture.md) | Structural/scalability concerns |

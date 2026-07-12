@@ -1,19 +1,14 @@
 /**
- * Lightweight in-process token bucket. Good enough for a single
- * Next.js instance running on Vercel's regional functions; for
- * horizontal scale-out plug in `@upstash/ratelimit` or Redis.
- *
- * The interface is deliberately minimal so the implementation can be
- * swapped without touching call sites: every API route accesses it
- * through `rateLimit(...)` with an explicit `key` and policy.
+ * Postgres-backed rate-limit bucket (see `RateLimitBucket` in
+ * schema.prisma). Replaces the old in-process Map, which reset on
+ * every serverless cold start and never shared state across
+ * instances. The interface is unchanged from that version — every API
+ * route still accesses it through `rateLimit(...)`/`enforceRateLimit`
+ * with an explicit `key` and policy; only the implementation moved
+ * from memory to the database, so both are now async.
  */
 
-interface BucketState {
-  tokens: number;
-  resetAt: number;
-}
-
-const buckets = new Map<string, BucketState>();
+import { prisma } from '@/lib/prisma';
 
 export interface RateLimitPolicy {
   /** How many requests are allowed in the window. */
@@ -28,22 +23,36 @@ export interface RateLimitResult {
   resetAt: number;
 }
 
-export function rateLimit(key: string, policy: RateLimitPolicy): RateLimitResult {
-  const now = Date.now();
-  const existing = buckets.get(key);
-  if (!existing || existing.resetAt <= now) {
-    const fresh: BucketState = {
-      tokens: policy.max - 1,
-      resetAt: now + policy.windowMs,
-    };
-    buckets.set(key, fresh);
-    return { ok: true, remaining: fresh.tokens, resetAt: fresh.resetAt };
+export async function rateLimit(key: string, policy: RateLimitPolicy): Promise<RateLimitResult> {
+  const now = new Date();
+  const resetAt = new Date(now.getTime() + policy.windowMs);
+
+  // Try to bump an existing, still-live window first.
+  const incremented = await prisma.rateLimitBucket.updateMany({
+    where: { key, resetAt: { gt: now } },
+    data: { count: { increment: 1 } },
+  });
+
+  if (incremented.count === 0) {
+    // No live window for this key (first request, or the previous
+    // window expired) — start a fresh one. Two concurrent first
+    // requests can both land here and both upsert; worst case one
+    // extra request slips through per window boundary, which is
+    // acceptable for an abuse guard and not worth a transaction.
+    await prisma.rateLimitBucket.upsert({
+      where: { key },
+      update: { count: 1, resetAt },
+      create: { key, count: 1, resetAt },
+    });
+    return { ok: true, remaining: policy.max - 1, resetAt: resetAt.getTime() };
   }
-  if (existing.tokens <= 0) {
-    return { ok: false, remaining: 0, resetAt: existing.resetAt };
-  }
-  existing.tokens -= 1;
-  return { ok: true, remaining: existing.tokens, resetAt: existing.resetAt };
+
+  const bucket = await prisma.rateLimitBucket.findUniqueOrThrow({ where: { key } });
+  return {
+    ok: bucket.count <= policy.max,
+    remaining: Math.max(0, policy.max - bucket.count),
+    resetAt: bucket.resetAt.getTime(),
+  };
 }
 
 /**
@@ -70,7 +79,7 @@ export class RateLimitedError extends Error {
  * Convenience helper: throws if the rate-limit policy is exceeded.
  * Routes catch RateLimitedError to set Retry-After + 429.
  */
-export function enforceRateLimit(key: string, policy: RateLimitPolicy): void {
-  const result = rateLimit(key, policy);
+export async function enforceRateLimit(key: string, policy: RateLimitPolicy): Promise<void> {
+  const result = await rateLimit(key, policy);
   if (!result.ok) throw new RateLimitedError(result.resetAt);
 }

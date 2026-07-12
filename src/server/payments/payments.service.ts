@@ -8,6 +8,7 @@ import {
   NotFoundError,
 } from '@/server/common/errors';
 import { log } from '@/server/common/logger';
+import { restockOrderItems } from '@/server/orders/orders.service';
 import type { InitiatedPayment } from '@/contracts/payments';
 
 import type { CallbackOutcome, PaymentInitInput } from './gateway.interface';
@@ -121,6 +122,21 @@ export const paymentsService = {
         return payment;
       }
 
+      // Log-only for now: gateway amount format is unverified against a
+      // real SSLCommerz/bKash account in this environment. Flip to
+      // rejecting (status -> FAILED) once confirmed against live traffic.
+      if (
+        outcome.status === PaymentStatus.SUCCEEDED &&
+        outcome.verifiedAmountCents !== undefined &&
+        outcome.verifiedAmountCents !== payment.amountCents
+      ) {
+        log.error('payments.callback.amount_mismatch', {
+          paymentId: payment.id,
+          expectedCents: payment.amountCents,
+          gotCents: outcome.verifiedAmountCents,
+        });
+      }
+
       const updated = await tx.payment.update({
         where: { id: payment.id },
         data: {
@@ -142,13 +158,24 @@ export const paymentsService = {
             note: `Payment received via ${method}`,
           },
         });
-      } else if (outcome.status === PaymentStatus.FAILED || outcome.status === PaymentStatus.CANCELLED) {
+      } else if (
+        outcome.status === PaymentStatus.FAILED ||
+        outcome.status === PaymentStatus.CANCELLED
+      ) {
         // Don't auto-cancel the order yet; the customer might retry.
+        // Restock so the held inventory isn't lost while they decide.
+        const order = await tx.order.findUnique({
+          where: { id: payment.orderId },
+          include: { items: true },
+        });
+        if (order) {
+          await restockOrderItems(tx, order.items);
+        }
         await tx.orderEvent.create({
           data: {
             orderId: payment.orderId,
             status: OrderStatus.PENDING,
-            note: `Payment ${outcome.status.toLowerCase()} via ${method}`,
+            note: `Payment ${outcome.status.toLowerCase()} via ${method}; stock restored`,
           },
         });
       }

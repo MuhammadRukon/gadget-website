@@ -29,7 +29,7 @@ UI (src/app pages, src/modules components/hooks)
 - `src/server/payments/gateway.interface.ts`: `PaymentGateway { init, parseCallback }`. Providers are DB-free; `payments.service.ts` owns persistence and idempotency.
 - `registry.ts` maps `PaymentMethod` → gateway: `cod.ts` (auto-confirm), `bank-transfer.ts` (customer submits bankRef → admin manually verifies), `bkash.ts` (grant→create→execute token flow), `sslcommerz.ts` (hosted checkout + validator API).
 - Callback routes (`/api/payments/{provider}/{success,fail,cancel,ipn}`) are thin wrappers over `src/app/api/payments/_handlers.ts`.
-- **Sandbox fallback**: with no credentials, providers redirect to `/api/payments/sandbox/*` harness pages that POST back `sandbox_`-prefixed refs. The `sandbox_` prefix is trusted from request data — this is the project's most critical security flaw (see `docs/issues/01-security.md`).
+- **Sandbox fallback**: with no credentials, providers redirect to `/api/payments/sandbox/*` harness pages that POST back `sandbox_`-prefixed refs. `parseCallback` now checks server-side credential presence *before* trusting that prefix (fixed in `docs/issues/00-fix-scope.md`'s pass; previously the prefix alone was trusted, the project's most critical security flaw — see `docs/issues/01-security.md`).
 - `paymentsService.applyCallback` runs in a transaction, dedupes by terminal payment status, flips order PENDING → CONFIRMED on success, writes an `OrderEvent`. Failed/cancelled payments do **not** restock.
 
 ## Cart
@@ -51,8 +51,8 @@ Known caveats: stock decrement and coupon increment are not concurrency-safe; ki
 `PENDING → CONFIRMED → PROCESSING → SHIPPED → DELIVERED`, plus `CANCELLED`.
 
 - COD confirms at checkout; gateway success confirms via callback; bank transfer confirms on admin verify.
-- Admin transitions via `ordersService.transition` — **no state-machine validation** (any → any) and admin cancel does not restock (documented as intentional).
-- Customer self-cancel allowed while PENDING/CONFIRMED/PROCESSING — this one **does** restock atomically.
+- Admin transitions via `ordersService.transition` — validated against an explicit `ALLOWED_TRANSITIONS` map (fixed in `docs/issues/00-fix-scope.md`'s pass; previously any → any). Admin cancel now restocks atomically, matching customer self-cancel.
+- Customer self-cancel allowed while PENDING/CONFIRMED/PROCESSING — restocks atomically via the shared `restockOrderItems` helper.
 - Every transition writes an `OrderEvent` (status, note, actorId) — the audit trail shown on both customer and admin order pages.
 
 ## Reviews & warranty
@@ -62,7 +62,7 @@ Known caveats: stock decrement and coupon increment are not concurrency-safe; ki
 
 ## Rate limiting & logging
 
-- `src/server/common/rate-limit.ts`: in-process token-bucket `Map` — applied to signup, forgot, reset, checkout only. **Ineffective on Vercel serverless** (per-instance memory); needs a shared store before it means anything.
+- `src/server/common/rate-limit.ts`: Postgres-backed (`RateLimitBucket` model) — applied to signup, forgot, reset, checkout only. Shared across serverless instances, unlike the earlier in-process `Map`.
 - `src/server/common/logger.ts`: structured server logging helpers.
 
 ## Testing

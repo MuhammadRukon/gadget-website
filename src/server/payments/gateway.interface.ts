@@ -46,6 +46,12 @@ export interface CallbackOutcome {
   status: Extract<PaymentStatus, 'SUCCEEDED' | 'FAILED' | 'CANCELLED' | 'PENDING'>;
   providerRef: string;
   rawPayload: unknown;
+  /**
+   * Amount the gateway itself reports for this transaction, converted to
+   * cents. Only populated on the live (non-sandbox) validation path —
+   * sandbox harness callbacks have no independent amount to check.
+   */
+  verifiedAmountCents?: number;
 }
 
 export interface PaymentGateway {
