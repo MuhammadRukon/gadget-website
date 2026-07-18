@@ -4,15 +4,25 @@ import { ZodError } from 'zod';
 
 import { authService } from '@/server/auth/auth.service';
 import { signOut as authSignOut } from '@/auth';
-import { forgotPasswordSchema, resetPasswordSchema, signupSchema } from '@/contracts/auth';
+import {
+  forgotPasswordSchema,
+  resendVerificationSchema,
+  resetPasswordSchema,
+  signupSchema,
+  verifyEmailSchema,
+} from '@/contracts/auth';
 import { AppError, toJsonError } from '@/server/common/errors';
 import { log } from '@/server/common/logger';
+import { RateLimitedError, enforceRateLimit } from '@/server/common/rate-limit';
 
 export interface ActionResult {
   ok: boolean;
   message?: string;
   /** dev-only convenience so the reset link is testable without email setup */
   devResetUrl?: string;
+  /** dev-only: verification code/link shown when no mailer is configured */
+  devCode?: string;
+  devVerifyUrl?: string;
   fieldErrors?: Record<string, string>;
 }
 
@@ -28,8 +38,13 @@ function fieldErrorsFromZod(err: ZodError): Record<string, string> {
 export async function signupAction(input: unknown): Promise<ActionResult> {
   try {
     const data = signupSchema.parse(input);
-    await authService.signup(data);
-    return { ok: true, message: 'Account created' };
+    const user = await authService.signup(data);
+    return {
+      ok: true,
+      message: 'Account created. Check your email for the verification code.',
+      devCode: user.devCode ?? undefined,
+      devVerifyUrl: user.devVerifyToken ? `/verify-email?token=${user.devVerifyToken}` : undefined,
+    };
   } catch (err) {
     if (err instanceof ZodError) {
       return { ok: false, message: 'Invalid signup details', fieldErrors: fieldErrorsFromZod(err) };
@@ -84,6 +99,64 @@ export async function resetPasswordAction(input: unknown): Promise<ActionResult>
       error: err instanceof Error ? err.message : String(err),
     });
     return { ok: false, message: toJsonError(err).message };
+  }
+}
+
+export async function verifyEmailAction(input: unknown): Promise<ActionResult> {
+  try {
+    const data = verifyEmailSchema.parse(input);
+    // 6-digit codes are brute-forceable; throttle attempts per email.
+    // Deeplink tokens are 32 random bytes — no practical brute force.
+    if (data.email) {
+      enforceRateLimit(`verify:${data.email}`, { max: 5, windowMs: 15 * 60 * 1000 });
+    }
+    await authService.verifyEmail({
+      email: data.email,
+      secret: data.token ?? data.code!,
+    });
+    return { ok: true, message: 'Email verified. You can now sign in.' };
+  } catch (err) {
+    if (err instanceof ZodError) {
+      return { ok: false, message: 'Invalid verification details', fieldErrors: fieldErrorsFromZod(err) };
+    }
+    if (err instanceof RateLimitedError) {
+      return { ok: false, message: 'Too many attempts. Try again in a few minutes.' };
+    }
+    if (err instanceof AppError) {
+      return { ok: false, message: err.message };
+    }
+    log.error('auth.verify.action.failed', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return { ok: false, message: toJsonError(err).message };
+  }
+}
+
+export async function resendVerificationAction(input: unknown): Promise<ActionResult> {
+  try {
+    const data = resendVerificationSchema.parse(input);
+    enforceRateLimit(`resend-verify:${data.email}`, { max: 3, windowMs: 15 * 60 * 1000 });
+    const result = await authService.resendVerification(data.email);
+    // Always generic: no account enumeration via this action.
+    return {
+      ok: true,
+      message: 'If that email needs verification, a new code has been sent.',
+      devCode: result.devCode ?? undefined,
+      devVerifyUrl: result.devVerifyToken
+        ? `/verify-email?token=${result.devVerifyToken}`
+        : undefined,
+    };
+  } catch (err) {
+    if (err instanceof ZodError) {
+      return { ok: false, message: 'Invalid email', fieldErrors: fieldErrorsFromZod(err) };
+    }
+    if (err instanceof RateLimitedError) {
+      return { ok: false, message: 'Too many resend requests. Try again in a few minutes.' };
+    }
+    log.error('auth.resendVerification.action.failed', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return { ok: false, message: 'Could not process request' };
   }
 }
 

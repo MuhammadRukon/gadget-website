@@ -7,10 +7,17 @@ import {
   BadRequestError,
 } from '@/server/common/errors';
 import { log } from '@/server/common/logger';
+import { mailerConfigured, sendMail, verificationEmail } from '@/server/common/mailer';
 
 import { hashPassword } from './password';
 import { hashResetToken, issueResetToken } from './tokens';
+import { issueVerification, matchVerification } from './verification';
 import type { ForgotPasswordInput, ResetPasswordInput, SignupInput } from '@/contracts/auth';
+
+function verifyUrl(token: string): string {
+  const base = (process.env.NEXT_PUBLIC_APP_URL ?? '').replace(/\/$/, '');
+  return `${base}/verify-email?token=${token}`;
+}
 
 export const authService = {
   async signup(input: SignupInput) {
@@ -26,13 +33,69 @@ export const authService = {
         },
         select: { id: true, email: true, name: true, role: true },
       });
-      return user;
+
+      const issued = await issueVerification(user.email);
+      // Fire-and-forget: sendMail never rejects, and delivery failure
+      // must not fail the signup (the user can hit "resend").
+      void sendMail(user.email, verificationEmail(issued.code, verifyUrl(issued.token)));
+
+      return {
+        ...user,
+        // Dev fallback (mirrors devResetUrl): expose the secrets only
+        // when no mailer is configured so the flow is testable locally.
+        devCode: mailerConfigured() ? null : issued.code,
+        devVerifyToken: mailerConfigured() ? null : issued.token,
+      };
     } catch (err) {
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
         throw new ConflictError('An account with this email already exists', { field: 'email' });
       }
       throw err;
     }
+  },
+
+  /**
+   * Verify via 6-digit code (email required) or deeplink token
+   * (email recovered from the row). Consumes every outstanding
+   * verification row for the email in the same transaction that
+   * marks the user verified.
+   */
+  async verifyEmail(input: { email?: string; secret: string }) {
+    const email = await matchVerification(input.secret, input.email ?? null);
+    if (!email) {
+      throw new ValidationError('Invalid or expired verification code');
+    }
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { email },
+        data: { emailVerified: new Date() },
+      }),
+      prisma.verificationToken.deleteMany({ where: { identifier: email } }),
+    ]);
+    log.info('auth.emailVerified', { email });
+    return { email };
+  },
+
+  /**
+   * Re-issue a verification code. Response is always generic so this
+   * can't be used to enumerate accounts; already-verified users and
+   * unknown emails are silent no-ops.
+   */
+  async resendVerification(email: string) {
+    const user = await prisma.user.findUnique({
+      where: { email },
+      select: { email: true, emailVerified: true },
+    });
+    if (!user || user.emailVerified) {
+      log.info('auth.resendVerification.noop', { email });
+      return { devCode: null as string | null, devVerifyToken: null as string | null };
+    }
+    const issued = await issueVerification(user.email);
+    void sendMail(user.email, verificationEmail(issued.code, verifyUrl(issued.token)));
+    return {
+      devCode: mailerConfigured() ? null : issued.code,
+      devVerifyToken: mailerConfigured() ? null : issued.token,
+    };
   },
 
   /**
@@ -78,7 +141,9 @@ export const authService = {
     await prisma.$transaction([
       prisma.user.update({
         where: { id: record.userId },
-        data: { passwordHash },
+        // Completing a reset proves mailbox ownership, so it also
+        // verifies the email — unblocks users who lost the signup code.
+        data: { passwordHash, emailVerified: record.user.emailVerified ?? new Date() },
       }),
       prisma.passwordResetToken.update({
         where: { tokenHash },

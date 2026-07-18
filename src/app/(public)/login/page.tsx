@@ -44,6 +44,13 @@ function LoginContent() {
     setIsSubmitting(false);
 
     if (!res || res.error) {
+      // `code` is set by UnverifiedEmailError in the credentials
+      // authorize() — correct password but email never verified.
+      if (res?.code === 'unverified') {
+        toast.error('Please verify your email before logging in.');
+        router.push(`/verify-email?email=${encodeURIComponent(values.email)}`);
+        return;
+      }
       toast.error('Invalid email or password');
       return;
     }

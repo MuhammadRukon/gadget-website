@@ -1,4 +1,5 @@
 import type { NextAuthConfig } from 'next-auth';
+import { CredentialsSignin } from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
 import Google from 'next-auth/providers/google';
 import type { UserRole } from '@prisma/client';
@@ -6,6 +7,16 @@ import type { UserRole } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { credentialsSchema } from '@/contracts/auth';
 import { verifyPassword } from './password';
+
+/**
+ * Thrown from `authorize` when the account exists and the password is
+ * correct but the email was never verified. The `code` lands in the
+ * client-side `signIn(..., { redirect: false })` result so the login
+ * page can point the user at /verify-email instead of a generic error.
+ */
+class UnverifiedEmailError extends CredentialsSignin {
+  code = 'unverified';
+}
 
 /**
  * Auth.js v5 config.
@@ -43,12 +54,25 @@ export const authOptions: NextAuthConfig = {
 
         const user = await prisma.user.findUnique({
           where: { email: parsed.data.email },
-          select: { id: true, email: true, name: true, role: true, passwordHash: true, image: true },
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            role: true,
+            passwordHash: true,
+            image: true,
+            emailVerified: true,
+          },
         });
         if (!user || !user.passwordHash) return null;
 
         const ok = await verifyPassword(parsed.data.password, user.passwordHash);
         if (!ok) return null;
+
+        // Correct credentials but unverified email: block with a
+        // distinguishable code (only after the password check, so this
+        // can't be used to probe which emails are registered).
+        if (!user.emailVerified) throw new UnverifiedEmailError();
 
         return {
           id: user.id,
@@ -90,6 +114,14 @@ export const authOptions: NextAuthConfig = {
           (user as { id?: string; role?: UserRole }).id = created.id;
           (user as { id?: string; role?: UserRole }).role = created.role;
         } else {
+          if (!existing.emailVerified) {
+            // Google vouches for the mailbox, so a Google sign-in
+            // verifies a previously-unverified account.
+            await prisma.user.update({
+              where: { id: existing.id },
+              data: { emailVerified: new Date() },
+            });
+          }
           (user as { id?: string; role?: UserRole }).id = existing.id;
           (user as { id?: string; role?: UserRole }).role = existing.role;
         }

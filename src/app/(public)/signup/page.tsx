@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { signIn } from 'next-auth/react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -51,23 +50,12 @@ export default function SignupPage() {
       return;
     }
 
-    // Auto sign-in so the user lands logged in - same UX as the user just
-    // walking through a single flow.
-    const signin = await signIn('credentials', {
-      email: values.email,
-      password: values.password,
-      redirect: false,
-    });
-    setIsSubmitting(false);
-
-    if (!signin || signin.error) {
-      toast.success('Account created. Please sign in.');
-      router.push('/login');
-      return;
-    }
-    toast.success('Welcome!');
-    router.push('/');
-    router.refresh();
+    // Account is created unverified: hand off to the verify page. The
+    // dev params only exist when no mailer is configured locally.
+    toast.success(res.message ?? 'Account created. Check your email.');
+    const query = new URLSearchParams({ email: values.email });
+    if (res.devCode) query.set('devCode', res.devCode);
+    router.push(`/verify-email?${query.toString()}`);
   }
 
   return (
