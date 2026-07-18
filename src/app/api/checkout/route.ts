@@ -5,6 +5,7 @@ import { checkoutService } from '@/server/checkout/checkout.service';
 import { BadRequestError } from '@/server/common/errors';
 import { jsonError, requireSession } from '@/server/common/http';
 import { log } from '@/server/common/logger';
+import { orderConfirmationEmail, sendMail } from '@/server/common/mailer';
 import { clientIp, enforceRateLimit } from '@/server/common/rate-limit';
 import { paymentsService } from '@/server/payments/payments.service';
 
@@ -21,6 +22,13 @@ export async function POST(request: Request) {
     const origin = new URL(request.url).origin;
     try {
       const initiated = await paymentsService.kickoff(paymentId, { origin });
+
+      // Fire-and-forget, only once kickoff succeeded (a failed kickoff
+      // cancels the order below — no confirmation for a dead order).
+      void sendMail(
+        user.email,
+        orderConfirmationEmail({ orderNumber: order.orderNumber, totalCents: order.totalCents }),
+      );
       return NextResponse.json(
         {
           id: order.id,

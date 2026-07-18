@@ -25,6 +25,10 @@ const schema = z.object({
   BKASH_PASSWORD: z.string().optional(),
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
+  // Transactional email (Resend). Optional: absence = mailer logs and
+  // skips instead of sending (dev/test mode) — see src/server/common/mailer.ts.
+  RESEND_API_KEY: z.string().optional(),
+  EMAIL_FROM: z.string().optional(),
 });
 
 export const env = schema.parse(process.env);

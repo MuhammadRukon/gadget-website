@@ -26,17 +26,12 @@ export function Footer(): JSX.Element {
             <h4>About Us</h4>
             <ul className="flex flex-wrap justify-center [&>li]:pr-5 list-disc md:list-none md:grid grid-cols-2 xl:grid-cols-3 gap-2 md:gap-5">
               {[
-                // ['EMI Terms', '/'],
-                ['About Us', '/'],
-                ['Online Delivery', '/'],
-                ['Privacy Policy', '/'],
-                ['Terms and Conditions', '/'],
-                ['Refund and Return Policy', '/'],
-                ['Blog', '/'],
-                // ['Contact Us', '/'],
-                // ['Brands', '/'],
-                ['Online Service Support', '/', 1],
-                ['Complain / Advice', '/', 1],
+                ['About Us', '/about'],
+                ['Contact Us', '/contact'],
+                ['Privacy Policy', '/privacy-policy'],
+                ['Terms and Conditions', '/terms'],
+                ['Refund and Return Policy', '/refund-policy'],
+                ['Complain / Advice', '/contact', 1],
               ].map(([label, link, active = 0], index) => (
                 <li key={index}>
                   <Link

@@ -1,6 +1,7 @@
 import { Prisma, OrderStatus } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { ConflictError, ForbiddenError, NotFoundError } from '@/server/common/errors';
+import { orderStatusEmail, sendMail } from '@/server/common/mailer';
 
 const orderInclude = {
   items: true,
@@ -124,8 +125,11 @@ export const ordersService = {
    * matching customer self-cancel behavior.
    */
   async transition(adminId: string, orderId: string, status: OrderStatus, note?: string) {
-    return prisma.$transaction(async (tx) => {
-      const order = await tx.order.findUnique({ where: { id: orderId }, include: { items: true } });
+    const { updated, customerEmail } = await prisma.$transaction(async (tx) => {
+      const order = await tx.order.findUnique({
+        where: { id: orderId },
+        include: { items: true, user: { select: { email: true } } },
+      });
       if (!order) throw new NotFoundError('Order');
       if (!ALLOWED_TRANSITIONS[order.status].includes(status)) {
         throw new ConflictError(`Cannot move order from ${order.status} to ${status}`);
@@ -147,7 +151,12 @@ export const ordersService = {
       await tx.orderEvent.create({
         data: { orderId, status, note: note ?? null, actorId: adminId },
       });
-      return updated;
+      return { updated, customerEmail: order.user.email };
     });
+
+    // Fire-and-forget, after commit: a failed email never fails the transition.
+    void sendMail(customerEmail, orderStatusEmail({ orderNumber: updated.orderNumber }, status));
+
+    return updated;
   },
 };

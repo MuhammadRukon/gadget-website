@@ -28,9 +28,9 @@ Audit date: 2026-07-11. Verdict: **solid foundation, several high-impact gaps.**
 5. **No `Organization` / `WebSite` JSON-LD** (logo, name, social profiles; `WebSite` + `SearchAction` can enable a sitelinks search box).
 6. **No Twitter card metadata** anywhere.
 7. **Category/brand pages have generic descriptions** and no OG tags; no description field exists on the Category/Brand models to source from.
-8. **Missing trust pages** (About/Contact/Privacy/Terms/Refund — footer links point to `/`). Thin-content/trust signal for Google, especially for e-commerce ("Your Money or Your Life" scrutiny). Also see FEATURE-GAPS P0.
-9. **`sitemap.ts` declares `dynamic='force-dynamic'` alongside `revalidate=3600`** — force-dynamic wins; the sitemap queries the DB on every crawler hit. Remove `force-dynamic` to serve it from ISR cache (also saves free-tier function invocations).
-10. **Env drift**: sitemap/robots read `NEXT_PUBLIC_APP_URL` but `.env` defines `NEXT_PUBLIC_BASE_URL` — currently held together by the `NEXTAUTH_URL` fallback. If that ever changes, sitemap URLs silently become `http://localhost:3000/...`.
+8. ~~**Missing trust pages** (About/Contact/Privacy/Terms/Refund — footer links point to `/`). Thin-content/trust signal for Google, especially for e-commerce ("Your Money or Your Life" scrutiny). Also see FEATURE-GAPS P0.~~ (✅ completed — all five pages live, footer-linked, in sitemap)
+9. ~~**`sitemap.ts` declares `dynamic='force-dynamic'` alongside `revalidate=3600`** — force-dynamic wins; the sitemap queries the DB on every crawler hit. Remove `force-dynamic` to serve it from ISR cache (also saves free-tier function invocations).~~ (✅ completed)
+10. ~~**Env drift**: sitemap/robots read `NEXT_PUBLIC_APP_URL` but `.env` defines `NEXT_PUBLIC_BASE_URL` — currently held together by the `NEXTAUTH_URL` fallback. If that ever changes, sitemap URLs silently become `http://localhost:3000/...`.~~ (✅ completed — `NEXT_PUBLIC_APP_URL` standardized + validated in `src/env.ts`)
 
 ### LOW
 
@@ -47,5 +47,5 @@ Audit date: 2026-07-11. Verdict: **solid foundation, several high-impact gaps.**
 3. Breadcrumbs (visible + JSON-LD) on PDP/category/brand.
 4. h1 fixes (home; remove "Filter Panel" heading).
 5. Organization/WebSite JSON-LD + Twitter cards in root layout.
-6. Trust pages (shared with FEATURE-GAPS P0).
-7. Sitemap cleanup (`force-dynamic`, env var name, image entries).
+6. ~~Trust pages (shared with FEATURE-GAPS P0).~~ (✅ completed)
+7. Sitemap cleanup (`force-dynamic`, env var name, image entries). (⚠️ `force-dynamic` + env var completed; image entries still open)

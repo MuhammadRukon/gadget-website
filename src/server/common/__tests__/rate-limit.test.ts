@@ -13,7 +13,10 @@ import { prisma } from '@/lib/prisma';
 
 import { RateLimitedError, enforceRateLimit, rateLimit } from '../rate-limit';
 
-const policy = { max: 3, windowMs: 1000 };
+// Windows must comfortably outlast several sequential round-trips to the
+// remote test database (~0.5-1s each), or the bucket legitimately expires
+// mid-test and the "over the limit" assertions flake.
+const policy = { max: 3, windowMs: 30_000 };
 
 const usedKeys: string[] = [];
 function freshKey(prefix: string) {
@@ -39,17 +42,24 @@ describe('rate-limit: rateLimit', () => {
     expect(fourth.remaining).toBe(0);
   });
 
-  it('refills after the window elapses', async () => {
-    const key = freshKey('test');
-    await rateLimit(key, policy);
-    await rateLimit(key, policy);
-    await rateLimit(key, policy);
-    expect((await rateLimit(key, policy)).ok).toBe(false);
+  it(
+    'refills after the window elapses',
+    async () => {
+      // Short-window policy just for this test: long enough to survive the
+      // three fill calls, short enough that waiting it out is practical.
+      const refillPolicy = { max: 3, windowMs: 6_000 };
+      const key = freshKey('test');
+      await rateLimit(key, refillPolicy);
+      await rateLimit(key, refillPolicy);
+      await rateLimit(key, refillPolicy);
+      expect((await rateLimit(key, refillPolicy)).ok).toBe(false);
 
-    await new Promise((resolve) => setTimeout(resolve, 1100));
+      await new Promise((resolve) => setTimeout(resolve, 6_100));
 
-    expect((await rateLimit(key, policy)).ok).toBe(true);
-  });
+      expect((await rateLimit(key, refillPolicy)).ok).toBe(true);
+    },
+    20_000,
+  );
 
   it('isolates different keys', async () => {
     const a = freshKey('test-a');

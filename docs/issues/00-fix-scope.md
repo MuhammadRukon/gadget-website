@@ -1,4 +1,4 @@
-# Fix Scope — 2026-07-12
+# Fix Scope — 2026-07-12 (✅ completed 2026-07-18 — see `.claude/PRPs/reports/fix-critical-security-and-correctness-issues-report.md`; follow-up launch-blocker items in `.claude/PRPs/reports/production-launch-blockers-report.md`)
 
 This file decides **what gets fixed now** out of the full flaw list in this folder, and why. It exists because "fix the current issues" against 16+ documented findings needs an explicit cut line — otherwise scope creeps into a rewrite. Full evidence for every item below already lives in [01-security.md](./01-security.md), [02-correctness.md](./02-correctness.md), [03-architecture.md](./03-architecture.md); this file does not repeat file:line evidence, only the scoping decision.
 
@@ -10,24 +10,26 @@ The goal stated for this round: **make the shop safe to actually run** (no forge
 
 ## In scope now
 
+All 16 items below shipped. #2 landed log-only in the first pass and was flipped to enforcing (mismatch → FAILED + restock) in the launch-blockers pass; #6's migration was also recorded in that pass.
+
 | # | Issue | Source | Why now |
 | --- | --- | --- | --- |
-| 1 | Payment success callbacks forgeable via `sandbox_` prefix | security §1 | CRITICAL — real money bypass |
-| 2 | No amount verification on gateway callbacks | security §2 | HIGH — partial-payment fraud |
-| 3 | Admin payment verify defaults to SUCCEEDED on empty body | security §4 | Trivial one-line fix, same file family as #1/#2 |
-| 4 | Stock oversell race in checkout | correctness §1 | HIGH — sells inventory you don't have |
-| 5 | Coupon usage-limit race (+ tx-client bug that causes it) | correctness §2, §6 | HIGH — same root cause as #4, one pattern fixes both |
-| 6 | In-memory rate limiting ineffective on Vercel | security §3 | HIGH — auth/checkout abuse currently unthrottled in prod |
-| 7 | Order status transitions unvalidated | correctness §4 | Admin can accidentally corrupt order state; cheap state-machine guard |
-| 8 | Stock leaks on abandoned online payments | correctness §3 (partial) | Restock-on-terminal-failure is cheap; full expiry sweep deferred (needs cron, see below) |
-| 9 | Payment kickoff failure orphans the order | correctness §7 | Currently a silent 500 with a half-created order; needs a clean failure path |
-| 10 | Default admin credentials in seed script | security §5 | One guard clause |
-| 11 | `allowDangerousEmailAccountLinking: true` | security §6 | One-line disable, no new flow needed |
-| 12 | Middleware checks cookie presence only | security §7 | Role is already in the JWT; verifying it at the edge is cheap (no DB read needed) |
-| 13 | Env var naming drift (`NEXT_PUBLIC_APP_URL` vs `NEXT_PUBLIC_BASE_URL`) + sitemap `force-dynamic` contradiction | correctness §11, §12 | Folded into the env-validation task below |
-| 14 | No central env validation | architecture §8 | Prerequisite for #10 and #13; fail fast on missing prod config instead of silently degrading (which is *why* #1 was exploitable) |
-| 15 | No shared concurrency primitive | architecture §2 | This *is* the fix for #4/#5 — conditional `updateMany`, not a new abstraction |
-| 16 | Vestigial repo passthroughs (`cart.repo.ts`, `orders.repo.ts`, `coupons.repo.ts`) | architecture §1 | Confirmed zero external imports (grepped) — pure dead indirection, delete rather than pretend they're a real repo layer |
+| 1 | ~~Payment success callbacks forgeable via `sandbox_` prefix~~ (✅ completed) | security §1 | CRITICAL — real money bypass |
+| 2 | ~~No amount verification on gateway callbacks~~ (✅ completed — enforcing) | security §2 | HIGH — partial-payment fraud |
+| 3 | ~~Admin payment verify defaults to SUCCEEDED on empty body~~ (✅ completed) | security §4 | Trivial one-line fix, same file family as #1/#2 |
+| 4 | ~~Stock oversell race in checkout~~ (✅ completed) | correctness §1 | HIGH — sells inventory you don't have |
+| 5 | ~~Coupon usage-limit race (+ tx-client bug that causes it)~~ (✅ completed) | correctness §2, §6 | HIGH — same root cause as #4, one pattern fixes both |
+| 6 | ~~In-memory rate limiting ineffective on Vercel~~ (✅ completed — incl. migration) | security §3 | HIGH — auth/checkout abuse currently unthrottled in prod |
+| 7 | ~~Order status transitions unvalidated~~ (✅ completed) | correctness §4 | Admin can accidentally corrupt order state; cheap state-machine guard |
+| 8 | ~~Stock leaks on abandoned online payments~~ (✅ completed — restock; expiry sweep still deferred) | correctness §3 (partial) | Restock-on-terminal-failure is cheap; full expiry sweep deferred (needs cron, see below) |
+| 9 | ~~Payment kickoff failure orphans the order~~ (✅ completed) | correctness §7 | Currently a silent 500 with a half-created order; needs a clean failure path |
+| 10 | ~~Default admin credentials in seed script~~ (✅ completed) | security §5 | One guard clause |
+| 11 | ~~`allowDangerousEmailAccountLinking: true`~~ (✅ completed — via `signIn` callback fix) | security §6 | One-line disable, no new flow needed |
+| 12 | ~~Middleware checks cookie presence only~~ (✅ completed) | security §7 | Role is already in the JWT; verifying it at the edge is cheap (no DB read needed) |
+| 13 | ~~Env var naming drift (`NEXT_PUBLIC_APP_URL` vs `NEXT_PUBLIC_BASE_URL`) + sitemap `force-dynamic` contradiction~~ (✅ completed) | correctness §11, §12 | Folded into the env-validation task below |
+| 14 | ~~No central env validation~~ (✅ completed) | architecture §8 | Prerequisite for #10 and #13; fail fast on missing prod config instead of silently degrading (which is *why* #1 was exploitable) |
+| 15 | ~~No shared concurrency primitive~~ (✅ completed) | architecture §2 | This *is* the fix for #4/#5 — conditional `updateMany`, not a new abstraction |
+| 16 | ~~Vestigial repo passthroughs (`cart.repo.ts`, `orders.repo.ts`, `coupons.repo.ts`)~~ (✅ completed — deleted) | architecture §1 | Confirmed zero external imports (grepped) — pure dead indirection, delete rather than pretend they're a real repo layer |
 
 ## Deferred (explicitly out of scope for this pass)
 
