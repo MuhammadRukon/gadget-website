@@ -4,6 +4,9 @@ import { applyPercentDiscount } from '@/server/common/money';
 import { ConflictError, NotFoundError, ValidationError } from '@/server/common/errors';
 import type { CouponInput } from '@/contracts/coupons';
 
+/** Either the global client or an in-flight `prisma.$transaction` callback client. */
+type Db = typeof prisma | Prisma.TransactionClient;
+
 export interface ValidateCouponInput {
   code: string;
   userId: string;
@@ -93,16 +96,15 @@ export const couponsService = {
     }
   },
 
-
   /**
    * Look up a coupon by code and validate it against the current cart
    * subtotal and the user's per-user usage cap. Returns the applicable
    * discount in cents, or throws a ValidationError with a user-facing
    * message that the checkout UI can surface.
    */
-  async validate(input: ValidateCouponInput): Promise<ValidatedCoupon> {
+  async validate(input: ValidateCouponInput, db: Db = prisma): Promise<ValidatedCoupon> {
     const code = input.code.trim().toUpperCase();
-    const coupon = await prisma.coupon.findUnique({ where: { code } });
+    const coupon = await db.coupon.findUnique({ where: { code } });
     if (!coupon || !coupon.isActive) {
       throw new ValidationError('Coupon code is invalid');
     }
@@ -120,7 +122,7 @@ export const couponsService = {
       throw new ValidationError('Cart subtotal does not meet the minimum for this coupon');
     }
     if (coupon.perUserLimit !== null) {
-      const used = await prisma.order.count({
+      const used = await db.order.count({
         where: { userId: input.userId, couponId: coupon.id },
       });
       if (used >= coupon.perUserLimit) {
@@ -132,9 +134,7 @@ export const couponsService = {
       coupon.type === CouponType.PERCENT
         ? applyPercentDiscount(input.subtotalCents, coupon.value)
         : Math.min(coupon.value, input.subtotalCents);
-    const discount = coupon.maxDiscountCents
-      ? Math.min(raw, coupon.maxDiscountCents)
-      : raw;
+    const discount = coupon.maxDiscountCents ? Math.min(raw, coupon.maxDiscountCents) : raw;
 
     return { id: coupon.id, code: coupon.code, discountCents: discount };
   },

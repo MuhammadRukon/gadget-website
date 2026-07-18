@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Suspense, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { signIn } from 'next-auth/react';
@@ -28,6 +28,12 @@ function LoginContent() {
   const params = useSearchParams();
   const callbackUrl = params.get('callbackUrl') || '/';
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (params.get('error') === 'AccessDenied') {
+      toast.error('An account already exists with this email; sign in with your password instead.');
+    }
+  }, [params]);
 
   const form = useForm<CredentialsInput>({
     resolver: zodResolver(credentialsSchema),
@@ -117,7 +123,9 @@ function LoginContent() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="py-8 text-center text-sm text-muted-foreground">Loading...</div>}>
+    <Suspense
+      fallback={<div className="py-8 text-center text-sm text-muted-foreground">Loading...</div>}
+    >
       <LoginContent />
     </Suspense>
   );

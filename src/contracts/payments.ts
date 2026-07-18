@@ -12,8 +12,7 @@ export const submitBankReferenceSchema = z.object({
 export type SubmitBankReferenceInput = z.infer<typeof submitBankReferenceSchema>;
 
 export const verifyPaymentSchema = z.object({
-  /** Defaults to SUCCEEDED. Admins can also mark a manual transfer as FAILED. */
-  outcome: z.enum(['SUCCEEDED', 'FAILED']).default('SUCCEEDED'),
+  outcome: z.enum(['SUCCEEDED', 'FAILED']),
   note: z.string().max(300).optional(),
 });
 export type VerifyPaymentInput = z.infer<typeof verifyPaymentSchema>;

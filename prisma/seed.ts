@@ -13,6 +13,13 @@ import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
+if (
+  process.env.NODE_ENV === 'production' &&
+  (!process.env.SEED_ADMIN_EMAIL || !process.env.SEED_ADMIN_PASSWORD)
+) {
+  throw new Error('SEED_ADMIN_EMAIL and SEED_ADMIN_PASSWORD must be set before seeding production');
+}
+
 const ADMIN_EMAIL = process.env.SEED_ADMIN_EMAIL ?? 'admin@Cryptech.test';
 const ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD ?? 'admin12345';
 const CUSTOMER_EMAIL = process.env.SEED_CUSTOMER_EMAIL ?? 'customer@Cryptech.test';
