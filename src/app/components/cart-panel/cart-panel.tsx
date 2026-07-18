@@ -22,12 +22,21 @@ import { useCart } from '@/modules/cart/hooks';
 export function CartPanel() {
   const { cart, isLoading, isAuthenticated } = useCart();
   const isEmpty = !cart || cart.lines.length === 0;
+  const itemCount = cart?.itemCount ?? 0;
 
   return (
     <Sheet>
       <SheetTrigger asChild>
-        <button type="button" aria-label="Open cart" className="cursor-pointer">
+        <button type="button" aria-label="Open cart" className="relative cursor-pointer">
           <ShoppingCart size={18} />
+          {itemCount > 0 && (
+            <span
+              aria-label={`${itemCount} items in cart`}
+              className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-none text-primary-foreground"
+            >
+              {itemCount > 99 ? '99+' : itemCount}
+            </span>
+          )}
         </button>
       </SheetTrigger>
       <SheetContent className="flex flex-col gap-0">
@@ -64,14 +73,15 @@ export function CartPanel() {
 
         <SheetFooter className="gap-3">
           {isEmpty ? null : <CartSummary cart={cart} authenticated={isAuthenticated} isPanel />}
-          <div className="flex gap-2 w-full">
+          <div className="flex w-full gap-2">
             <SheetClose asChild>
-              <Button className="flex-1" disabled={isEmpty}>
+              <Button asChild className="flex-1" disabled={isEmpty}>
                 <Link href="/checkout">Proceed to checkout</Link>
               </Button>
             </SheetClose>
+
             <SheetClose asChild>
-              <Button className="flex-1" variant="outline" disabled={isEmpty}>
+              <Button asChild variant="outline" className="flex-1" disabled={isEmpty}>
                 <Link href="/cart">View cart</Link>
               </Button>
             </SheetClose>
