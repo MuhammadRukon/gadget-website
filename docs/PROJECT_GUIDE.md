@@ -78,7 +78,7 @@ This layered approach keeps UI and business/data concerns separated and reduces 
 
 ## 4) Architecture Notes
 
-- **Framework:** Next.js 15 (App Router) + TypeScript
+- **Framework:** Next.js 16 (App Router) + TypeScript
 - **Database:** PostgreSQL via Prisma ORM
 - **Auth:** Auth.js with JWT session strategy
 - **Validation:** Zod contracts in `src/contracts`
@@ -117,7 +117,7 @@ gadget-website/
       robots.ts                # Robots rules
       sitemap.ts               # Dynamic sitemap
 
-    auth.ts / middleware.ts    # Auth config + route protection
+    auth.ts / proxy.ts         # Auth config + route protection (Next 16 uses proxy.ts, not middleware.ts)
 
     components/                # Shared UI components (shadcn + custom)
     modules/                   # Feature-focused frontend modules/hooks/components
@@ -139,6 +139,10 @@ gadget-website/
 
   docs/
     PROJECT_GUIDE.md           # This document
+    context/                   # Orientation docs (index, architecture, data model, API, frontend, conventions)
+    issues/                    # Known flaws / fix list (security, correctness, architecture, frontend)
+    product/FEATURE-GAPS.md    # Prioritized missing features
+    SEO-AUDIT.md               # SEO findings
 ```
 
 ---
@@ -171,6 +175,13 @@ gadget-website/
 
 ## 7) Current Status
 
-This project has completed its planned refactor and implementation phases (foundation through hardening).  
-It is now in a maintainable state with production-oriented patterns, while still keeping complexity practical for ecommerce needs.
+This project has completed its planned refactor and implementation phases (foundation through hardening).
+It is in a maintainable state with production-oriented patterns, while still keeping complexity practical for ecommerce needs.
+
+**Caveats (as of the 2026-07 review):**
+
+- Payment callback handling has a **critical forgery vulnerability** and no amount verification — fix before enabling live gateways. See [issues/01-security.md](./issues/01-security.md).
+- Rate limiting is in-memory and ineffective on Vercel serverless; stock/coupon updates are race-prone. See [issues/](./issues/README.md).
+- Transactional email is not wired — password reset only works in dev; no order confirmation emails. See [product/FEATURE-GAPS.md](./product/FEATURE-GAPS.md).
+- SEO fundamentals are in place (SSR catalog, sitemap, Product JSON-LD) with known gaps (canonicals, aggregateRating, breadcrumbs). See [SEO-AUDIT.md](./SEO-AUDIT.md).
 
