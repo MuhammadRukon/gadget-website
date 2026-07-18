@@ -18,6 +18,35 @@ import { applyDiscount } from '@/server/common/money';
 import { slugify } from '@/server/common/slug';
 
 import { catalogRepo } from './catalog.repo';
+import { compareScored, scoreProduct } from './search-score';
+
+/** Hard cap on rows fetched for in-memory relevance scoring (see `listPublicProducts`). */
+const MAX_SEARCH_CANDIDATES = 500;
+
+/**
+ * Terms used to widen the candidate `where` clause for a search query: the
+ * full query plus every 3-char sliding-window substring ("trigram") of each
+ * token. A single edit (typo, missing letter, transposition) anywhere in a
+ * word still leaves at least one unaffected trigram in common with the
+ * correctly-spelled word, so the row reaches the in-memory scoring pass in
+ * `search-score.ts` (which does the actual fuzzy-match scoring). Tokens
+ * shorter than 3 chars are kept whole since they have no trigram.
+ */
+function candidateTerms(q: string): string[] {
+  const normalized = q.trim().toLowerCase();
+  const tokens = normalized.split(/[^a-z0-9]+/).filter(Boolean);
+  const terms = new Set<string>([normalized]);
+  for (const t of tokens) {
+    if (t.length < 3) {
+      terms.add(t);
+      continue;
+    }
+    for (let i = 0; i + 3 <= t.length; i++) {
+      terms.add(t.slice(i, i + 3));
+    }
+  }
+  return Array.from(terms).filter(Boolean);
+}
 
 interface VariantPricing {
   priceCents: number;
@@ -35,6 +64,43 @@ function pricingFromVariant(v: {
     priceCents: applyDiscount(v.sellingPriceCents, v.discountCents),
     originalPriceCents: v.sellingPriceCents,
     inStock: v.isActive && v.stock > 0,
+  };
+}
+
+/**
+ * Shared by both `listPublicProducts` branches (ranked and newest/price).
+ * Structural typing means either branch's Prisma select (the ranked branch
+ * additionally selects `description`/`sku`) satisfies this shape.
+ */
+function toPublicProductSummary(p: {
+  id: string;
+  slug: string;
+  name: string;
+  isPopular: boolean;
+  brand: { id: string; name: string; slug: string };
+  images: { url: string }[];
+  variants: { sellingPriceCents: number; discountCents: number; stock: number }[];
+  _count: { variants: number };
+}): PublicProductSummary {
+  const variant = p.variants[0];
+  const pricing = variant
+    ? pricingFromVariant({
+        sellingPriceCents: variant.sellingPriceCents,
+        discountCents: variant.discountCents,
+        stock: variant.stock,
+        isActive: true,
+      })
+    : { priceCents: 0, originalPriceCents: 0, inStock: false };
+  return {
+    id: p.id,
+    slug: p.slug,
+    name: p.name,
+    brand: p.brand,
+    imageUrl: p.images[0]?.url ?? null,
+    priceCents: pricing.priceCents,
+    originalPriceCents: pricing.originalPriceCents,
+    inStock: p._count.variants > 0,
+    isPopular: p.isPopular,
   };
 }
 
@@ -411,9 +477,15 @@ export const catalogService = {
       status: PublishStatus.PUBLISHED,
     };
     if (query.q) {
+      const terms = candidateTerms(query.q);
+      const mode = Prisma.QueryMode.insensitive;
       where.OR = [
-        { name: { contains: query.q, mode: 'insensitive' } },
-        { description: { contains: query.q, mode: 'insensitive' } },
+        { description: { contains: query.q, mode } },
+        ...terms.flatMap((t): Prisma.ProductWhereInput[] => [
+          { name: { contains: t, mode } },
+          { brand: { is: { name: { contains: t, mode } } } },
+          { variants: { some: { sku: { contains: t, mode } } } },
+        ]),
       ];
     }
     if (query.brandSlug) {
@@ -430,6 +502,14 @@ export const catalogService = {
     return where;
   },
 
+  /**
+   * When `q` is present, ranks by relevance instead of the newest/price
+   * sort: fetch up to `MAX_SEARCH_CANDIDATES` matching rows, score each in
+   * memory (see `search-score.ts`), drop non-matches, then rank and
+   * paginate. Explicit price sorts still override relevance ordering.
+   * Upgrade path if the catalog outgrows this: Postgres full-text search
+   * or pg_trgm similarity, both of which need a migration + raw SQL.
+   */
   async listPublicProducts(query: ProductListQuery): Promise<PublicProductPage> {
     const pageSize = Math.min(60, Math.max(1, query.limit ?? 12));
     const page = Math.max(1, query.page ?? 1);
@@ -450,6 +530,84 @@ export const catalogService = {
           ...(query.maxPrice !== undefined ? { sellingPriceCents: { lte: query.maxPrice } } : {}),
         },
       };
+    }
+
+    if (query.q) {
+      const q = query.q;
+      const rows = await prisma.product.findMany({
+        where,
+        take: MAX_SEARCH_CANDIDATES,
+        select: {
+          id: true,
+          createdAt: true,
+          slug: true,
+          name: true,
+          description: true,
+          isPopular: true,
+          brand: { select: { id: true, name: true, slug: true } },
+          images: { orderBy: { sortOrder: 'asc' }, take: 1 },
+          variants: {
+            where: { isActive: true },
+            orderBy: { sellingPriceCents: 'asc' },
+            select: {
+              sku: true,
+              sellingPriceCents: true,
+              discountCents: true,
+              stock: true,
+            },
+          },
+          _count: {
+            select: {
+              variants: {
+                where: {
+                  isActive: true,
+                  stock: { gt: 0 },
+                },
+              },
+            },
+          },
+        },
+      });
+
+      const scored = rows
+        .map((row) => ({
+          row,
+          score: scoreProduct(q, {
+            name: row.name,
+            brandName: row.brand.name,
+            skus: row.variants.map((v) => v.sku),
+            description: row.description,
+            isPopular: row.isPopular,
+            createdAt: row.createdAt,
+          }),
+        }))
+        .filter((s) => s.score > 0);
+
+      const rankedRows =
+        sort === 'price_asc' || sort === 'price_desc'
+          ? scored
+              .slice()
+              .sort((a, b) => {
+                const aPrice = a.row.variants[0]?.sellingPriceCents ?? Number.POSITIVE_INFINITY;
+                const bPrice = b.row.variants[0]?.sellingPriceCents ?? Number.POSITIVE_INFINITY;
+                if (aPrice === bPrice) return b.row.createdAt.getTime() - a.row.createdAt.getTime();
+                return sort === 'price_asc' ? aPrice - bPrice : bPrice - aPrice;
+              })
+              .map((s) => s.row)
+          : scored
+              .slice()
+              .sort((a, b) =>
+                compareScored(
+                  { score: a.score, isPopular: a.row.isPopular, createdAt: a.row.createdAt },
+                  { score: b.score, isPopular: b.row.isPopular, createdAt: b.row.createdAt },
+                ),
+              )
+              .map((s) => s.row);
+
+      const total = rankedRows.length;
+      const items = rankedRows.slice(skip, skip + pageSize).map(toPublicProductSummary);
+
+      return { items, total, page, pageSize };
     }
 
     const orderBy: Prisma.ProductOrderByWithRelationInput[] = [{ createdAt: 'desc' }];
@@ -507,28 +665,7 @@ export const catalogService = {
             return sort === 'price_asc' ? aPrice - bPrice : bPrice - aPrice;
           });
 
-    const items: PublicProductSummary[] = sortedRows.map((p) => {
-      const variant = p.variants[0];
-      const pricing = variant
-        ? pricingFromVariant({
-            sellingPriceCents: variant.sellingPriceCents,
-            discountCents: variant.discountCents,
-            stock: variant.stock,
-            isActive: true,
-          })
-        : { priceCents: 0, originalPriceCents: 0, inStock: false };
-      return {
-        id: p.id,
-        slug: p.slug,
-        name: p.name,
-        brand: p.brand,
-        imageUrl: p.images[0]?.url ?? null,
-        priceCents: pricing.priceCents,
-        originalPriceCents: pricing.originalPriceCents,
-        inStock: p._count.variants > 0,
-        isPopular: p.isPopular,
-      };
-    });
+    const items: PublicProductSummary[] = sortedRows.map(toPublicProductSummary);
 
     return { items, total, page, pageSize };
   },
