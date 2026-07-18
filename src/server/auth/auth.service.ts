@@ -7,6 +7,7 @@ import {
   BadRequestError,
 } from '@/server/common/errors';
 import { log } from '@/server/common/logger';
+import { passwordResetEmail, sendMail } from '@/server/common/mailer';
 
 import { hashPassword } from './password';
 import { hashResetToken, issueResetToken } from './tokens';
@@ -56,6 +57,12 @@ export const authService = {
         expiresAt: issued.expiresAt,
       },
     });
+
+    // Fire-and-forget: delivery failure is logged by the mailer and must
+    // not change the (deliberately generic) response to the caller.
+    const resetUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/reset-password?token=${issued.raw}`;
+    void sendMail(user.email, passwordResetEmail(resetUrl));
+
     return { rawToken: issued.raw };
   },
 

@@ -13,10 +13,10 @@ Admins: products (with variants/images/SEO fields), categories (tree), brands, c
 
 | Feature | Why it's a blocker | Notes |
 | --- | --- | --- |
-| **Transactional email** | Password reset literally doesn't work in production (link only shown in dev). No order confirmation — customers of an online shop expect at minimum a confirmation email. | One `mailer.ts` + Resend/Brevo free tier. Wire: reset link, order confirmation, order status change, warranty updates. Unblocks half of this table. |
-| **Trust/legal pages** | Footer links to About, Privacy Policy, Terms, Refund/Return Policy all point to `/`. SSLCommerz/bKash merchant approval typically *requires* published refund & privacy policies. Customers won't pay without them either. | Static pages; a day of work. Also an SEO/trust signal. |
-| **Contact channel** | No contact page, phone, or support email anywhere. COD + warranty business needs one. | Static page + optional form → email. |
-| **Fix payment forgery + amount check** | Not a "feature" but the shop cannot safely take online payments until docs/issues/01-security.md #1–2 are fixed. | Listed here so it's not deprioritized as a mere refactor. |
+| ~~**Transactional email**~~ (✅ completed — reset, order confirmation, payment result, status emails; warranty emails still pending) | Password reset literally doesn't work in production (link only shown in dev). No order confirmation — customers of an online shop expect at minimum a confirmation email. | One `mailer.ts` + Resend/Brevo free tier. Wire: reset link, order confirmation, order status change, warranty updates. Unblocks half of this table. |
+| ~~**Trust/legal pages**~~ (✅ completed — `/about`, `/privacy-policy`, `/terms`, `/refund-policy`; owner should review copy before gateway submission) | Footer links to About, Privacy Policy, Terms, Refund/Return Policy all point to `/`. SSLCommerz/bKash merchant approval typically *requires* published refund & privacy policies. Customers won't pay without them either. | Static pages; a day of work. Also an SEO/trust signal. |
+| ~~**Contact channel**~~ (✅ completed — `/contact`) | No contact page, phone, or support email anywhere. COD + warranty business needs one. | Static page + optional form → email. |
+| ~~**Fix payment forgery + amount check**~~ (✅ completed — forgery fixed; amount mismatch now rejects + restocks) | Not a "feature" but the shop cannot safely take online payments until docs/issues/01-security.md #1–2 are fixed. | Listed here so it's not deprioritized as a mere refactor. |
 
 ## P1 — Needed soon for day-to-day operation
 
@@ -24,11 +24,11 @@ Admins: products (with variants/images/SEO fields), categories (tree), brands, c
 - **Quantity selector on product page** — add-to-cart is hardcoded to qty 1; buying 2 chargers means editing the cart afterwards.
 - **Stock visibility on PDP** — only an in/out-of-stock badge; show "only N left" under a threshold (data already exists: `stock`, `lowStockThreshold`).
 - **Account profile page** — no way to change name, phone, or password after signup.
-- **Order status email/SMS** — covered by the email layer above; SMS (e.g. BulkSMS BD providers) matters in the BD market where email open rates are low.
+- **Order status email/SMS** — (⚠️ email part completed via the mailer; SMS still open) covered by the email layer above; SMS (e.g. BulkSMS BD providers) matters in the BD market where email open rates are low.
 - **Related products on PDP** — same category/brand query; big conversion lever, cheap to build server-side.
 
 **For admins**
-- **Order state machine + restock policy** — see issues/02 #4; operationally this is what prevents accidental DELIVERED → PENDING chaos.
+- ~~**Order state machine + restock policy**~~ (✅ completed) — see issues/02 #4; operationally this is what prevents accidental DELIVERED → PENDING chaos.
 - **Quick stock adjustment** — editing stock requires opening the full product form; a simple inline stock editor on the products table saves daily pain.
 - **Server-side pagination for orders/products lists** — usability degrades quickly past a few hundred rows (also issues/03 #3).
 - **Refund/return workflow** — `PaymentStatus.REFUNDED` exists but is unreachable; even a manual "mark refunded + note + optional restock" beats nothing. Return policy page (P0) implies you need this.
@@ -48,10 +48,10 @@ Multi-language (Bangla) & currency display, SMS OTP login, delivery-zone rate ta
 
 ## Suggested build order (dependency-aware)
 
-1. Email layer (`mailer.ts` + Resend) → makes password reset production-real; order confirmation email.
-2. Static pages: About, Contact, Privacy, Terms, Refund policy (+ footer links).
-3. Payment security fixes (issues/01 #1–2) — before enabling live gateway credentials.
+1. ~~Email layer (`mailer.ts` + Resend) → makes password reset production-real; order confirmation email.~~ (✅ completed)
+2. ~~Static pages: About, Contact, Privacy, Terms, Refund policy (+ footer links).~~ (✅ completed)
+3. ~~Payment security fixes (issues/01 #1–2) — before enabling live gateway credentials.~~ (✅ completed)
 4. PDP quantity selector + stock hint + related products.
-5. Order state machine + tracking number + status-change emails.
+5. Order state machine + tracking number + status-change emails. (⚠️ state machine + status emails completed; tracking-number fields still open)
 6. Account profile page.
 7. Admin: quick stock edit, server pagination, refund marking.

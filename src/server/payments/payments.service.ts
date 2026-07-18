@@ -8,6 +8,8 @@ import {
   NotFoundError,
 } from '@/server/common/errors';
 import { log } from '@/server/common/logger';
+import { paymentResultEmail, sendMail } from '@/server/common/mailer';
+import { restockOrderItems } from '@/server/orders/orders.service';
 import type { InitiatedPayment } from '@/contracts/payments';
 
 import type { CallbackOutcome, PaymentInitInput } from './gateway.interface';
@@ -102,7 +104,11 @@ export const paymentsService = {
    * status only advances on the first SUCCEEDED.
    */
   async applyCallback(method: PaymentMethod, outcome: CallbackOutcome) {
-    return prisma.$transaction(async (tx) => {
+    // The customer notification is collected inside the transaction but
+    // sent only after it commits (never email about a rolled-back state).
+    let notify: { email: string | null; orderNumber: string; totalCents: number; succeeded: boolean } | null = null;
+
+    const result = await prisma.$transaction(async (tx) => {
       const payment = await tx.payment.findUnique({
         where: { id: outcome.paymentId },
       });
@@ -121,19 +127,42 @@ export const paymentsService = {
         return payment;
       }
 
+      // A SUCCEEDED callback whose independently-verified amount doesn't
+      // match what we charged is treated as FAILED (which restocks below):
+      // otherwise a tampered gateway hop could pay less than the order
+      // total and still confirm it. `verifiedAmountCents` is only set on
+      // live validation paths — sandbox callbacks carry no independent
+      // amount and are unaffected.
+      let effectiveStatus = outcome.status;
+      let amountMismatch = false;
+      if (
+        outcome.status === PaymentStatus.SUCCEEDED &&
+        outcome.verifiedAmountCents !== undefined &&
+        outcome.verifiedAmountCents !== payment.amountCents
+      ) {
+        amountMismatch = true;
+        effectiveStatus = PaymentStatus.FAILED;
+        log.error('payments.callback.amount_mismatch', {
+          paymentId: payment.id,
+          expectedCents: payment.amountCents,
+          gotCents: outcome.verifiedAmountCents,
+        });
+      }
+
       const updated = await tx.payment.update({
         where: { id: payment.id },
         data: {
-          status: outcome.status,
+          status: effectiveStatus,
           providerRef: outcome.providerRef,
           rawPayload: (outcome.rawPayload as Prisma.InputJsonValue) ?? Prisma.JsonNull,
         },
       });
 
-      if (outcome.status === PaymentStatus.SUCCEEDED) {
-        await tx.order.update({
+      if (effectiveStatus === PaymentStatus.SUCCEEDED) {
+        const order = await tx.order.update({
           where: { id: payment.orderId },
           data: { status: OrderStatus.CONFIRMED },
+          select: { orderNumber: true, totalCents: true, user: { select: { email: true } } },
         });
         await tx.orderEvent.create({
           data: {
@@ -142,13 +171,38 @@ export const paymentsService = {
             note: `Payment received via ${method}`,
           },
         });
-      } else if (outcome.status === PaymentStatus.FAILED || outcome.status === PaymentStatus.CANCELLED) {
+        notify = {
+          email: order.user.email,
+          orderNumber: order.orderNumber,
+          totalCents: order.totalCents,
+          succeeded: true,
+        };
+      } else if (
+        effectiveStatus === PaymentStatus.FAILED ||
+        effectiveStatus === PaymentStatus.CANCELLED
+      ) {
         // Don't auto-cancel the order yet; the customer might retry.
+        // Restock so the held inventory isn't lost while they decide.
+        const order = await tx.order.findUnique({
+          where: { id: payment.orderId },
+          include: { items: true, user: { select: { email: true } } },
+        });
+        if (order) {
+          await restockOrderItems(tx, order.items);
+          notify = {
+            email: order.user.email,
+            orderNumber: order.orderNumber,
+            totalCents: order.totalCents,
+            succeeded: false,
+          };
+        }
         await tx.orderEvent.create({
           data: {
             orderId: payment.orderId,
             status: OrderStatus.PENDING,
-            note: `Payment ${outcome.status.toLowerCase()} via ${method}`,
+            note: amountMismatch
+              ? `Payment rejected via ${method}: amount mismatch; stock restored`
+              : `Payment ${effectiveStatus.toLowerCase()} via ${method}; stock restored`,
           },
         });
       }
@@ -160,6 +214,12 @@ export const paymentsService = {
       });
       return updated;
     });
+
+    if (notify) {
+      const { email, orderNumber, totalCents, succeeded } = notify;
+      void sendMail(email, paymentResultEmail({ orderNumber, totalCents }, succeeded));
+    }
+    return result;
   },
 
   /**

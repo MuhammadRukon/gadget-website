@@ -1,6 +1,7 @@
 import { PaymentMethod, PaymentStatus } from '@prisma/client';
 
 import { log } from '@/server/common/logger';
+import { takaToCents } from '@/server/common/money';
 
 import type {
   CallbackOutcome,
@@ -30,8 +31,7 @@ const SANDBOX_INIT_URL = 'https://sandbox.sslcommerz.com/gwprocess/v4/api.php';
 const PROD_INIT_URL = 'https://securepay.sslcommerz.com/gwprocess/v4/api.php';
 const SANDBOX_VALIDATOR_URL =
   'https://sandbox.sslcommerz.com/validator/api/validationserverAPI.php';
-const PROD_VALIDATOR_URL =
-  'https://securepay.sslcommerz.com/validator/api/validationserverAPI.php';
+const PROD_VALIDATOR_URL = 'https://securepay.sslcommerz.com/validator/api/validationserverAPI.php';
 
 interface SslcCallbackPayload {
   status?: string;
@@ -122,8 +122,12 @@ async function realParseCallback(payload: unknown): Promise<CallbackOutcome> {
   const valId = data.val_id;
   if (!tran) throw new Error('Missing tran_id in SSLCommerz callback');
 
-  // Sandbox-mode callbacks come from our local harness; trust them.
-  if (typeof valId === 'string' && valId.startsWith('sandbox_')) {
+  // Real credentials must be checked BEFORE trusting a `sandbox_`-prefixed
+  // val_id — otherwise a forged callback with a fake sandbox ref could
+  // bypass validation even when live credentials are configured.
+  const creds = getCreds();
+
+  if (!creds && typeof valId === 'string' && valId.startsWith('sandbox_')) {
     return {
       paymentId: tran,
       status:
@@ -137,7 +141,6 @@ async function realParseCallback(payload: unknown): Promise<CallbackOutcome> {
     };
   }
 
-  const creds = getCreds();
   if (!creds) {
     throw new Error('SSLCommerz credentials missing for live callback validation');
   }
@@ -155,6 +158,7 @@ async function realParseCallback(payload: unknown): Promise<CallbackOutcome> {
     status: okStatuses.has(json.status) ? PaymentStatus.SUCCEEDED : PaymentStatus.FAILED,
     providerRef: json.val_id ?? valId,
     rawPayload: json,
+    verifiedAmountCents: json.amount ? takaToCents(Number.parseFloat(json.amount)) : undefined,
   };
 }
 

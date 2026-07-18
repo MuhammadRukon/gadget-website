@@ -8,7 +8,7 @@ import { clientIp, enforceRateLimit } from '@/server/common/rate-limit';
 export async function POST(request: Request) {
   try {
     // Tight bucket since this triggers email sends + DB writes.
-    enforceRateLimit(`forgot:${clientIp(request)}`, { max: 5, windowMs: 60 * 60 * 1000 });
+    await enforceRateLimit(`forgot:${clientIp(request)}`, { max: 5, windowMs: 60 * 60 * 1000 });
     const body = (await request.json()) as unknown;
     const input = forgotPasswordSchema.parse(body);
     const result = await authService.issuePasswordReset(input);

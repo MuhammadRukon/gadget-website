@@ -409,3 +409,14 @@ enum WarrantyStatus {
   REJECTED
   RESOLVED
 }
+
+/// Postgres-backed rate-limit bucket. Replaces the old in-process Map
+/// so limits survive across serverless instances/cold starts.
+model RateLimitBucket {
+  key       String   @id
+  count     Int      @default(0)
+  resetAt   DateTime
+  updatedAt DateTime @updatedAt
+
+  @@index([resetAt])
+}

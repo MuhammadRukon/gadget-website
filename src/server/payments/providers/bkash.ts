@@ -1,6 +1,7 @@
 import { PaymentMethod, PaymentStatus } from '@prisma/client';
 
 import { log } from '@/server/common/logger';
+import { takaToCents } from '@/server/common/money';
 
 import type {
   CallbackOutcome,
@@ -166,8 +167,12 @@ async function realParseCallback(payload: unknown): Promise<CallbackOutcome> {
     throw new Error('Missing bKash paymentID');
   }
 
-  // Sandbox mode: trust the harness and skip execute call.
-  if (data.paymentID.startsWith('sandbox_')) {
+  // Real credentials must be checked BEFORE trusting a `sandbox_`-prefixed
+  // paymentID — otherwise a forged callback with a fake sandbox ref could
+  // bypass the execute call even when live credentials are configured.
+  const creds = getCreds();
+
+  if (!creds && data.paymentID.startsWith('sandbox_')) {
     return {
       paymentId: data.paymentDbId,
       status:
@@ -181,7 +186,6 @@ async function realParseCallback(payload: unknown): Promise<CallbackOutcome> {
     };
   }
 
-  const creds = getCreds();
   if (!creds) {
     throw new Error('bKash credentials missing for live execute');
   }
@@ -213,6 +217,7 @@ async function realParseCallback(payload: unknown): Promise<CallbackOutcome> {
     status: json.transactionStatus === 'Completed' ? PaymentStatus.SUCCEEDED : PaymentStatus.FAILED,
     providerRef: json.trxID ?? data.paymentID,
     rawPayload: json,
+    verifiedAmountCents: json.amount ? takaToCents(Number.parseFloat(json.amount)) : undefined,
   };
 }
 

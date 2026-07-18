@@ -5,12 +5,13 @@ import { prisma } from '@/lib/prisma';
 
 function siteUrl(): string {
   return (
-    process.env.NEXT_PUBLIC_APP_URL ?? process.env.NEXTAUTH_URL ?? 'http://localhost:3000'
+    process.env.NEXT_PUBLIC_APP_URL ??
+    process.env.NEXTAUTH_URL ??
+    'http://localhost:3000'
   ).replace(/\/$/, '');
 }
 
 export const revalidate = 3600;
-export const dynamic = 'force-dynamic';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = siteUrl();
@@ -36,6 +37,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticEntries: MetadataRoute.Sitemap = [
     { url: `${base}/`, lastModified: now, changeFrequency: 'daily', priority: 1 },
     { url: `${base}/products`, lastModified: now, changeFrequency: 'daily', priority: 0.9 },
+    { url: `${base}/about`, lastModified: now, changeFrequency: 'monthly', priority: 0.3 },
+    { url: `${base}/contact`, lastModified: now, changeFrequency: 'monthly', priority: 0.3 },
+    { url: `${base}/privacy-policy`, lastModified: now, changeFrequency: 'yearly', priority: 0.2 },
+    { url: `${base}/terms`, lastModified: now, changeFrequency: 'yearly', priority: 0.2 },
+    { url: `${base}/refund-policy`, lastModified: now, changeFrequency: 'yearly', priority: 0.2 },
   ];
 
   const productEntries: MetadataRoute.Sitemap = products.map((p) => ({

@@ -6,10 +6,12 @@ import type { CheckoutInput, CheckoutQuote } from '@/contracts/checkout';
 import { applyDiscount } from '@/server/common/money';
 import {
   BadRequestError,
+  ConflictError,
   NotFoundError,
   ValidationError,
 } from '@/server/common/errors';
 import { couponsService } from '@/server/coupons/coupons.service';
+import { restockOrderItems } from '@/server/orders/orders.service';
 
 import { computeShippingCents } from './shipping';
 
@@ -152,7 +154,18 @@ export const checkoutService = {
       const cartItems = await tx.cartItem.findMany({
         where: { cart: { userId } },
         include: {
-          variant: { include: { product: { select: { id: true, name: true, status: true, images: { orderBy: { sortOrder: 'asc' as const }, take: 1 } } } } },
+          variant: {
+            include: {
+              product: {
+                select: {
+                  id: true,
+                  name: true,
+                  status: true,
+                  images: { orderBy: { sortOrder: 'asc' as const }, take: 1 },
+                },
+              },
+            },
+          },
         },
       });
       if (cartItems.length === 0) {
@@ -185,11 +198,10 @@ export const checkoutService = {
       let couponId: string | null = null;
       let couponCode: string | null = null;
       if (input.couponCode) {
-        const validated = await couponsService.validate({
-          code: input.couponCode,
-          userId,
-          subtotalCents,
-        });
+        const validated = await couponsService.validate(
+          { code: input.couponCode, userId, subtotalCents },
+          tx,
+        );
         discountCents = validated.discountCents;
         couponId = validated.id;
         couponCode = validated.code;
@@ -252,20 +264,36 @@ export const checkoutService = {
         },
       });
 
-      // 5. Decrement stock per variant (grouped, fewer writes).
+      // 5. Decrement stock per variant (grouped, fewer writes). Conditional
+      // on stock still being sufficient — under concurrent checkouts for
+      // the same variant, only one transaction's decrement can win; the
+      // other sees `count !== 1` and fails cleanly instead of overselling.
       for (const [variantId, quantity] of qtyByVariantId.entries()) {
-        await tx.productVariant.update({
-          where: { id: variantId },
+        const res = await tx.productVariant.updateMany({
+          where: { id: variantId, stock: { gte: quantity } },
           data: { stock: { decrement: quantity } },
         });
+        if (res.count !== 1) {
+          throw new ConflictError('Not enough stock to complete checkout', { variantId });
+        }
       }
 
-      // 6. Increment coupon usage atomically.
+      // 6. Increment coupon usage atomically. Re-read the limit inside this
+      // transaction and only increment if still under it — closes the race
+      // where concurrent checkouts could both pass validate()'s read-only
+      // check and both increment past usageLimit.
       if (couponId) {
-        await tx.coupon.update({
-          where: { id: couponId },
+        const coupon = await tx.coupon.findUniqueOrThrow({ where: { id: couponId } });
+        const couponRes = await tx.coupon.updateMany({
+          where: {
+            id: couponId,
+            ...(coupon.usageLimit !== null ? { usedCount: { lt: coupon.usageLimit } } : {}),
+          },
           data: { usedCount: { increment: 1 } },
         });
+        if (couponRes.count !== 1) {
+          throw new ConflictError('This coupon has reached its usage limit');
+        }
       }
 
       // 7. Create payment record.
@@ -282,7 +310,12 @@ export const checkoutService = {
       // 8. Clear cart and audit.
       await tx.cartItem.deleteMany({ where: { cart: { userId } } });
       await tx.orderEvent.create({
-        data: { orderId: order.id, status: OrderStatus.PENDING, note: 'Order placed', actorId: userId },
+        data: {
+          orderId: order.id,
+          status: OrderStatus.PENDING,
+          note: 'Order placed',
+          actorId: userId,
+        },
       });
 
       // Auto-confirm COD orders so the admin sees them in CONFIRMED state.
@@ -307,6 +340,50 @@ export const checkoutService = {
       });
       if (!placed) throw new Error('Order disappeared after creation');
       return { order: placed, paymentId: payment.id };
+    });
+  },
+
+  /**
+   * Undo a just-placed order when starting the payment (gateway
+   * `kickoff`) failed — restores stock, releases the coupon slot, and
+   * marks the order/payment cancelled so the customer isn't left with
+   * a silent orphan. Called from the checkout route's catch branch.
+   */
+  async cancelOrphanedOrder(orderId: string) {
+    return prisma.$transaction(async (tx) => {
+      const order = await tx.order.findUnique({ where: { id: orderId }, include: { items: true } });
+      if (!order || order.status === OrderStatus.CANCELLED) return;
+
+      await tx.order.update({
+        where: { id: orderId },
+        data: {
+          status: OrderStatus.CANCELLED,
+          cancelledAt: new Date(),
+          cancelReason: 'Payment could not be started',
+        },
+      });
+
+      await restockOrderItems(tx, order.items);
+
+      if (order.couponId) {
+        await tx.coupon.update({
+          where: { id: order.couponId },
+          data: { usedCount: { decrement: 1 } },
+        });
+      }
+
+      await tx.payment.updateMany({
+        where: { orderId, status: PaymentStatus.PENDING },
+        data: { status: PaymentStatus.FAILED },
+      });
+
+      await tx.orderEvent.create({
+        data: {
+          orderId,
+          status: OrderStatus.CANCELLED,
+          note: 'Payment could not be started; order cancelled automatically',
+        },
+      });
     });
   },
 };

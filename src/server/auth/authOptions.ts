@@ -43,7 +43,14 @@ export const authOptions: NextAuthConfig = {
 
         const user = await prisma.user.findUnique({
           where: { email: parsed.data.email },
-          select: { id: true, email: true, name: true, role: true, passwordHash: true, image: true },
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            role: true,
+            passwordHash: true,
+            image: true,
+          },
         });
         if (!user || !user.passwordHash) return null;
 
@@ -64,7 +71,6 @@ export const authOptions: NextAuthConfig = {
           Google({
             clientId: process.env.GOOGLE_CLIENT_ID!,
             clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-            allowDangerousEmailAccountLinking: true,
           }),
         ]
       : []),
@@ -75,6 +81,14 @@ export const authOptions: NextAuthConfig = {
       // app (orders, cart, reviews) has a stable FK target. We do not
       // store Google's account row separately in JWT mode - the link is
       // by email.
+      //
+      // No PrismaAdapter is attached (see file header), so NextAuth's
+      // `allowDangerousEmailAccountLinking` flag has no effect here -
+      // this callback IS the account-linking logic. Auto-linking to an
+      // existing user that already has a password set would let anyone
+      // who pre-registers a victim's email via credentials sign-up
+      // silently take over the account the victim later reaches via
+      // Google. Refuse to link in that case instead.
       if (account?.provider === 'google' && user?.email) {
         const existing = await prisma.user.findUnique({ where: { email: user.email } });
         if (!existing) {
@@ -89,6 +103,8 @@ export const authOptions: NextAuthConfig = {
           });
           (user as { id?: string; role?: UserRole }).id = created.id;
           (user as { id?: string; role?: UserRole }).role = created.role;
+        } else if (existing.passwordHash) {
+          return false;
         } else {
           (user as { id?: string; role?: UserRole }).id = existing.id;
           (user as { id?: string; role?: UserRole }).role = existing.role;
