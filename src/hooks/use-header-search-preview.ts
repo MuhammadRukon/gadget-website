@@ -1,7 +1,5 @@
 'use client';
 
-//TODO: add score based search.
-
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 
