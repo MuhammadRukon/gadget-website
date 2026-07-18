@@ -2,9 +2,14 @@
 
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useState, useTransition } from 'react';
+import { ChevronDown } from 'lucide-react';
+
+import { cn } from '@/lib/utils';
+
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+
 import {
   Select,
   SelectContent,
@@ -12,6 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+
 import { Switch } from '@/components/ui/switch';
 
 interface BrandOption {
@@ -19,6 +25,7 @@ interface BrandOption {
   name: string;
   slug: string;
 }
+
 interface CategoryOption {
   id: string;
   name: string;
@@ -28,7 +35,6 @@ interface CategoryOption {
 interface Props {
   brands: BrandOption[];
   categories: CategoryOption[];
-  /** Hide the filter when locked by route, e.g. on /[category] route. */
   lockedCategorySlug?: string;
   lockedBrandSlug?: string;
 }
@@ -44,135 +50,195 @@ export function ProductFilters({
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
+
   const [, startTransition] = useTransition();
+
+  const [open, setOpen] = useState(false);
 
   function setParam(key: string, value: string | null) {
     const sp = new URLSearchParams(params);
-    if (value === null || value === '') sp.delete(key);
-    else sp.set(key, value);
+
+    if (!value) {
+      sp.delete(key);
+    } else {
+      sp.set(key, value);
+    }
+
     sp.delete('page');
-    startTransition(() => router.push(`${pathname}?${sp.toString()}`));
+
+    startTransition(() => {
+      router.push(`${pathname}?${sp.toString()}`);
+    });
   }
 
   function clearAll() {
-    startTransition(() => router.push(pathname));
+    startTransition(() => {
+      router.push(pathname);
+    });
   }
 
   const sort = params.get('sort') ?? 'newest';
-  const inStock = params.get('inStock') === 'true';
-  // const q = params.get('q') ?? '';
-  const minPrice = params.get('minPrice') ?? '';
-  const maxPrice = params.get('maxPrice') ?? '';
-  const categorySlug = lockedCategorySlug ?? params.get('categorySlug') ?? '';
-  const brandSlug = lockedBrandSlug ?? params.get('brandSlug') ?? '';
-  return (
-    <>
-      <h2>Filter Panel</h2>
 
-      <div className="space-y-4">
-        {/* <div className="space-y-2">
-        <Label htmlFor="q">Search</Label>
-        <Input
-          id="q"
-          defaultValue={q}
-          placeholder="Search products"
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault();
-              setParam('q', (e.target as HTMLInputElement).value);
-            }
-          }}
+  const inStock = params.get('inStock') === 'true';
+
+  const minPrice = params.get('minPrice') ?? '';
+
+  const maxPrice = params.get('maxPrice') ?? '';
+
+  const categorySlug = lockedCategorySlug ?? params.get('categorySlug') ?? '';
+
+  const brandSlug = lockedBrandSlug ?? params.get('brandSlug') ?? '';
+
+  return (
+    <div>
+      {/* Mobile only */}
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="
+          md:hidden
+          flex
+          w-full
+          items-center
+          justify-between
+          border-b
+          pb-2
+        "
+      >
+        <h2 className="text-lg font-semibold">Filter Panel</h2>
+
+        <ChevronDown
+          className={cn('size-5 transition-transform duration-300', open && 'rotate-180')}
         />
-      </div> */}
-        <div className="flex gap-2">
-          {!lockedCategorySlug ? (
-            <div className="space-y-2 flex-1">
-              <Label>Category</Label>
-              <Select
-                value={categorySlug || ANY}
-                onValueChange={(v) => setParam('categorySlug', v === ANY ? null : v)}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Any" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ANY}>Any</SelectItem>
-                  {categories.map((c) => (
-                    <SelectItem key={c.id} value={c.slug}>
-                      {c.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          ) : null}
-          {!lockedBrandSlug ? (
-            <div className="space-y-2 flex-1">
-              <Label>Brand</Label>
-              <Select
-                value={brandSlug || ANY}
-                onValueChange={(v) => setParam('brandSlug', v === ANY ? null : v)}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Any" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ANY}>Any</SelectItem>
-                  {brands.map((b) => (
-                    <SelectItem key={b.id} value={b.slug}>
-                      {b.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          ) : null}
-          <div className="space-y-2 flex-1">
+      </button>
+
+      <h2 className="text-lg font-semibold  max-md:hidden pt-10 pb-2 border-b">Filter Panel</h2>
+
+      <div
+        className={cn(
+          `
+          overflow-hidden
+          transition-all
+          duration-300
+          ease-in-out
+          md:pt-4
+          `,
+
+          // mobile animation
+          open
+            ? 'max-md:max-h-[800px] max-md:opacity-100 max-md:pt-4'
+            : 'max-md:max-h-0 max-md:opacity-0',
+
+          // desktop always visible
+          'md:max-h-none md:opacity-100',
+        )}
+      >
+        <div className="space-y-4">
+          <div className="flex gap-2">
+            {!lockedCategorySlug && (
+              <div className="flex-1 space-y-2">
+                <Label>Category</Label>
+
+                <Select
+                  value={categorySlug || ANY}
+                  onValueChange={(v) => setParam('categorySlug', v === ANY ? null : v)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+
+                  <SelectContent>
+                    <SelectItem value={ANY}>Any</SelectItem>
+
+                    {categories.map((c) => (
+                      <SelectItem key={c.id} value={c.slug}>
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {!lockedBrandSlug && (
+              <div className="flex-1 space-y-2">
+                <Label>Brand</Label>
+
+                <Select
+                  value={brandSlug || ANY}
+                  onValueChange={(v) => setParam('brandSlug', v === ANY ? null : v)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+
+                  <SelectContent>
+                    <SelectItem value={ANY}>Any</SelectItem>
+
+                    {brands.map((b) => (
+                      <SelectItem key={b.id} value={b.slug}>
+                        {b.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
+          <div className="space-y-2">
             <Label>Sort</Label>
+
             <Select value={sort} onValueChange={(v) => setParam('sort', v === 'newest' ? null : v)}>
               <SelectTrigger className="w-full">
                 <SelectValue />
               </SelectTrigger>
+
               <SelectContent>
                 <SelectItem value="newest">Newest</SelectItem>
-                <SelectItem value="price_asc">Price (low to high)</SelectItem>
-                <SelectItem value="price_desc">Price (high to low)</SelectItem>
+
+                <SelectItem value="price_asc">Price low-high</SelectItem>
+
+                <SelectItem value="price_desc">Price high-low</SelectItem>
               </SelectContent>
             </Select>
           </div>
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          <div className="space-y-1">
-            <Label htmlFor="minPrice">Min ৳</Label>
-            <Input
-              id="minPrice"
-              inputMode="numeric"
-              defaultValue={minPrice}
-              onBlur={(e) => setParam('minPrice', e.target.value || null)}
+
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1">
+              <Label>Min ৳</Label>
+
+              <Input
+                defaultValue={minPrice}
+                inputMode="numeric"
+                onBlur={(e) => setParam('minPrice', e.target.value || null)}
+              />
+            </div>
+
+            <div className="space-y-1">
+              <Label>Max ৳</Label>
+
+              <Input
+                defaultValue={maxPrice}
+                inputMode="numeric"
+                onBlur={(e) => setParam('maxPrice', e.target.value || null)}
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <Label>In stock only</Label>
+
+            <Switch
+              checked={inStock}
+              onCheckedChange={(v) => setParam('inStock', v ? 'true' : null)}
             />
           </div>
-          <div className="space-y-1">
-            <Label htmlFor="maxPrice">Max ৳</Label>
-            <Input
-              id="maxPrice"
-              inputMode="numeric"
-              defaultValue={maxPrice}
-              onBlur={(e) => setParam('maxPrice', e.target.value || null)}
-            />
-          </div>
+
+          <Button variant="outline" className="w-full" onClick={clearAll}>
+            Clear filters
+          </Button>
         </div>
-        <div className="flex items-center justify-between">
-          <Label htmlFor="inStock">In stock only</Label>
-          <Switch
-            id="inStock"
-            checked={inStock}
-            onCheckedChange={(c) => setParam('inStock', c ? 'true' : null)}
-          />
-        </div>
-        <Button type="button" variant="outline" className="w-full" onClick={clearAll}>
-          Clear filters
-        </Button>
       </div>
-    </>
+    </div>
   );
 }

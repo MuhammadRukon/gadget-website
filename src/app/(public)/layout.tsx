@@ -35,7 +35,9 @@ export default async function PublicLayout({ children }: Readonly<{ children: Re
   return (
     <>
       <Header menu={menu} />
-      <Container>{children}</Container>
+      <main>
+        <Container>{children}</Container>
+      </main>
       <Footer />
     </>
   );

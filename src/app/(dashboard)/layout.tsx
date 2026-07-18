@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 
 import { auth } from '@/auth';
-import { AppSidebar } from '@/components/app-sidebar';
+import { DashboardSidebar } from '@/components/dashboard-sidebar';
 import { SiteHeader } from '@/components/site-header';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 
@@ -29,7 +29,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         } as React.CSSProperties
       }
     >
-      <AppSidebar
+      <DashboardSidebar
         variant="inset"
         user={{
           name: session.user.name ?? 'Admin',

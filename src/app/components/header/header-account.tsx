@@ -52,7 +52,7 @@ export function HeaderAccount() {
   const isAdmin = data.user.role === 'ADMIN';
 
   return (
-    <DropdownMenu>
+    <DropdownMenu modal={false}>
       <DropdownMenuTrigger
         className={cn(
           'flex items-center  gap-1.5 $ h-full transition-all cursor-pointer duration-200  outline-none',
