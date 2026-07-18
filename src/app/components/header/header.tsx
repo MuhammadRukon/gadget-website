@@ -50,7 +50,6 @@ export function Header({ menu }: Readonly<HeaderProps>): JSX.Element {
 
 Header.TopBar = function TopBar({ menu }: { menu: MenuCategory[] }): JSX.Element {
   const [showSearchBar, setShowSearchBar] = useState(false);
-  //TODO: add score based search.
   const { search, setSearch, preview, previewLoading, submitSearch } = useHeaderSearchPreview();
 
   return (
