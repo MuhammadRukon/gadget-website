@@ -24,3 +24,23 @@ export const resetPasswordSchema = z.object({
   password: z.string().min(8).max(72),
 });
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
+
+export const verifyEmailSchema = z
+  .object({
+    email: z.string().email().toLowerCase().optional(),
+    code: z
+      .string()
+      .regex(/^\d{6}$/, 'Code must be 6 digits')
+      .optional(),
+    token: z.string().min(32).optional(),
+  })
+  .refine((d) => (d.email && d.code) || d.token, {
+    message: 'Provide your email and code, or use the emailed link',
+    path: ['code'],
+  });
+export type VerifyEmailInput = z.infer<typeof verifyEmailSchema>;
+
+export const resendVerificationSchema = z.object({
+  email: z.string().email().toLowerCase(),
+});
+export type ResendVerificationInput = z.infer<typeof resendVerificationSchema>;

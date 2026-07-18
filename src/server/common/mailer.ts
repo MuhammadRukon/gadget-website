@@ -7,7 +7,7 @@
  * without an email account. Sends are always fire-and-forget side
  * effects — callers must invoke this AFTER their DB transaction has
  * committed and never let a failure here fail the request
- * (`sendMail(...).catch(...)` is built in; it never rejects).
+ * (`sendMail` never rejects).
  */
 
 import { formatBDT } from '@/server/common/money';
@@ -26,6 +26,11 @@ function getMailerConfig() {
   const from = process.env.EMAIL_FROM;
   if (!apiKey || !from) return null;
   return { apiKey, from };
+}
+
+/** True when email can actually be delivered (used for dev fallbacks). */
+export function mailerConfigured(): boolean {
+  return getMailerConfig() !== null;
 }
 
 export async function sendMail(to: string | null | undefined, content: MailContent): Promise<void> {
@@ -68,6 +73,20 @@ function layout(title: string, bodyHtml: string): string {
   ${bodyHtml}
   <p style="margin-top:32px;font-size:12px;color:#777">Cryptech Ltd &middot; Tali Office Road, Hazaribagh, Dhaka-1209</p>
 </div>`;
+}
+
+export function verificationEmail(code: string, verifyUrl: string): MailContent {
+  return {
+    subject: 'Verify your Cryptech account',
+    html: layout(
+      'Verify your email',
+      `<p>Welcome to Cryptech! Enter this code on the verification page to activate your account:</p>
+<p style="margin:24px 0;font-size:28px;font-weight:bold;letter-spacing:6px">${code}</p>
+<p>Or click the button below to verify instantly:</p>
+<p style="margin:24px 0"><a href="${verifyUrl}" style="background:#111;color:#fff;padding:10px 18px;text-decoration:none;border-radius:6px">Verify my email</a></p>
+<p>This code and link expire in 30 minutes. If you didn't create an account, you can safely ignore this email.</p>`,
+    ),
+  };
 }
 
 export function passwordResetEmail(resetUrl: string): MailContent {
