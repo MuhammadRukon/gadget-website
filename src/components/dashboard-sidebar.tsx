@@ -55,7 +55,7 @@ const navSecondary: { title: string; url: string; icon: Icon }[] = [
   { title: 'Settings', url: '/dashboard/settings', icon: IconSettings },
 ];
 
-export function AppSidebar({ user, ...props }: AppSidebarProps) {
+export function DashboardSidebar({ user, ...props }: AppSidebarProps) {
   return (
     <Sidebar collapsible="offcanvas" {...props}>
       <SidebarHeader>
