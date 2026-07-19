@@ -83,3 +83,12 @@ export async function enforceRateLimit(key: string, policy: RateLimitPolicy): Pr
   const result = await rateLimit(key, policy);
   if (!result.ok) throw new RateLimitedError(result.resetAt);
 }
+
+/**
+ * Drop the bucket for a key. Call after a successful action (login,
+ * password change) so a run of failures doesn't count against the user
+ * once they succeed.
+ */
+export async function clearRateLimit(key: string): Promise<void> {
+  await prisma.rateLimitBucket.deleteMany({ where: { key } });
+}

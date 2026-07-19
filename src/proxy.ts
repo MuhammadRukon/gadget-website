@@ -16,13 +16,17 @@ import { getToken } from 'next-auth/jwt';
 export default async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const needsAdmin = pathname.startsWith('/dashboard') || pathname.startsWith('/api/admin');
+  const needsUser = pathname.startsWith('/account');
 
-  if (!needsAdmin) return NextResponse.next();
+  if (!needsAdmin && !needsUser) return NextResponse.next();
 
   const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
-  const isAdmin = !!token && token.role === 'ADMIN';
+  // Admin routes require the ADMIN role; /account only requires any
+  // authenticated user. Verifying the JWT here (not just cookie
+  // presence) means a CUSTOMER token can't reach admin routes.
+  const authorized = needsAdmin ? !!token && token.role === 'ADMIN' : !!token;
 
-  if (!isAdmin) {
+  if (!authorized) {
     if (pathname.startsWith('/api/')) {
       return NextResponse.json(
         { code: 'UNAUTHORIZED', message: 'Authentication required' },
@@ -39,5 +43,5 @@ export default async function proxy(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/api/admin/:path*'],
+  matcher: ['/dashboard/:path*', '/api/admin/:path*', '/account/:path*'],
 };

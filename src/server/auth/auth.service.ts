@@ -5,19 +5,26 @@ import {
   NotFoundError,
   ValidationError,
   BadRequestError,
+  UnauthorizedError,
 } from '@/server/common/errors';
 import { log } from '@/server/common/logger';
 import {
   mailerConfigured,
+  passwordChangedEmail,
   passwordResetEmail,
   sendMail,
   verificationEmail,
 } from '@/server/common/mailer';
 
-import { hashPassword } from './password';
+import { hashPassword, verifyPassword } from './password';
 import { hashResetToken, issueResetToken } from './tokens';
 import { issueVerification, matchVerification } from './verification';
-import type { ForgotPasswordInput, ResetPasswordInput, SignupInput } from '@/contracts/auth';
+import type {
+  ChangePasswordInput,
+  ForgotPasswordInput,
+  ResetPasswordInput,
+  SignupInput,
+} from '@/contracts/auth';
 
 function verifyUrl(token: string): string {
   const base = (process.env.NEXT_PUBLIC_APP_URL ?? '').replace(/\/$/, '');
@@ -160,6 +167,45 @@ export const authService = {
         where: { tokenHash },
         data: { usedAt: new Date() },
       }),
+      // Invalidate any OTHER outstanding reset tokens for this user, so a
+      // second "forgot password" request can't leave a second live link.
+      prisma.passwordResetToken.deleteMany({
+        where: { userId: record.userId, usedAt: null, tokenHash: { not: tokenHash } },
+      }),
     ]);
+
+    void sendMail(record.user.email, passwordChangedEmail());
+    log.info('auth.passwordReset.completed', { userId: record.userId });
+  },
+
+  /**
+   * Change the password of an already-authenticated user. Requires the
+   * current password (defence against session-hijack "silent" takeover
+   * and against a shoulder-surfer who has an open session). Google-only
+   * accounts (no local password) are rejected — they have nothing to
+   * verify against. Success invalidates any outstanding reset tokens and
+   * sends a security notification.
+   */
+  async changePassword(userId: string, input: ChangePasswordInput) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, passwordHash: true },
+    });
+    if (!user) throw new NotFoundError('User');
+    if (!user.passwordHash) {
+      throw new BadRequestError('This account uses Google sign-in and has no password to change');
+    }
+
+    const ok = await verifyPassword(input.currentPassword, user.passwordHash);
+    if (!ok) throw new UnauthorizedError('Current password is incorrect');
+
+    const passwordHash = await hashPassword(input.password);
+    await prisma.$transaction([
+      prisma.user.update({ where: { id: user.id }, data: { passwordHash } }),
+      prisma.passwordResetToken.deleteMany({ where: { userId: user.id, usedAt: null } }),
+    ]);
+
+    void sendMail(user.email, passwordChangedEmail());
+    log.info('auth.passwordChanged', { userId: user.id });
   },
 };

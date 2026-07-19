@@ -5,6 +5,7 @@ import { ZodError } from 'zod';
 import { authService } from '@/server/auth/auth.service';
 import { signOut as authSignOut } from '@/auth';
 import {
+  changePasswordSchema,
   forgotPasswordSchema,
   resendVerificationSchema,
   resetPasswordSchema,
@@ -12,8 +13,9 @@ import {
   verifyEmailSchema,
 } from '@/contracts/auth';
 import { AppError, toJsonError } from '@/server/common/errors';
+import { requireSession } from '@/server/common/http';
 import { log } from '@/server/common/logger';
-import { RateLimitedError, enforceRateLimit } from '@/server/common/rate-limit';
+import { RateLimitedError, clearRateLimit, enforceRateLimit } from '@/server/common/rate-limit';
 
 export interface ActionResult {
   ok: boolean;
@@ -108,7 +110,7 @@ export async function verifyEmailAction(input: unknown): Promise<ActionResult> {
     // 6-digit codes are brute-forceable; throttle attempts per email.
     // Deeplink tokens are 32 random bytes — no practical brute force.
     if (data.email) {
-      enforceRateLimit(`verify:${data.email}`, { max: 5, windowMs: 15 * 60 * 1000 });
+      await enforceRateLimit(`verify:${data.email}`, { max: 5, windowMs: 15 * 60 * 1000 });
     }
     await authService.verifyEmail({
       email: data.email,
@@ -117,7 +119,11 @@ export async function verifyEmailAction(input: unknown): Promise<ActionResult> {
     return { ok: true, message: 'Email verified. You can now sign in.' };
   } catch (err) {
     if (err instanceof ZodError) {
-      return { ok: false, message: 'Invalid verification details', fieldErrors: fieldErrorsFromZod(err) };
+      return {
+        ok: false,
+        message: 'Invalid verification details',
+        fieldErrors: fieldErrorsFromZod(err),
+      };
     }
     if (err instanceof RateLimitedError) {
       return { ok: false, message: 'Too many attempts. Try again in a few minutes.' };
@@ -135,7 +141,7 @@ export async function verifyEmailAction(input: unknown): Promise<ActionResult> {
 export async function resendVerificationAction(input: unknown): Promise<ActionResult> {
   try {
     const data = resendVerificationSchema.parse(input);
-    enforceRateLimit(`resend-verify:${data.email}`, { max: 3, windowMs: 15 * 60 * 1000 });
+    await enforceRateLimit(`resend-verify:${data.email}`, { max: 3, windowMs: 15 * 60 * 1000 });
     const result = await authService.resendVerification(data.email);
     // Always generic: no account enumeration via this action.
     return {
@@ -157,6 +163,39 @@ export async function resendVerificationAction(input: unknown): Promise<ActionRe
       error: err instanceof Error ? err.message : String(err),
     });
     return { ok: false, message: 'Could not process request' };
+  }
+}
+
+export async function changePasswordAction(input: unknown): Promise<ActionResult> {
+  try {
+    const user = await requireSession();
+    // Parse BEFORE throttling so malformed payloads don't burn the
+    // budget; only real change attempts count. Cleared on success so a
+    // few wrong-current-password typos don't lock out a legitimate user.
+    const data = changePasswordSchema.parse(input);
+    const rlKey = `change-pw:${user.id}`;
+    await enforceRateLimit(rlKey, { max: 10, windowMs: 15 * 60 * 1000 });
+    await authService.changePassword(user.id, data);
+    await clearRateLimit(rlKey);
+    return { ok: true, message: 'Password updated.' };
+  } catch (err) {
+    if (err instanceof ZodError) {
+      return {
+        ok: false,
+        message: 'Invalid password details',
+        fieldErrors: fieldErrorsFromZod(err),
+      };
+    }
+    if (err instanceof RateLimitedError) {
+      return { ok: false, message: 'Too many attempts. Try again in a few minutes.' };
+    }
+    if (err instanceof AppError) {
+      return { ok: false, message: err.message };
+    }
+    log.error('auth.changePassword.action.failed', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return { ok: false, message: toJsonError(err).message };
   }
 }
 
