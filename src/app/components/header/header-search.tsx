@@ -60,10 +60,10 @@ export function HeaderSearch() {
         'relative col-span-2 sm:col-span-1 order-3 sm:order-none sm:py-2 transition-all duration-300',
 
         showSearchBar
-          ? 'max-sm:max-h-20 max-sm:opacity-100 max-sm:translate-y-0 max-sm:mt-2 pb-2'
-          : 'max-sm:max-h-0 max-sm:opacity-0 max-sm:-translate-y-4 max-sm:mt-0',
+          ? 'max-sm:max-h-20 max-sm:opacity-100 max-sm:translate-y-0 max-sm:mt-2 max-sm:pointer-events-auto pb-3'
+          : 'max-sm:max-h-0 max-sm:opacity-0 max-sm:-translate-y-4 max-sm:mt-0 max-sm:pointer-events-none max-sm:overflow-hidden',
 
-        'sm:max-h-none sm:opacity-100 sm:translate-y-0',
+        'sm:max-h-none sm:opacity-100 sm:translate-y-0 sm:pointer-events-auto',
       )}
     >
       <form className="flex h-10 w-full items-center" onSubmit={handleSubmit}>
