@@ -1,6 +1,6 @@
 'use client';
 
-import { SearchIcon } from 'lucide-react';
+import { SearchIcon, ShoppingCart } from 'lucide-react';
 
 import { useMobileSearch } from '../../../stores/mobile-search.store';
 
@@ -12,11 +12,13 @@ export function MobileSearchToggle() {
   const toggle = useMobileSearch((state) => state.toggle);
 
   return (
-    <SearchIcon
-      size={18}
-      className="sm:hidden cursor-pointer"
-      aria-label="Toggle search"
+    <button
+      type="button"
       onClick={toggle}
-    />
+      aria-label="Toggle search"
+      className="relative cursor-pointer sm:hidden h-full"
+    >
+      <SearchIcon size={18} />
+    </button>
   );
 }

@@ -36,7 +36,7 @@ export default async function PublicLayout({ children }: Readonly<{ children: Re
     <>
       <Header menu={menu} />
       <main>
-        <Container>{children}</Container>
+        <Container className="min-h-[calc(100vh-384px)]">{children}</Container>
       </main>
       <Footer />
     </>

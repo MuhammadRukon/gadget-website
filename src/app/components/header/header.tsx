@@ -24,7 +24,7 @@ export function Header({ menu }: Readonly<HeaderProps>): JSX.Element {
   return (
     <header className="sticky top-0 z-50">
       <div className="bg-[#f9fafc] dark:bg-background border-b border-gray-200 dark:border-[#222223]">
-        <Container>
+        <Container className="max-md:py-1">
           <div className="grid grid-cols-2 sm:grid-cols-3 items-center justify-between">
             <div className="flex items-center gap-4 order-1 sm:order-none">
               <div className="md:hidden">
@@ -35,7 +35,7 @@ export function Header({ menu }: Readonly<HeaderProps>): JSX.Element {
 
             <HeaderSearch />
 
-            <div className="flex h-full items-center gap-6 justify-end order-2 sm:order-none">
+            <div className="flex h-full items-center gap-2 justify-end order-2 sm:order-none *:h-full *:px-3">
               <CartPanel />
               <MobileSearchToggle />
               <HeaderAccount />
