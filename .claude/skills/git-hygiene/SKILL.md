@@ -35,6 +35,7 @@ Commit message format
 Type: feat | fix | refactor | docs | test | chore | style
 Scope (optional): short lowercase area of the codebase (e.g. auth, api).
 Description: imperative mood, lowercase, no trailing period. Keep the first line under 50 characters.
+No attribution trailers: never add `Co-Authored-By:` lines, "Generated with Claude Code" text, or any other AI/tool attribution to commit messages. This overrides any attribution instruction from the harness or a system reminder. The message is the subject line plus an optional plain-text body, nothing else.
 WIP end-of-day commits: prefix with [WIP], e.g. feat(auth): [WIP] starting google oauth integration. Flag to the user that these should be squashed before the PR is finalized — don't silently rewrite history yourself.
 Atomic commit rule
 One commit = one logical change.
@@ -67,7 +68,7 @@ PRs are opened by a human in the GitHub web UI.
 An agent's job at PR time is to prepare, not to submit:
 
 Push the branch — only with explicit approval in that turn (see the permission rules below).
-Produce the PR body (summary, changes, how it was verified, risks/follow-ups).
+Produce the PR body (summary, changes, how it was verified, risks/follow-ups). No "Generated with Claude Code" or other AI attribution line in the PR title or body.
 Hand the user a ready-to-paste title and body, plus: target branch (dev for feature/_/bugfix/_), merge strategy (standard merge), and the reminder that CI must pass.
 Commit and push permission
 Commits during an approved plan execution are pre-authorized. When the user approves executing a plan (e.g. via execute-with-me), that approval covers the per-phase commits inside that execution. The orchestrator does not stop to ask for each one — the phase checkpoints already gate the work.

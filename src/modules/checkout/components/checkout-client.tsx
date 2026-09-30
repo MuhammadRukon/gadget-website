@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -14,6 +15,9 @@ import { Loader } from '@/app/common/loader/loader';
 import { ApiClientError, apiFetch } from '@/lib/fetcher';
 import { formatBDT } from '@/server/common/money';
 import type { CheckoutInput, CheckoutQuote } from '@/contracts/checkout';
+import { queryKeys } from '@/constants/queryKeys';
+import { checkoutErrorMessage } from '@/modules/checkout/checkout-error';
+import { usePlaceOrder } from '@/modules/checkout/hooks';
 import { useServerCart } from '@/modules/cart/hooks';
 import { useAddresses } from '@/modules/account/hooks';
 import { AddressForm } from '@/modules/account/components/address-form';
@@ -41,7 +45,11 @@ export function CheckoutClient() {
 
   const [quote, setQuote] = useState<CheckoutQuote | null>(null);
   const [quoting, setQuoting] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
+  const [orderPlaced, setOrderPlaced] = useState(false);
+  // Synchronous double-click guard: mutate() can fire twice before isPending re-renders.
+  const submitGuard = useRef(false);
+  const placeOrderMutation = usePlaceOrder();
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     if (!addressId && addresses.data && addresses.data.length > 0) {
@@ -65,8 +73,12 @@ export function CheckoutClient() {
       })
       .catch((err) => {
         if (cancelled) return;
-        const message = err instanceof ApiClientError ? err.message : 'Could not calculate totals';
-        toast.error(message);
+        const isApiError = err instanceof ApiClientError;
+        toast.error(isApiError ? checkoutErrorMessage(err) : 'Could not calculate totals');
+        // Quote returns the same stock-conflict 409 as checkout; the cart snapshot is stale.
+        if (isApiError && err.status === 409) {
+          queryClient.invalidateQueries({ queryKey: queryKeys.cart });
+        }
         setQuote(null);
         if (appliedCoupon) setAppliedCoupon(null);
       })
@@ -76,7 +88,7 @@ export function CheckoutClient() {
     return () => {
       cancelled = true;
     };
-  }, [addressId, appliedCoupon]);
+  }, [addressId, appliedCoupon, queryClient]);
 
   const itemCount = cart.data?.itemCount ?? 0;
   const ready = !!addressId && itemCount > 0 && !quoting && !!quote;
@@ -86,38 +98,39 @@ export function CheckoutClient() {
     setAppliedCoupon(couponCode.trim() || null);
   }
 
-  async function placeOrder() {
+  function placeOrder() {
     if (!addressId) return;
-    setSubmitting(true);
-    try {
-      const res = await apiFetch<{
-        id: string;
-        orderNumber: string;
-        redirectUrl: string | null;
-      }>('/api/checkout', {
-        method: 'POST',
-        body: {
-          addressId,
-          paymentMethod,
-          couponCode: appliedCoupon ?? undefined,
-          notes: notes || undefined,
-        } satisfies CheckoutInput,
-      });
-      toast.success(`Order ${res.orderNumber} placed`);
-      if (res.redirectUrl) {
-        window.location.href = res.redirectUrl;
-        return;
-      }
-      router.push(`/orders/${res.id}`);
-    } catch (err) {
-      const message = err instanceof ApiClientError ? err.message : 'Could not place order';
-      toast.error(message);
-    } finally {
-      setSubmitting(false);
-    }
+    if (submitGuard.current) return;
+    submitGuard.current = true;
+    placeOrderMutation.mutate(
+      {
+        addressId,
+        paymentMethod,
+        couponCode: appliedCoupon ?? undefined,
+        notes: notes || undefined,
+      } satisfies CheckoutInput,
+      {
+        onSuccess: (res) => {
+          // Guard stays set while navigating away.
+          setOrderPlaced(true);
+          if (res.redirectUrl) {
+            window.location.href = res.redirectUrl;
+            return;
+          }
+          router.push(`/orders/${res.id}`);
+        },
+        onError: () => {
+          submitGuard.current = false;
+        },
+      },
+    );
   }
 
-  if (cart.isLoading || addresses.isLoading) {
+  const submitting = placeOrderMutation.isPending || orderPlaced;
+
+  // After a successful order the cart refetches empty while navigation is in
+  // flight; keep the loader up instead of flashing "Your cart is empty".
+  if (cart.isLoading || addresses.isLoading || (itemCount === 0 && orderPlaced)) {
     return (
       <div className="flex justify-center py-20">
         <Loader />

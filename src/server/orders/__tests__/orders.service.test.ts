@@ -177,3 +177,133 @@ describe('ordersService.transition', () => {
     TEST_TIMEOUT,
   );
 });
+
+function split(results: PromiseSettledResult<unknown>[]) {
+  return {
+    fulfilled: results.filter((r) => r.status === 'fulfilled'),
+    rejected: results.filter((r): r is PromiseRejectedResult => r.status === 'rejected'),
+  };
+}
+
+async function stockOf(variantId: string) {
+  return (await prisma.productVariant.findUniqueOrThrow({ where: { id: variantId } })).stock;
+}
+
+describe('order status change concurrency', () => {
+  it(
+    'two concurrent cancelByCustomer: one wins, restock exactly once, one CANCELLED event',
+    async () => {
+      const { user, order, variant, quantity, stock } = await createOrderFixture({
+        orderStatus: OrderStatus.PENDING,
+      });
+
+      const { fulfilled, rejected } = split(
+        await Promise.allSettled([
+          ordersService.cancelByCustomer(user.id, order.id, 'a'),
+          ordersService.cancelByCustomer(user.id, order.id, 'b'),
+        ]),
+      );
+      expect(fulfilled).toHaveLength(1);
+      expect(rejected).toHaveLength(1);
+      expect(rejected[0].reason).toBeInstanceOf(ConflictError);
+
+      expect(await stockOf(variant.id)).toBe(stock + quantity);
+      expect(
+        await prisma.orderEvent.count({
+          where: { orderId: order.id, status: OrderStatus.CANCELLED },
+        }),
+      ).toBe(1);
+    },
+    TEST_TIMEOUT,
+  );
+
+  it(
+    'cancelByCustomer racing admin cancel: one wins, stock up by quantity once',
+    async () => {
+      const { user, order, variant, quantity, stock } = await createOrderFixture({
+        orderStatus: OrderStatus.CONFIRMED,
+      });
+
+      const { fulfilled, rejected } = split(
+        await Promise.allSettled([
+          ordersService.cancelByCustomer(user.id, order.id, 'customer'),
+          ordersService.transition(user.id, order.id, OrderStatus.CANCELLED, 'admin'),
+        ]),
+      );
+      expect(fulfilled).toHaveLength(1);
+      expect(rejected).toHaveLength(1);
+      expect(rejected[0].reason).toBeInstanceOf(ConflictError);
+
+      const refreshed = await prisma.order.findUniqueOrThrow({ where: { id: order.id } });
+      expect(refreshed.status).toBe(OrderStatus.CANCELLED);
+      expect(await stockOf(variant.id)).toBe(stock + quantity);
+      expect(
+        await prisma.orderEvent.count({
+          where: { orderId: order.id, status: OrderStatus.CANCELLED },
+        }),
+      ).toBe(1);
+    },
+    TEST_TIMEOUT,
+  );
+
+  it(
+    'cancelByCustomer racing PROCESSING -> SHIPPED: never both events',
+    async () => {
+      const { user, order, variant, quantity, stock } = await createOrderFixture({
+        orderStatus: OrderStatus.PROCESSING,
+      });
+
+      const { fulfilled, rejected } = split(
+        await Promise.allSettled([
+          ordersService.cancelByCustomer(user.id, order.id, 'customer'),
+          ordersService.transition(user.id, order.id, OrderStatus.SHIPPED),
+        ]),
+      );
+      expect(fulfilled).toHaveLength(1);
+      expect(rejected).toHaveLength(1);
+      expect(rejected[0].reason).toBeInstanceOf(ConflictError);
+
+      const refreshed = await prisma.order.findUniqueOrThrow({ where: { id: order.id } });
+      const shipped = await prisma.orderEvent.count({
+        where: { orderId: order.id, status: OrderStatus.SHIPPED },
+      });
+      const cancelled = await prisma.orderEvent.count({
+        where: { orderId: order.id, status: OrderStatus.CANCELLED },
+      });
+      expect(shipped + cancelled).toBe(1);
+      if (refreshed.status === OrderStatus.SHIPPED) {
+        expect(await stockOf(variant.id)).toBe(stock);
+        expect(cancelled).toBe(0);
+      } else {
+        expect(refreshed.status).toBe(OrderStatus.CANCELLED);
+        expect(await stockOf(variant.id)).toBe(stock + quantity);
+        expect(shipped).toBe(0);
+      }
+    },
+    TEST_TIMEOUT,
+  );
+
+  it(
+    'two concurrent transitions to the same status: one wins, one event',
+    async () => {
+      const { user, order } = await createOrderFixture({ orderStatus: OrderStatus.PENDING });
+
+      const { fulfilled, rejected } = split(
+        await Promise.allSettled([
+          ordersService.transition(user.id, order.id, OrderStatus.CONFIRMED),
+          ordersService.transition(user.id, order.id, OrderStatus.CONFIRMED),
+        ]),
+      );
+      expect(fulfilled).toHaveLength(1);
+      expect(rejected).toHaveLength(1);
+      expect(rejected[0].reason).toBeInstanceOf(ConflictError);
+
+      expect(
+        await prisma.orderEvent.count({
+          where: { orderId: order.id, status: OrderStatus.CONFIRMED },
+        }),
+      ).toBe(1);
+    },
+    TEST_TIMEOUT,
+  );
+});

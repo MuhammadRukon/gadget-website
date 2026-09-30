@@ -20,7 +20,17 @@ export default async function proxy(req: NextRequest) {
 
   if (!needsAdmin && !needsUser) return NextResponse.next();
 
-  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+  // Auth.js v5's getToken does not auto-detect HTTPS: it defaults to the
+  // non-secure cookie name (`authjs.session-token`). Over HTTPS Auth.js
+  // issues `__Secure-authjs.session-token`, so without this flag the guard
+  // finds no token in production and bounces every admin to /login.
+  const secureCookie =
+    req.nextUrl.protocol === 'https:' || req.headers.get('x-forwarded-proto') === 'https';
+  const token = await getToken({
+    req,
+    secret: process.env.NEXTAUTH_SECRET ?? process.env.AUTH_SECRET,
+    secureCookie,
+  });
   // Admin routes require the ADMIN role; /account only requires any
   // authenticated user. Verifying the JWT here (not just cookie
   // presence) means a CUSTOMER token can't reach admin routes.
