@@ -2,16 +2,15 @@ import { OrderStatus, PaymentMethod, PaymentStatus } from '@prisma/client';
 import { randomBytes } from 'crypto';
 
 import { prisma } from '@/lib/prisma';
-import type { CheckoutInput, CheckoutQuote } from '@/contracts/checkout';
+import type { CheckoutInput, CheckoutQuote, StockConflictMeta } from '@/contracts/checkout';
 import { applyDiscount } from '@/server/common/money';
 import {
   BadRequestError,
   ConflictError,
   NotFoundError,
-  ValidationError,
 } from '@/server/common/errors';
 import { couponsService } from '@/server/coupons/coupons.service';
-import { restockOrderItems } from '@/server/orders/orders.service';
+import { cancelOrderInTx } from '@/server/orders/orders.service';
 
 import { computeShippingCents } from './shipping';
 
@@ -39,12 +38,50 @@ interface ResolvedCartLine {
   quantity: number;
 }
 
-function groupQtyByVariantId(lines: Pick<ResolvedCartLine, 'variantId' | 'quantity'>[]) {
-  const byVariantId = new Map<string, number>();
-  for (const line of lines) {
-    byVariantId.set(line.variantId, (byVariantId.get(line.variantId) ?? 0) + line.quantity);
+/** Total quantity per variant (a variant may appear on several lines). */
+function groupLinesByVariantId(
+  lines: Pick<ResolvedCartLine, 'variantId' | 'productName' | 'quantity'>[],
+) {
+  const byVariantId = new Map<string, { quantity: number; productName: string }>();
+  for (const { variantId, productName, quantity } of lines) {
+    const group = byVariantId.get(variantId);
+    if (group) group.quantity += quantity;
+    else byVariantId.set(variantId, { quantity, productName });
   }
   return byVariantId;
+}
+
+function stockConflict(
+  variantId: string,
+  productName: string,
+  reason: StockConflictMeta['reason'],
+): ConflictError {
+  const message =
+    reason === 'unavailable'
+      ? `"${productName}" is no longer available`
+      : `Not enough stock for "${productName}"`;
+  const meta: StockConflictMeta = { variantId, productName, reason };
+  return new ConflictError(message, meta);
+}
+
+/** Throws a stock ConflictError if a cart line can't be fulfilled right now. */
+function assertLineAvailable(item: {
+  quantity: number;
+  variant: {
+    id: string;
+    isActive: boolean;
+    stock: number;
+    product: { name: string; status: string };
+  };
+}) {
+  const { variant } = item;
+  const productName = variant.product.name;
+  if (!variant.isActive || variant.product.status !== 'PUBLISHED') {
+    throw stockConflict(variant.id, productName, 'unavailable');
+  }
+  if (variant.stock < item.quantity) {
+    throw stockConflict(variant.id, productName, 'insufficient_stock');
+  }
 }
 
 async function loadAddressOrThrow(userId: string, addressId: string) {
@@ -78,16 +115,7 @@ async function loadCartLines(userId: string): Promise<ResolvedCartLine[]> {
   return items.map((item) => {
     const v = item.variant;
     const p = v.product;
-    if (!v.isActive || p.status !== 'PUBLISHED') {
-      throw new ValidationError(`"${p.name}" is no longer available`, { variantId: v.id });
-    }
-    if (v.stock < item.quantity) {
-      throw new ValidationError(`Not enough stock for "${p.name}"`, {
-        variantId: v.id,
-        stock: v.stock,
-        requested: item.quantity,
-      });
-    }
+    assertLineAvailable(item);
     return {
       variantId: v.id,
       variantName: v.name,
@@ -133,25 +161,27 @@ export const checkoutService = {
 
   /**
    * Place an order. Single Prisma transaction does:
-   *   0. Consume the cart first (count-checked delete) to serialize
+   *   1. Consume the cart first (count-checked delete) to serialize
    *      duplicate submits for the same user.
-   *   1. Re-validate the cart against current stock to avoid overselling
-   *      between quote and confirm.
-   *   2. Snapshot every line into `OrderItem` (price, name, sku, image,
-   *      buying price) so future catalog changes never alter past orders.
-   *   3. Decrement variant stock (in sorted variantId order).
-   *   4. Bump coupon `usedCount` if applied.
-   *   5. Create the `Payment` row in PENDING (or SUCCEEDED for COD,
-   *      since cash on delivery is collected on receipt; treating it
-   *      as immediately succeeded keeps order dashboards consistent).
-   *   6. Append an `OrderEvent` for audit.
+   *   2. Re-validate every line against current availability/stock to
+   *      avoid overselling between quote and confirm.
+   *   3. Re-validate the coupon and compute totals + shipping.
+   *   4. Create the `Order`, snapshotting every line into `OrderItem`
+   *      (price, name, sku, image, buying price) so future catalog
+   *      changes never alter past orders.
+   *   5. Decrement variant stock atomically (in sorted variantId order);
+   *      the conditional update is the real oversell guard.
+   *   6. Bump coupon `usedCount` if applied.
+   *   7. Create the `Payment` row in PENDING (COD is auto-confirmed at the
+   *      order level; payment itself stays PENDING until cash is collected).
+   *   8. Append an `OrderEvent` for audit.
    * Anything failing rolls the whole thing back atomically.
    */
   async placeOrder(userId: string, input: CheckoutInput) {
     const address = await loadAddressOrThrow(userId, input.addressId);
 
     return prisma.$transaction(async (tx) => {
-      // 1. Re-validate cart inside the transaction.
+      // 1. Read and consume the cart inside the transaction.
       const cartItems = await tx.cartItem.findMany({
         where: { cart: { userId } },
         include: {
@@ -182,24 +212,9 @@ export const checkoutService = {
         throw new ConflictError('Your cart changed, please review and try again');
       }
 
-      const productNameByVariantId = new Map<string, string>();
+      // 2. Re-validate availability and per-line stock.
       for (const item of cartItems) {
-        productNameByVariantId.set(item.variant.id, item.variant.product.name);
-        const productName = item.variant.product.name;
-        if (!item.variant.isActive || item.variant.product.status !== 'PUBLISHED') {
-          throw new ConflictError(`"${productName}" is no longer available`, {
-            variantId: item.variant.id,
-            productName,
-            reason: 'unavailable',
-          });
-        }
-        if (item.variant.stock < item.quantity) {
-          throw new ConflictError(`Not enough stock for "${productName}"`, {
-            variantId: item.variant.id,
-            productName,
-            reason: 'insufficient_stock',
-          });
-        }
+        assertLineAvailable(item);
       }
 
       const lines: ResolvedCartLine[] = cartItems.map((item) => ({
@@ -215,7 +230,7 @@ export const checkoutService = {
       }));
       const subtotalCents = lines.reduce((sum, l) => sum + l.unitPriceCents * l.quantity, 0);
 
-      // 2. Validate coupon (we re-run inside tx to lock in usedCount).
+      // 3. Validate coupon (we re-run inside tx to lock in usedCount).
       let discountCents = 0;
       let couponId: string | null = null;
       let couponCode: string | null = null;
@@ -236,21 +251,6 @@ export const checkoutService = {
         itemCount,
       });
       const totalCents = Math.max(0, subtotalCents - discountCents) + shippingCents;
-
-      // 3. Re-check grouped stock totals to avoid oversell when the same
-      // variant appears multiple times (defensive) and to support grouped
-      // decrement updates below.
-      const qtyByVariantId = groupQtyByVariantId(lines);
-      for (const [variantId, requiredQty] of qtyByVariantId.entries()) {
-        const variant = cartItems.find((item) => item.variant.id === variantId)?.variant;
-        if (!variant || variant.stock < requiredQty) {
-          throw new ConflictError('Not enough stock to complete checkout', {
-            variantId,
-            productName: productNameByVariantId.get(variantId) ?? '',
-            reason: 'insufficient_stock',
-          });
-        }
-      }
 
       // 4. Create order with snapshotted address + items.
       const order = await tx.order.create({
@@ -296,20 +296,14 @@ export const checkoutService = {
       // other sees `count !== 1` and fails cleanly instead of overselling.
       // Sorted by variantId so carts holding the same variants in different
       // order acquire row locks in a consistent order (no deadlocks).
-      const sortedQty = [...qtyByVariantId.entries()].sort(([a], [b]) =>
-        a < b ? -1 : a > b ? 1 : 0,
-      );
-      for (const [variantId, quantity] of sortedQty) {
+      const sortedGroups = [...groupLinesByVariantId(lines)].sort(([a], [b]) => a.localeCompare(b));
+      for (const [variantId, { quantity, productName }] of sortedGroups) {
         const res = await tx.productVariant.updateMany({
           where: { id: variantId, stock: { gte: quantity } },
           data: { stock: { decrement: quantity } },
         });
         if (res.count !== 1) {
-          throw new ConflictError('Not enough stock to complete checkout', {
-            variantId,
-            productName: productNameByVariantId.get(variantId) ?? '',
-            reason: 'insufficient_stock',
-          });
+          throw stockConflict(variantId, productName, 'insufficient_stock');
         }
       }
 
@@ -388,18 +382,12 @@ export const checkoutService = {
       const order = await tx.order.findUnique({ where: { id: orderId }, include: { items: true } });
       if (!order || order.status === OrderStatus.CANCELLED) return;
 
-      // Conditional on the status we read: a concurrent canceller wins, we no-op.
-      const claimed = await tx.order.updateMany({
-        where: { id: orderId, status: order.status },
-        data: {
-          status: OrderStatus.CANCELLED,
-          cancelledAt: new Date(),
-          cancelReason: 'Payment could not be started',
-        },
+      // A concurrent canceller wins; we no-op.
+      const claimed = await cancelOrderInTx(tx, order, {
+        reason: 'Payment could not be started',
+        event: { note: 'Payment could not be started; order cancelled automatically' },
       });
-      if (claimed.count !== 1) return;
-
-      await restockOrderItems(tx, order.items);
+      if (!claimed) return;
 
       if (order.couponId) {
         await tx.coupon.update({
@@ -411,14 +399,6 @@ export const checkoutService = {
       await tx.payment.updateMany({
         where: { orderId, status: PaymentStatus.PENDING },
         data: { status: PaymentStatus.FAILED },
-      });
-
-      await tx.orderEvent.create({
-        data: {
-          orderId,
-          status: OrderStatus.CANCELLED,
-          note: 'Payment could not be started; order cancelled automatically',
-        },
       });
     });
   },

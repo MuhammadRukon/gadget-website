@@ -8,6 +8,13 @@ export const checkoutInputSchema = z.object({
 });
 export type CheckoutInput = z.infer<typeof checkoutInputSchema>;
 
+export const stockConflictMetaSchema = z.object({
+  variantId: z.string(),
+  productName: z.string(),
+  reason: z.enum(['insufficient_stock', 'unavailable']),
+});
+export type StockConflictMeta = z.infer<typeof stockConflictMetaSchema>;
+
 export interface CheckoutQuote {
   subtotalCents: number;
   discountCents: number;

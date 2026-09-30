@@ -31,6 +31,53 @@ export async function restockOrderItems(
   }
 }
 
+/**
+ * Compare-and-set on order status: applies `data` only if the order is
+ * still in the status we read. Returns false when a concurrent writer
+ * got there first, so exactly one caller wins.
+ */
+export async function claimOrderStatus(
+  tx: Prisma.TransactionClient,
+  order: { id: string; status: OrderStatus },
+  data: Prisma.OrderUpdateManyMutationInput,
+): Promise<boolean> {
+  const res = await tx.order.updateMany({
+    where: { id: order.id, status: order.status },
+    data,
+  });
+  return res.count === 1;
+}
+
+/**
+ * Cancel an order inside an existing transaction: claim the status, then
+ * (only if claimed) restock its items and append the CANCELLED event.
+ * Returns false when a concurrent writer already changed the status.
+ */
+export async function cancelOrderInTx(
+  tx: Prisma.TransactionClient,
+  order: { id: string; status: OrderStatus; items: { variantId: string | null; quantity: number }[] },
+  opts: { reason: string; event: { note: string; actorId?: string } },
+): Promise<boolean> {
+  const claimed = await claimOrderStatus(tx, order, {
+    status: OrderStatus.CANCELLED,
+    cancelledAt: new Date(),
+    cancelReason: opts.reason,
+  });
+  if (!claimed) return false;
+
+  await restockOrderItems(tx, order.items);
+
+  await tx.orderEvent.create({
+    data: {
+      orderId: order.id,
+      status: OrderStatus.CANCELLED,
+      note: opts.event.note,
+      actorId: opts.event.actorId,
+    },
+  });
+  return true;
+}
+
 const ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   [OrderStatus.PENDING]: [OrderStatus.CONFIRMED, OrderStatus.CANCELLED],
   [OrderStatus.CONFIRMED]: [OrderStatus.PROCESSING, OrderStatus.CANCELLED],
@@ -94,29 +141,13 @@ export const ordersService = {
         throw new ConflictError('Order is already cancelled');
       }
 
-      // Conditional on the status we read: only one concurrent caller wins.
-      const claimed = await tx.order.updateMany({
-        where: { id: orderId, status: order.status },
-        data: {
-          status: OrderStatus.CANCELLED,
-          cancelledAt: new Date(),
-          cancelReason: reason,
-        },
+      const cancelled = await cancelOrderInTx(tx, order, {
+        reason,
+        event: { note: `Cancelled by customer: ${reason}`, actorId: userId },
       });
-      if (claimed.count !== 1) {
+      if (!cancelled) {
         throw new ConflictError('Order status changed, refresh and retry');
       }
-
-      await restockOrderItems(tx, order.items);
-
-      await tx.orderEvent.create({
-        data: {
-          orderId,
-          status: OrderStatus.CANCELLED,
-          note: `Cancelled by customer: ${reason}`,
-          actorId: userId,
-        },
-      });
 
       return tx.order.findUnique({ where: { id: orderId }, include: orderInclude });
     });
@@ -139,15 +170,12 @@ export const ordersService = {
         throw new ConflictError(`Cannot move order from ${order.status} to ${status}`);
       }
 
-      const claimed = await tx.order.updateMany({
-        where: { id: orderId, status: order.status },
-        data: {
-          status,
-          cancelledAt: status === OrderStatus.CANCELLED ? new Date() : order.cancelledAt,
-          cancelReason: status === OrderStatus.CANCELLED ? (note ?? 'Admin') : order.cancelReason,
-        },
+      const claimed = await claimOrderStatus(tx, order, {
+        status,
+        cancelledAt: status === OrderStatus.CANCELLED ? new Date() : order.cancelledAt,
+        cancelReason: status === OrderStatus.CANCELLED ? (note ?? 'Admin') : order.cancelReason,
       });
-      if (claimed.count !== 1) {
+      if (!claimed) {
         throw new ConflictError('Order status changed, refresh and retry');
       }
       const updated = await tx.order.findUniqueOrThrow({ where: { id: orderId } });
