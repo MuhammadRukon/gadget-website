@@ -6,8 +6,8 @@ import { SiteHeader } from '@/components/site-header';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 
 /**
- * Admin shell. Middleware already enforces ADMIN role, but we re-check
- * here so that:
+ * Admin shell. `proxy.ts` (Next 16's middleware convention) already
+ * enforces ADMIN role at the edge, but we re-check here so that:
  * 1. The session is loaded once and passed down (no client `useSession`).
  * 2. Defense in depth in case the matcher misses an edge case.
  */

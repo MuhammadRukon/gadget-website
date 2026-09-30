@@ -1,6 +1,9 @@
 import bcrypt from 'bcryptjs';
 
-const COST = 10;
+// bcrypt work factor. Cost is embedded in each hash, so raising this
+// does not invalidate existing lower-cost hashes — they keep verifying
+// and upgrade naturally the next time the user sets a password.
+const COST = 12;
 
 export function hashPassword(plain: string): Promise<string> {
   return bcrypt.hash(plain, COST);

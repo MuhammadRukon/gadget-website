@@ -44,3 +44,9 @@ export const resendVerificationSchema = z.object({
   email: z.string().email().toLowerCase(),
 });
 export type ResendVerificationInput = z.infer<typeof resendVerificationSchema>;
+
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(8).max(72),
+  password: z.string().min(8).max(72),
+});
+export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;

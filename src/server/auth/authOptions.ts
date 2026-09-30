@@ -6,6 +6,12 @@ import type { UserRole } from '@prisma/client';
 
 import { prisma } from '@/lib/prisma';
 import { credentialsSchema } from '@/contracts/auth';
+import {
+  RateLimitedError,
+  clearRateLimit,
+  clientIp,
+  enforceRateLimit,
+} from '@/server/common/rate-limit';
 import { verifyPassword } from './password';
 
 /**
@@ -16,6 +22,16 @@ import { verifyPassword } from './password';
  */
 class UnverifiedEmailError extends CredentialsSignin {
   code = 'unverified';
+}
+
+/**
+ * Thrown when too many login attempts have been made for an email.
+ * Subclasses CredentialsSignin so the `code` survives to the client —
+ * a plain Error thrown from `authorize` collapses into a generic
+ * CredentialsSignin with no distinguishable code.
+ */
+class ThrottledLoginError extends CredentialsSignin {
+  code = 'throttled';
 }
 
 /**
@@ -48,9 +64,26 @@ export const authOptions: NextAuthConfig = {
         email: { label: 'Email', type: 'email' },
         password: { label: 'Password', type: 'password' },
       },
-      authorize: async (raw) => {
+      authorize: async (raw, request) => {
         const parsed = credentialsSchema.safeParse(raw);
         if (!parsed.success) return null;
+
+        // Throttle password guessing (credential stuffing / brute force);
+        // bcrypt alone is not an anti-brute-force control. Key by IP +
+        // email, NOT email alone: an email-only bucket lets a remote
+        // attacker lock a victim out globally, because the throttle
+        // throws before the password check so the victim's correct
+        // password can never clear it. Scoping to the source IP means a
+        // victim signing in from a different IP is unaffected. The bucket
+        // is cleared on success so a run of typos doesn't accumulate.
+        const ip = request instanceof Request ? clientIp(request) : 'unknown';
+        const rlKey = `login:${ip}:${parsed.data.email}`;
+        try {
+          await enforceRateLimit(rlKey, { max: 10, windowMs: 15 * 60 * 1000 });
+        } catch (err) {
+          if (err instanceof RateLimitedError) throw new ThrottledLoginError();
+          throw err;
+        }
 
         const user = await prisma.user.findUnique({
           where: { email: parsed.data.email },
@@ -68,6 +101,9 @@ export const authOptions: NextAuthConfig = {
 
         const ok = await verifyPassword(parsed.data.password, user.passwordHash);
         if (!ok) return null;
+
+        // Correct password: reset the failure counter for this key.
+        await clearRateLimit(rlKey);
 
         // Correct credentials but unverified email: block with a
         // distinguishable code (only after the password check, so this

@@ -75,6 +75,9 @@ export function HeaderAccount() {
           <Link href="/account/reviews">Write a review</Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
+          <Link href="/account/settings">Change password</Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
           <button
             type="button"
             className="w-full"

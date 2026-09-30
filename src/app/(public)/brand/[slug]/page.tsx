@@ -26,6 +26,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return {
     title: brand.name ?? '',
     description: `Browse all ${brand.name} products.`,
+    alternates: { canonical: `/brand/${brand.slug}` },
   };
 }
 
@@ -51,6 +52,7 @@ export default async function BrandPage({ params, searchParams }: Readonly<PageP
       brand={brand}
       page={page}
       title={brand.name}
+      breadcrumbItems={[{ label: 'Home', href: '/' }, { label: brand.name }]}
     />
   );
 }

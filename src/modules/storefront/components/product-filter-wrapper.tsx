@@ -51,7 +51,7 @@ export function ProductFilterWrapper({
           onClick={() => setSidebarOpen((v) => !v)}
         >
           <SlidersHorizontal className="mr-2 size-4" />
-          Filters
+          {sidebarOpen ? 'Hide' : 'Show'} Filters
         </Button>
 
         {/* Mobile */}

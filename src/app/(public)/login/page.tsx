@@ -57,6 +57,10 @@ function LoginContent() {
         router.push(`/verify-email?email=${encodeURIComponent(values.email)}`);
         return;
       }
+      if (res?.code === 'throttled') {
+        toast.error('Too many attempts. Try again in a few minutes.');
+        return;
+      }
       toast.error('Invalid email or password');
       return;
     }

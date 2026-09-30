@@ -61,11 +61,25 @@ function VerifyEmailContent() {
     })();
   }, [token, router]);
 
+  // Rehydrate the resend cooldown from localStorage so a hard refresh
+  // doesn't hand the user a fresh "Resend" button (the real abuse guard
+  // is the server rate limit on `resend-verify:${email}`; this is UX).
+  const watchedEmail = form.watch('email');
   useEffect(() => {
-    if (resendCooldown <= 0) return;
+    if (!watchedEmail) return;
+    const until = Number(localStorage.getItem(`resend-at:${watchedEmail}`) ?? 0);
+    const remaining = Math.ceil((until - Date.now()) / 1000);
+    setResendCooldown(remaining > 0 ? remaining : 0);
+  }, [watchedEmail]);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) {
+      if (watchedEmail) localStorage.removeItem(`resend-at:${watchedEmail}`);
+      return;
+    }
     const t = setTimeout(() => setResendCooldown((s) => s - 1), 1000);
     return () => clearTimeout(t);
-  }, [resendCooldown]);
+  }, [resendCooldown, watchedEmail]);
 
   async function onSubmit(values: VerifyEmailInput) {
     setIsSubmitting(true);
@@ -92,6 +106,7 @@ function VerifyEmailContent() {
       return;
     }
     setResendCooldown(RESEND_COOLDOWN_S);
+    localStorage.setItem(`resend-at:${email}`, String(Date.now() + RESEND_COOLDOWN_S * 1000));
     const res = await resendVerificationAction({ email });
     if (!res.ok) {
       toast.error(res.message ?? 'Could not resend code');

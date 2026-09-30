@@ -102,6 +102,18 @@ export function passwordResetEmail(resetUrl: string): MailContent {
   };
 }
 
+export function passwordChangedEmail(): MailContent {
+  return {
+    subject: 'Your Cryptech password was changed',
+    html: layout(
+      'Your password was changed',
+      `<p>The password for your Cryptech account was just changed.</p>
+<p>If you made this change, no action is needed. If you did <strong>not</strong> change your password, reset it immediately and contact us — someone may have access to your account.</p>
+<p style="margin:24px 0"><a href="${(process.env.NEXT_PUBLIC_APP_URL ?? '').replace(/\/$/, '')}/forgot-password" style="background:#111;color:#fff;padding:10px 18px;text-decoration:none;border-radius:6px">Reset my password</a></p>`,
+    ),
+  };
+}
+
 export function orderConfirmationEmail(order: {
   orderNumber: string;
   totalCents: number;
