@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -14,6 +15,8 @@ import { Loader } from '@/app/common/loader/loader';
 import { ApiClientError, apiFetch } from '@/lib/fetcher';
 import { formatBDT } from '@/server/common/money';
 import type { CheckoutInput, CheckoutQuote } from '@/contracts/checkout';
+import { queryKeys } from '@/constants/queryKeys';
+import { describeCheckoutError } from '@/modules/checkout/checkout-error';
 import { useServerCart } from '@/modules/cart/hooks';
 import { useAddresses } from '@/modules/account/hooks';
 import { AddressForm } from '@/modules/account/components/address-form';
@@ -42,6 +45,8 @@ export function CheckoutClient() {
   const [quote, setQuote] = useState<CheckoutQuote | null>(null);
   const [quoting, setQuoting] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     if (!addressId && addresses.data && addresses.data.length > 0) {
@@ -88,6 +93,8 @@ export function CheckoutClient() {
 
   async function placeOrder() {
     if (!addressId) return;
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setSubmitting(true);
     try {
       const res = await apiFetch<{
@@ -104,16 +111,18 @@ export function CheckoutClient() {
         } satisfies CheckoutInput,
       });
       toast.success(`Order ${res.orderNumber} placed`);
+      queryClient.invalidateQueries({ queryKey: queryKeys.cart });
       if (res.redirectUrl) {
         window.location.href = res.redirectUrl;
         return;
       }
       router.push(`/orders/${res.id}`);
     } catch (err) {
-      const message = err instanceof ApiClientError ? err.message : 'Could not place order';
+      const { message, refetchCart } = describeCheckoutError(err);
       toast.error(message);
-    } finally {
+      if (refetchCart) queryClient.invalidateQueries({ queryKey: queryKeys.cart });
       setSubmitting(false);
+      submittingRef.current = false;
     }
   }
 
