@@ -10,7 +10,11 @@ function apiErr(status: number, message: string, meta?: Record<string, unknown>)
 describe('describeCheckoutError', () => {
   it('names the product on 409 insufficient_stock and refetches the cart', () => {
     const r = describeCheckoutError(
-      apiErr(409, 'conflict', { variantId: 'v1', productName: 'Foo', reason: 'insufficient_stock' }),
+      apiErr(409, 'conflict', {
+        variantId: 'v1',
+        productName: 'Foo',
+        reason: 'insufficient_stock',
+      }),
     );
     expect(r.message).toContain('"Foo"');
     expect(r.message).toBe('Not enough stock for "Foo". Your cart has been refreshed.');

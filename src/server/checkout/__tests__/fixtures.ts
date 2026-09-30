@@ -23,7 +23,7 @@ export interface CheckoutFixtureOptions {
 }
 
 /** Creates a user + address + cart (qty of `variant`) and tracks the user for cleanup. */
-async function createShopper(variantId: string, cartQty: number) {
+async function createShopper(items: { variantId: string; quantity: number }[]) {
   const suffix = rand();
   const user = await prisma.user.create({
     data: { email: `checkout-test-${suffix}@example.com`, name: 'Checkout Test' },
@@ -41,7 +41,7 @@ async function createShopper(variantId: string, cartQty: number) {
   });
 
   const cart = await prisma.cart.create({
-    data: { userId: user.id, items: { create: [{ variantId, quantity: cartQty }] } },
+    data: { userId: user.id, items: { create: items } },
   });
 
   return { user, address, cart };
@@ -91,7 +91,7 @@ export async function createCheckoutFixture(opts: CheckoutFixtureOptions) {
     createdCouponIds.push(coupon.id);
   }
 
-  const first = await createShopper(variant.id, opts.cartQty);
+  const first = await createShopper([{ variantId: variant.id, quantity: opts.cartQty }]);
 
   return {
     brand,
@@ -99,9 +99,26 @@ export async function createCheckoutFixture(opts: CheckoutFixtureOptions) {
     variant,
     coupon,
     user: first.user,
+    cart: first.cart,
     address: first.address,
     /** Another user with their own cart against the SAME variant. */
-    addShopper: (cartQty: number) => createShopper(variant.id, cartQty),
+    addShopper: (cartQty: number) =>
+      createShopper([{ variantId: variant.id, quantity: cartQty }]),
+    /** Another variant (same product) with the given stock. */
+    addVariant: (stock: number) =>
+      prisma.productVariant.create({
+        data: {
+          productId: product.id,
+          sku: `CHECKOUT-TEST-${rand()}`,
+          buyingPriceCents: 50_000,
+          sellingPriceCents: 100_000,
+          stock,
+          isActive: true,
+        },
+      }),
+    /** Another user whose cart lists the given variants in the given order. */
+    addShopperWithItems: (items: { variantId: string; quantity: number }[]) =>
+      createShopper(items),
   };
 }
 

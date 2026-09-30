@@ -126,7 +126,9 @@ export function CheckoutClient() {
     }
   }
 
-  if (cart.isLoading || addresses.isLoading) {
+  // After a successful order the cart refetches empty while navigation is in
+  // flight; keep the loader up instead of flashing "Your cart is empty".
+  if (cart.isLoading || addresses.isLoading || (itemCount === 0 && submitting)) {
     return (
       <div className="flex justify-center py-20">
         <Loader />

@@ -69,7 +69,10 @@ describe('checkoutService.placeOrder concurrency', () => {
       expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
       const rejected = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected');
       expect(rejected).toHaveLength(1);
-      expect(rejected[0].reason).toBeInstanceOf(ConflictError);
+      // Loser is a ConflictError (cart-consumption guard) or, if it read after
+      // the winner committed, BadRequestError('Cart is empty').
+      const loser = rejected[0].reason;
+      expect(loser instanceof ConflictError || loser instanceof BadRequestError).toBe(true);
 
       expect(await prisma.order.count({ where: { userId: fx.user.id } })).toBe(1);
       const variant = await prisma.productVariant.findUniqueOrThrow({
@@ -87,16 +90,54 @@ describe('checkoutService.placeOrder concurrency', () => {
       const fx = await createCheckoutFixture({ stock: 5, cartQty: 1, couponPerUserLimit: 1 });
       const coupon = fx.coupon!;
 
-      await Promise.allSettled([
+      const results = await Promise.allSettled([
         checkoutService.placeOrder(fx.user.id, input(fx.address.id, coupon.code)),
         checkoutService.placeOrder(fx.user.id, input(fx.address.id, coupon.code)),
       ]);
+      expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+      expect(results.filter((r) => r.status === 'rejected')).toHaveLength(1);
 
       expect(await prisma.order.count({ where: { userId: fx.user.id, couponId: coupon.id } })).toBe(
         1,
       );
       const after = await prisma.coupon.findUniqueOrThrow({ where: { id: coupon.id } });
       expect(after.usedCount).toBe(1);
+    },
+    TEST_TIMEOUT,
+  );
+});
+
+describe('checkoutService.placeOrder lock ordering', () => {
+  it(
+    'opposite cart item order over the same two variants: one wins, loser gets ConflictError, no deadlock',
+    async () => {
+      const fx = await createCheckoutFixture({ stock: 1, cartQty: 1 });
+      const variantA = fx.variant;
+      const variantB = await fx.addVariant(1);
+      // fx.user's cart is [A]; add B so it reads [A, B].
+      await prisma.cartItem.create({
+        data: { cartId: fx.cart.id, variantId: variantB.id, quantity: 1 },
+      });
+      const second = await fx.addShopperWithItems([
+        { variantId: variantB.id, quantity: 1 },
+        { variantId: variantA.id, quantity: 1 },
+      ]);
+
+      const results = await Promise.allSettled([
+        checkoutService.placeOrder(fx.user.id, input(fx.address.id)),
+        checkoutService.placeOrder(second.user.id, input(second.address.id)),
+      ]);
+
+      expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+      const rejected = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected');
+      expect(rejected).toHaveLength(1);
+      expect(rejected[0].reason).toBeInstanceOf(ConflictError);
+
+      for (const v of [variantA, variantB]) {
+        expect((await prisma.productVariant.findUniqueOrThrow({ where: { id: v.id } })).stock).toBe(
+          0,
+        );
+      }
     },
     TEST_TIMEOUT,
   );

@@ -133,17 +133,18 @@ export const checkoutService = {
 
   /**
    * Place an order. Single Prisma transaction does:
+   *   0. Consume the cart first (count-checked delete) to serialize
+   *      duplicate submits for the same user.
    *   1. Re-validate the cart against current stock to avoid overselling
    *      between quote and confirm.
    *   2. Snapshot every line into `OrderItem` (price, name, sku, image,
    *      buying price) so future catalog changes never alter past orders.
-   *   3. Decrement variant stock.
+   *   3. Decrement variant stock (in sorted variantId order).
    *   4. Bump coupon `usedCount` if applied.
    *   5. Create the `Payment` row in PENDING (or SUCCEEDED for COD,
    *      since cash on delivery is collected on receipt; treating it
    *      as immediately succeeded keeps order dashboards consistent).
-   *   6. Clear the cart.
-   *   7. Append an `OrderEvent` for audit.
+   *   6. Append an `OrderEvent` for audit.
    * Anything failing rolls the whole thing back atomically.
    */
   async placeOrder(userId: string, input: CheckoutInput) {
@@ -293,7 +294,12 @@ export const checkoutService = {
       // on stock still being sufficient — under concurrent checkouts for
       // the same variant, only one transaction's decrement can win; the
       // other sees `count !== 1` and fails cleanly instead of overselling.
-      for (const [variantId, quantity] of qtyByVariantId.entries()) {
+      // Sorted by variantId so carts holding the same variants in different
+      // order acquire row locks in a consistent order (no deadlocks).
+      const sortedQty = [...qtyByVariantId.entries()].sort(([a], [b]) =>
+        a < b ? -1 : a > b ? 1 : 0,
+      );
+      for (const [variantId, quantity] of sortedQty) {
         const res = await tx.productVariant.updateMany({
           where: { id: variantId, stock: { gte: quantity } },
           data: { stock: { decrement: quantity } },
