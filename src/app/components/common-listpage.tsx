@@ -10,6 +10,13 @@ import type { PublicProductPage } from '@/contracts';
 
 import { $Enums } from '@prisma/client';
 
+import { env } from '@/env';
+import {
+  CustomBreadcrumb,
+  buildBreadcrumbJsonLd,
+  type BreadcrumbItem,
+} from '@/app/components/breadcrumb/custom-breadcrumb';
+
 interface Props {
   brands: IBrandOption[];
 
@@ -25,6 +32,8 @@ interface Props {
   page: PublicProductPage;
 
   title: string;
+
+  breadcrumbItems: BreadcrumbItem[];
 }
 
 export default function CommonListPage({
@@ -33,7 +42,10 @@ export default function CommonListPage({
   brand,
   page,
   title,
+  breadcrumbItems,
 }: Readonly<Props>) {
+  const breadcrumbJsonLd = buildBreadcrumbJsonLd(breadcrumbItems, env.NEXT_PUBLIC_APP_URL);
+
   return (
     <ProductFilterWrapper
       filters={
@@ -41,7 +53,13 @@ export default function CommonListPage({
       }
     >
       <section>
-        <h1 className="text-2xl font-semibold mb-4">{title}</h1>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
+        />
+        <CustomBreadcrumb items={breadcrumbItems} />
+
+        <h1 className="text-2xl font-semibold mb-4 mt-2">{title}</h1>
 
         <ProductGrid products={page.items} />
 

@@ -19,6 +19,25 @@ interface BreadcrumbProps {
   items: BreadcrumbItem[];
 }
 
+/**
+ * schema.org BreadcrumbList JSON-LD for the same trail rendered by
+ * CustomBreadcrumb. `baseUrl` is the site origin (no trailing slash);
+ * entries without `href` (typically the current page) are omitted from
+ * `item`, matching Google's guidance that the last crumb's URL is optional.
+ */
+export function buildBreadcrumbJsonLd(items: BreadcrumbItem[], baseUrl: string) {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: items.map((item, index) => ({
+      '@type': 'ListItem',
+      position: index + 1,
+      name: item.label,
+      ...(item.href ? { item: `${baseUrl}${item.href}` } : {}),
+    })),
+  };
+}
+
 export function CustomBreadcrumb({ items }: Readonly<BreadcrumbProps>) {
   return (
     <Breadcrumb>

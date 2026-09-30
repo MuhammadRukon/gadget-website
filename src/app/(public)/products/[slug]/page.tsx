@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
 import { catalogService } from '@/server/catalog/catalog.service';
+import { reviewsService } from '@/server/reviews/reviews.service';
 import { AppError } from '@/server/common/errors';
 import { ProductDetail } from '@/modules/storefront/components/product-detail';
 
@@ -23,6 +24,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     return {
       title: product.metaTitle ?? product.name,
       description: product.metaDescription ?? undefined,
+      alternates: { canonical: `/products/${product.slug}` },
       openGraph: {
         title: product.metaTitle ?? product.name,
         description: product.metaDescription ?? undefined,
@@ -48,5 +50,6 @@ export default async function ProductDetailPage({ params }: Readonly<PageProps>)
     }
     throw err;
   }
-  return <ProductDetail product={product} />;
+  const reviewSummary = await reviewsService.summaryForProduct(product.id);
+  return <ProductDetail product={product} reviewSummary={reviewSummary} />;
 }

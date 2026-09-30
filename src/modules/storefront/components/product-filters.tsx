@@ -105,14 +105,19 @@ export function ProductFilters({
           pb-2
         "
       >
-        <h2 className="text-lg font-semibold">Filter Panel</h2>
+        {/* Not a heading: this sidebar/disclosure label sits before the
+            page's own <h1> in DOM order, so a real <h2> here would break
+            heading hierarchy for crawlers and screen readers. */}
+        <span className="text-lg font-semibold">Filter Panel</span>
 
         <ChevronDown
           className={cn('size-5 transition-transform duration-300', open && 'rotate-180')}
         />
       </button>
 
-      <h2 className="text-lg font-semibold  max-md:hidden pt-10 pb-2 border-b">Filter Panel</h2>
+      <span className="text-lg font-semibold  max-md:hidden pt-10 pb-2 border-b block">
+        Filter Panel
+      </span>
 
       <div
         className={cn(

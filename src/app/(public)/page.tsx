@@ -9,6 +9,7 @@ import { ProductGrid } from '@/modules/storefront/components/product-grid';
 export const metadata = {
   title: 'Cryptech - gadgets & electronics',
   description: 'Discover the latest gadgets, laptops, phones and accessories.',
+  alternates: { canonical: '/' },
 };
 
 export const revalidate = 120;
@@ -18,6 +19,7 @@ export default async function HomePage() {
 
   return (
     <div className="space-y-10 py-6">
+      <h1 className="sr-only">Cryptech — gadgets &amp; electronics in Bangladesh</h1>
       <Carousel opts={{ loop: true }}>
         <CarouselContent>
           <CarouselItem>

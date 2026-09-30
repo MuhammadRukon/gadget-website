@@ -1,6 +1,8 @@
 # SEO Audit
 
-Audit date: 2026-07-11. Verdict: **solid foundation, several high-impact gaps.** Catalog content is server-rendered and crawlable, sitemap/robots exist, PDP has OpenGraph + Product JSON-LD. Missing: `metadataBase`/canonicals, review/rating structured data (reviews are invisible to crawlers), breadcrumbs, Organization/WebSite schema, and a correct heading hierarchy.
+Audit date: 2026-07-11, re-verified 2026-09-30. Verdict: **solid foundation, several high-impact gaps.** Catalog content is server-rendered and crawlable, sitemap/robots exist, PDP has OpenGraph + Product JSON-LD. Missing: `metadataBase`/canonicals, review/rating structured data (reviews are invisible to crawlers), breadcrumbs, Organization/WebSite schema, and a correct heading hierarchy.
+
+**2026-09-30 re-verification**: all HIGH/MEDIUM/LOW items below re-checked against current source. No regressions, no fixes had landed since July. Items 1–5 (HIGH + Organization/WebSite) fixed in this pass — see checkmarks below. Also added, outside this list: `X-Content-Type-Options`, `X-Frame-Options: DENY`, and HSTS response headers in `next.config.ts` (trust signals; no iframe usage anywhere in the codebase, confirmed by grep, so `DENY` is safe).
 
 ## What's already good ✅
 
@@ -16,17 +18,15 @@ Audit date: 2026-07-11. Verdict: **solid foundation, several high-impact gaps.**
 
 ### HIGH
 
-1. **No `metadataBase`, no canonical URLs** — zero matches for `metadataBase`/`canonical`/`alternates` in `src`. Filtered/paginated listing URLs (`/products?page=2&sort=…`) have no canonical, risking duplicate-content dilution; OG image URL resolution is unspecified.
-   *Fix*: set `metadataBase` in `src/app/layout.tsx`; add `alternates.canonical` in each page's metadata (PDP → `/products/[slug]`, listings → their base path).
-2. **Reviews are invisible to crawlers and absent from structured data** — PDP reviews load via `next/dynamic ssr:false` (`deferred-reviews-section.tsx`), and Product JSON-LD has no `aggregateRating`/`review`. You forfeit star rich results, the single biggest e-commerce SERP CTR lever.
-   *Fix*: fetch the review summary server-side on the PDP (it's one cheap query) and add `aggregateRating` to the JSON-LD; the interactive list can stay client-side.
-3. **No `BreadcrumbList` JSON-LD and no visible breadcrumbs** — a `CustomBreadcrumb` component exists but is never used. Category → product breadcrumbs help both UX and SERP display.
-4. **Home page has no `<h1>`**; listing pages have an out-of-order `<h2>Filter Panel</h2>` before the `<h1>` (`product-filters.tsx:73`).
+1. ~~**No `metadataBase`, no canonical URLs** — zero matches for `metadataBase`/`canonical`/`alternates` in `src`. Filtered/paginated listing URLs (`/products?page=2&sort=…`) have no canonical, risking duplicate-content dilution; OG image URL resolution is unspecified.~~ (✅ completed — `metadataBase` set in `src/app/layout.tsx`; `alternates.canonical` added on home, `/products`, PDP, category, brand. Filtered/sorted listing query strings still canonicalize to their base path, by design.)
+2. ~~**Reviews are invisible to crawlers and absent from structured data** — PDP reviews load via `next/dynamic ssr:false` (`deferred-reviews-section.tsx`), and Product JSON-LD has no `aggregateRating`/`review`. You forfeit star rich results, the single biggest e-commerce SERP CTR lever.~~ (✅ completed — PDP now fetches `reviewsService.summaryForProduct` server-side and `buildJsonLd` adds `aggregateRating` when `count > 0`; interactive list stays client-side as before.)
+3. ~~**No `BreadcrumbList` JSON-LD and no visible breadcrumbs** — a `CustomBreadcrumb` component exists but is never used. Category → product breadcrumbs help both UX and SERP display.~~ (✅ completed — `CustomBreadcrumb` wired into PDP (Home → Brand → Product) and `CommonListPage` (Home → Category/Brand/All products); matching `BreadcrumbList` JSON-LD via new `buildBreadcrumbJsonLd` helper.)
+4. ~~**Home page has no `<h1>`**; listing pages have an out-of-order `<h2>Filter Panel</h2>` before the `<h1>` (`product-filters.tsx:73`).~~ (✅ completed — home page has a `sr-only` `<h1>`; "Filter Panel" demoted from `<h2>` to a non-heading `<span>` since it sits before the page's own `<h1>` in DOM order.)
 
 ### MEDIUM
 
-5. **No `Organization` / `WebSite` JSON-LD** (logo, name, social profiles; `WebSite` + `SearchAction` can enable a sitelinks search box).
-6. **No Twitter card metadata** anywhere.
+5. ~~**No `Organization` / `WebSite` JSON-LD** (logo, name, social profiles; `WebSite` + `SearchAction` can enable a sitelinks search box).~~ (✅ completed — static JSON-LD in `src/app/layout.tsx`; `SearchAction` targets existing `/products?q=`. No social profile links exist in the codebase, so `sameAs` was left out rather than invented.)
+6. ~~**No Twitter card metadata** anywhere.~~ (✅ partially — basic `twitter: { card: 'summary_large_image' }` added to root metadata in `src/app/layout.tsx`; per-page `twitter` overrides with title/image still open.)
 7. **Category/brand pages have generic descriptions** and no OG tags; no description field exists on the Category/Brand models to source from.
 8. ~~**Missing trust pages** (About/Contact/Privacy/Terms/Refund — footer links point to `/`). Thin-content/trust signal for Google, especially for e-commerce ("Your Money or Your Life" scrutiny). Also see FEATURE-GAPS P0.~~ (✅ completed — all five pages live, footer-linked, in sitemap)
 9. ~~**`sitemap.ts` declares `dynamic='force-dynamic'` alongside `revalidate=3600`** — force-dynamic wins; the sitemap queries the DB on every crawler hit. Remove `force-dynamic` to serve it from ISR cache (also saves free-tier function invocations).~~ (✅ completed)
@@ -42,10 +42,10 @@ Audit date: 2026-07-11. Verdict: **solid foundation, several high-impact gaps.**
 
 ## Recommended order of work
 
-1. `metadataBase` + canonicals (one file + small per-page additions).
-2. Server-render review summary + `aggregateRating` in Product JSON-LD.
-3. Breadcrumbs (visible + JSON-LD) on PDP/category/brand.
-4. h1 fixes (home; remove "Filter Panel" heading).
-5. Organization/WebSite JSON-LD + Twitter cards in root layout.
+1. ~~`metadataBase` + canonicals (one file + small per-page additions).~~ (✅ completed 2026-09-30)
+2. ~~Server-render review summary + `aggregateRating` in Product JSON-LD.~~ (✅ completed 2026-09-30)
+3. ~~Breadcrumbs (visible + JSON-LD) on PDP/category/brand.~~ (✅ completed 2026-09-30)
+4. ~~h1 fixes (home; remove "Filter Panel" heading).~~ (✅ completed 2026-09-30)
+5. ~~Organization/WebSite JSON-LD in root layout.~~ (✅ completed 2026-09-30, along with basic Twitter card)
 6. ~~Trust pages (shared with FEATURE-GAPS P0).~~ (✅ completed)
 7. Sitemap cleanup (`force-dynamic`, env var name, image entries). (⚠️ `force-dynamic` + env var completed; image entries still open)

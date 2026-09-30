@@ -7,6 +7,7 @@ import CommonListPage from '@/app/components/common-listpage';
 export const metadata: Metadata = {
   title: 'All products',
   description: 'Browse all gadgets and electronics in the catalog.',
+  alternates: { canonical: '/products' },
 };
 export const revalidate = 60;
 
@@ -25,6 +26,12 @@ export default async function ProductsPage({ searchParams }: Readonly<PageProps>
   ]);
 
   return (
-    <CommonListPage brands={brands} categories={categories} page={page} title="All products" />
+    <CommonListPage
+      brands={brands}
+      categories={categories}
+      page={page}
+      title="All products"
+      breadcrumbItems={[{ label: 'Home', href: '/' }, { label: 'All products' }]}
+    />
   );
 }

@@ -32,6 +32,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return {
     title: cat.name ?? '',
     description: `Browse all ${cat.name ?? ''} products in our catalog.`,
+    alternates: { canonical: `/category/${cat.slug}` },
   };
 }
 
@@ -57,6 +58,7 @@ export default async function CategoryPage({ params, searchParams }: Readonly<Pa
       brand={category}
       page={page}
       title={category.name}
+      breadcrumbItems={[{ label: 'Home', href: '/' }, { label: category.name }]}
     />
   );
 }

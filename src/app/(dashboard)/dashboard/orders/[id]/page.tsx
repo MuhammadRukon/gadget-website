@@ -24,6 +24,11 @@ const STATUSES: OrderStatus[] = [
   OrderStatus.CANCELLED,
 ];
 
+const getNextStatus = (current: OrderStatus): OrderStatus | null => {
+  const index = STATUSES.indexOf(current);
+  return index >= 0 && index < STATUSES.length - 1 ? STATUSES[index + 1] : null;
+};
+
 export default function AdminOrderDetailPage() {
   const params = useParams<{ id: string }>();
   const id = params?.id;
@@ -50,7 +55,7 @@ export default function AdminOrderDetailPage() {
   }
 
   const o = order.data;
-
+  const nextStatus = getNextStatus(o.status);
   return (
     <div className="space-y-6 p-6">
       <div className="flex items-start justify-between gap-4">
@@ -142,8 +147,7 @@ export default function AdminOrderDetailPage() {
               <span>{formatBDT(o.totalCents)}</span>
             </div>
             <p className="pt-2 text-xs text-muted-foreground">
-              Payment:{' '}
-              {o.payments.map((p) => `${p.method} (${p.status})`).join(', ') || 'Pending'}
+              Payment: {o.payments.map((p) => `${p.method} (${p.status})`).join(', ') || 'Pending'}
             </p>
           </CardContent>
         </Card>
@@ -160,20 +164,28 @@ export default function AdminOrderDetailPage() {
               placeholder="Optional note (visible to the customer)"
             />
             <div className="flex flex-wrap gap-2">
-              {STATUSES.map((s) => (
-                <Button
-                  key={s}
-                  size="sm"
-                  variant={o.status === s ? 'default' : 'outline'}
-                  disabled={o.status === s || transition.isPending}
-                  onClick={async () => {
-                    await transition.mutateAsync({ status: s, note: note || undefined });
-                    setNote('');
-                  }}
-                >
-                  {s}
-                </Button>
-              ))}
+              {STATUSES.map((s) => {
+                const isNext = s === nextStatus;
+                const isCancelled = s === OrderStatus.CANCELLED;
+
+                return (
+                  <Button
+                    key={s}
+                    size="sm"
+                    variant={o.status === s ? 'default' : 'outline'}
+                    disabled={o.status === s || transition.isPending || (!isNext && !isCancelled)}
+                    onClick={async () => {
+                      await transition.mutateAsync({
+                        status: s,
+                        note: note || undefined,
+                      });
+                      setNote('');
+                    }}
+                  >
+                    {s}
+                  </Button>
+                );
+              })}
             </div>
           </CardContent>
         </Card>

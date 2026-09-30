@@ -20,9 +20,9 @@ if (
   throw new Error('SEED_ADMIN_EMAIL and SEED_ADMIN_PASSWORD must be set before seeding production');
 }
 
-const ADMIN_EMAIL = process.env.SEED_ADMIN_EMAIL ?? 'admin@Cryptech.test';
+const ADMIN_EMAIL = process.env.SEED_ADMIN_EMAIL ?? 'admin@tecnologia.test';
 const ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD ?? 'admin12345';
-const CUSTOMER_EMAIL = process.env.SEED_CUSTOMER_EMAIL ?? 'customer@Cryptech.test';
+const CUSTOMER_EMAIL = process.env.SEED_CUSTOMER_EMAIL ?? 'customer@tecnologia.test';
 const CUSTOMER_PASSWORD = process.env.SEED_CUSTOMER_PASSWORD ?? 'customer12345';
 
 async function upsertUser(email: string, name: string, password: string, role: UserRole) {

@@ -2,17 +2,30 @@ import Link from 'next/link';
 
 import { Card, CardContent } from '@/components/ui/card';
 import type { PublicProductDetail } from '@/contracts/catalog';
+import type { ReviewSummary } from '@/contracts/reviews';
+import { env } from '@/env';
 import { ProductDetailGallery } from '@/modules/storefront/components/product-detail-gallery';
 import { ProductDetailPurchasePanel } from '@/modules/storefront/components/product-detail-purchase-panel';
 import { DeferredReviewsSection } from '@/modules/storefront/components/deferred-reviews-section';
+import {
+  CustomBreadcrumb,
+  buildBreadcrumbJsonLd,
+} from '@/app/components/breadcrumb/custom-breadcrumb';
 
 interface ProductDetailProps {
   product: PublicProductDetail;
+  reviewSummary: ReviewSummary;
 }
 
-export function ProductDetail({ product }: Readonly<ProductDetailProps>) {
+export function ProductDetail({ product, reviewSummary }: Readonly<ProductDetailProps>) {
   const initialVariant = product.variants.find((v) => v.inStock) ?? product.variants[0] ?? null;
-  const ldJson = buildJsonLd(product, initialVariant);
+  const ldJson = buildJsonLd(product, initialVariant, reviewSummary);
+  const breadcrumbItems = [
+    { label: 'Home', href: '/' },
+    { label: product.brand.name, href: `/brand/${product.brand.slug}` },
+    { label: product.name },
+  ];
+  const breadcrumbJsonLd = buildBreadcrumbJsonLd(breadcrumbItems, env.NEXT_PUBLIC_APP_URL);
 
   return (
     <article className="grid grid-cols-1 md:grid-cols-2 gap-8 py-6">
@@ -20,6 +33,14 @@ export function ProductDetail({ product }: Readonly<ProductDetailProps>) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(ldJson) }}
       />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
+      />
+
+      <div className="md:col-span-2">
+        <CustomBreadcrumb items={breadcrumbItems} />
+      </div>
 
       <section>
         <ProductDetailGallery productName={product.name} images={product.images} />
@@ -74,6 +95,7 @@ export function ProductDetail({ product }: Readonly<ProductDetailProps>) {
 function buildJsonLd(
   product: PublicProductDetail,
   variant: PublicProductDetail['variants'][number] | null,
+  reviewSummary: ReviewSummary,
 ) {
   const offers = variant
     ? {
@@ -86,6 +108,16 @@ function buildJsonLd(
         sku: variant.sku,
       }
     : undefined;
+  // aggregateRating requires Google's minimum of 1 rating; omit entirely
+  // when there are none rather than emitting a misleading 0-star block.
+  const aggregateRating =
+    reviewSummary.count > 0
+      ? {
+          '@type': 'AggregateRating',
+          ratingValue: reviewSummary.average.toFixed(1),
+          reviewCount: reviewSummary.count,
+        }
+      : undefined;
   return {
     '@context': 'https://schema.org/',
     '@type': 'Product',
@@ -95,5 +127,6 @@ function buildJsonLd(
     brand: { '@type': 'Brand', name: product.brand.name },
     sku: variant?.sku,
     offers,
+    aggregateRating,
   };
 }
