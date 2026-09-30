@@ -157,19 +157,33 @@ Delete `fix/checkout-concurrency` and stay on `main`: `git switch main` then `gi
 
 ## Execution Progress
 
-**Status: in progress**
+**Status: COMPLETE, ready for PR (manual browser checks outstanding, see Final Status)**
 
 _Last updated: 2026-10-01 — Branch: fix/checkout-concurrency — Workspace: main working directory_
 
-Final commit list: (pending)
+Final commit list: `2f5c5c3` (plan), `94630fc` (checkout server), `565da68` (cancel paths), `10477b8` (checkout UI), `68e9608` (review fixes)
 
 | Phase | Status | Commit | Review | Notes |
 | ----- | ------ | ------ | ------ | ----- |
-| 1. Checkout server (fixtures, race tests, cart guard, 409 meta) | pending | — | deferred | — |
-| 2. Cancel and transition paths (only the winner restocks) | pending | — | deferred | — |
-| 3. Checkout UI | pending | — | deferred | — |
-| 4. Cross-Validation | pending | — | pending | — |
+| 1. Checkout server (fixtures, race tests, cart guard, 409 meta) | done | `94630fc` | deferred | general-purpose agent (concurrency judgment). 9/9 vitest (5 new), typecheck clean. ESLint crashes on config (circular JSON), pre-existing, check in Cross-Validation. |
+| 2. Cancel and transition paths (only the winner restocks) | done | `565da68` | deferred | general-purpose agent. 18/18 vitest (orders + checkout, 5 new), typecheck clean. All 5 new race tests failed pre-fix. |
+| 3. Checkout UI | done | `10477b8` | deferred | general-purpose agent. 6/6 helper tests, typecheck clean. Manual checks deferred to Cross-Validation. Watch: cart invalidate on success may flash empty-cart view before navigation. |
+| 4. Cross-Validation | done | `68e9608` | 0 blocking, 4 advisory fixed | Full suite 94/94, typecheck clean, build exit 0, race suites green 5/5 reruns. Single combined gap+review agent. |
+
+### Cross-Validation
+
+- Review findings fixed in `68e9608`: empty-cart flash after successful order (Loader shown while submitting with emptied cart); same-user double-submit test accepts ConflictError or BadRequestError for the loser; coupon test asserts 1 fulfilled + 1 rejected; decrement loop sorted by variantId to avoid opposite-order deadlock (plus new test).
+- Deviation (trivial, same race class): sorted stock-decrement loop and placeOrder JSDoc update were not listed in the plan.
+- Not fixed, advisory: `/api/checkout/quote` still returns 422 for stock errors (`getCartLines`), inconsistent with the 409 on checkout. Stale docs listed below.
+- Gaps vs. requirements: manual criteria (synchronous double click sends one POST; two-browser sold-out toast + cart refetch) were NOT exercised in a browser. Covered only by service-level race tests, the pure helper tests and code inspection.
+- ESLint could not run (`eslint` crashes on shared config with circular JSON; `next lint` fails with invalid project directory). Not caused by this branch; lint is unverified.
 
 ## Final Status
 
-(pending)
+Shipped on `fix/checkout-concurrency` (5 commits off main): cart-consumption guard serializes duplicate `placeOrder` (also closes the per-user coupon race for one user); stock/availability errors are 409 `ConflictError` with `meta {variantId, productName, reason}`; cancel/transition/cancelOrphanedOrder use status-conditional updates so only the winner restocks and releases the coupon; checkout UI has a synchronous submit guard, names the sold-out product in a toast and refetches the cart.
+
+Verified: `npm run test` 15 files / 94 tests pass; `npm run typecheck` clean; `npm run build` exit 0; race suites passed 5 consecutive reruns.
+
+Follow-ups (not done): browser checks above; fix ESLint config; quote-route 409 consistency; update stale docs (`docs/context/02-architecture.md` L44, L54-55; `docs/context/04-api-reference.md` L35-36 error codes; `docs/issues/03-architecture.md` #10; `docs/issues/02-correctness.md` #2; CLAUDE.md "known violation" about coupon tx client). Earlier out-of-scope list still applies (payment callbacks, coupon release on cancel, admin stock overwrite, first add-to-cart P2002).
+
+Next step: push and open PR `fix/checkout-concurrency` into `dev` by hand (not pushed).
