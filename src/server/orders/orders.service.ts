@@ -94,14 +94,18 @@ export const ordersService = {
         throw new ConflictError('Order is already cancelled');
       }
 
-      await tx.order.update({
-        where: { id: orderId },
+      // Conditional on the status we read: only one concurrent caller wins.
+      const claimed = await tx.order.updateMany({
+        where: { id: orderId, status: order.status },
         data: {
           status: OrderStatus.CANCELLED,
           cancelledAt: new Date(),
           cancelReason: reason,
         },
       });
+      if (claimed.count !== 1) {
+        throw new ConflictError('Order status changed, refresh and retry');
+      }
 
       await restockOrderItems(tx, order.items);
 
@@ -135,14 +139,18 @@ export const ordersService = {
         throw new ConflictError(`Cannot move order from ${order.status} to ${status}`);
       }
 
-      const updated = await tx.order.update({
-        where: { id: orderId },
+      const claimed = await tx.order.updateMany({
+        where: { id: orderId, status: order.status },
         data: {
           status,
           cancelledAt: status === OrderStatus.CANCELLED ? new Date() : order.cancelledAt,
           cancelReason: status === OrderStatus.CANCELLED ? (note ?? 'Admin') : order.cancelReason,
         },
       });
+      if (claimed.count !== 1) {
+        throw new ConflictError('Order status changed, refresh and retry');
+      }
+      const updated = await tx.order.findUniqueOrThrow({ where: { id: orderId } });
 
       if (status === OrderStatus.CANCELLED) {
         await restockOrderItems(tx, order.items);

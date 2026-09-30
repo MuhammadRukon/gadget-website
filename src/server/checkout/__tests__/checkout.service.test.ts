@@ -109,7 +109,9 @@ describe('checkoutService.placeOrder sequential', () => {
       const fx = await createCheckoutFixture({ stock: 5, cartQty: 1 });
       await checkoutService.placeOrder(fx.user.id, input(fx.address.id));
 
-      const err = await checkoutService.placeOrder(fx.user.id, input(fx.address.id)).catch((e) => e);
+      const err = await checkoutService
+        .placeOrder(fx.user.id, input(fx.address.id))
+        .catch((e) => e);
       expect(err).toBeInstanceOf(BadRequestError);
       expect(err.message).toBe('Cart is empty');
     },
@@ -121,13 +123,52 @@ describe('checkoutService.placeOrder sequential', () => {
     async () => {
       const fx = await createCheckoutFixture({ stock: 1, cartQty: 3 });
 
-      const err = await checkoutService.placeOrder(fx.user.id, input(fx.address.id)).catch((e) => e);
+      const err = await checkoutService
+        .placeOrder(fx.user.id, input(fx.address.id))
+        .catch((e) => e);
       expect(err).toBeInstanceOf(ConflictError);
       expect(err.code).toBe('CONFLICT');
       expect(statusFromError(err)).toBe(409);
       expect(err.meta?.variantId).toBe(fx.variant.id);
       expect(err.meta?.productName).toBe(fx.product.name);
       expect(err.meta?.reason).toBe('insufficient_stock');
+    },
+    TEST_TIMEOUT,
+  );
+});
+
+describe('checkoutService.cancelOrphanedOrder concurrency', () => {
+  it(
+    'two concurrent calls: both resolve, stock restored once, coupon released once',
+    async () => {
+      const fx = await createCheckoutFixture({ stock: 5, cartQty: 2, couponPerUserLimit: 1 });
+      const coupon = fx.coupon!;
+      const { order } = await checkoutService.placeOrder(
+        fx.user.id,
+        input(fx.address.id, coupon.code),
+      );
+      expect(
+        (await prisma.productVariant.findUniqueOrThrow({ where: { id: fx.variant.id } })).stock,
+      ).toBe(3);
+      expect((await prisma.coupon.findUniqueOrThrow({ where: { id: coupon.id } })).usedCount).toBe(
+        1,
+      );
+
+      const results = await Promise.allSettled([
+        checkoutService.cancelOrphanedOrder(order.id),
+        checkoutService.cancelOrphanedOrder(order.id),
+      ]);
+      expect(results.map((r) => r.status)).toEqual(['fulfilled', 'fulfilled']);
+
+      expect(
+        (await prisma.productVariant.findUniqueOrThrow({ where: { id: fx.variant.id } })).stock,
+      ).toBe(5);
+      expect((await prisma.coupon.findUniqueOrThrow({ where: { id: coupon.id } })).usedCount).toBe(
+        0,
+      );
+      expect(
+        await prisma.orderEvent.count({ where: { orderId: order.id, status: 'CANCELLED' } }),
+      ).toBe(1);
     },
     TEST_TIMEOUT,
   );

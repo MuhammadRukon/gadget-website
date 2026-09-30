@@ -382,14 +382,16 @@ export const checkoutService = {
       const order = await tx.order.findUnique({ where: { id: orderId }, include: { items: true } });
       if (!order || order.status === OrderStatus.CANCELLED) return;
 
-      await tx.order.update({
-        where: { id: orderId },
+      // Conditional on the status we read: a concurrent canceller wins, we no-op.
+      const claimed = await tx.order.updateMany({
+        where: { id: orderId, status: order.status },
         data: {
           status: OrderStatus.CANCELLED,
           cancelledAt: new Date(),
           cancelReason: 'Payment could not be started',
         },
       });
+      if (claimed.count !== 1) return;
 
       await restockOrderItems(tx, order.items);
 
