@@ -1,31 +1,18 @@
 import { ApiClientError } from '@/lib/fetcher';
+import { stockConflictMetaSchema } from '@/contracts/checkout';
 
-export interface CheckoutErrorDescription {
-  message: string;
-  refetchCart: boolean;
-}
-
-export function describeCheckoutError(err: unknown): CheckoutErrorDescription {
-  if (!(err instanceof ApiClientError)) {
-    return { message: 'Could not place order', refetchCart: false };
-  }
+export function checkoutErrorMessage(err: unknown): string {
+  if (!(err instanceof ApiClientError)) return 'Could not place order';
 
   if (err.status === 409) {
-    const meta = err.payload?.meta;
-    const productName = typeof meta?.productName === 'string' ? meta.productName : null;
-    if (productName) {
-      const message =
-        meta?.reason === 'unavailable'
-          ? `"${productName}" is no longer available. Your cart has been refreshed.`
-          : `Not enough stock for "${productName}". Your cart has been refreshed.`;
-      return { message, refetchCart: true };
+    const meta = stockConflictMetaSchema.safeParse(err.payload?.meta);
+    if (meta.success) {
+      const { productName, reason } = meta.data;
+      return reason === 'unavailable'
+        ? `"${productName}" is no longer available. Your cart has been refreshed.`
+        : `Not enough stock for "${productName}". Your cart has been refreshed.`;
     }
-    return { message: err.message, refetchCart: true };
   }
 
-  if (err.status === 400 && err.message === 'Cart is empty') {
-    return { message: err.message, refetchCart: true };
-  }
-
-  return { message: err.message, refetchCart: false };
+  return err.message;
 }

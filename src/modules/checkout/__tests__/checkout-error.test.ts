@@ -1,56 +1,58 @@
 import { describe, expect, it } from 'vitest';
 
 import { ApiClientError } from '@/lib/fetcher';
-import { describeCheckoutError } from '../checkout-error';
+import { checkoutErrorMessage } from '../checkout-error';
 
 function apiErr(status: number, message: string, meta?: Record<string, unknown>) {
   return new ApiClientError(status, message, { code: 'CONFLICT', message, meta } as never);
 }
 
-describe('describeCheckoutError', () => {
-  it('names the product on 409 insufficient_stock and refetches the cart', () => {
-    const r = describeCheckoutError(
+describe('checkoutErrorMessage', () => {
+  it('names the product on 409 insufficient_stock', () => {
+    const msg = checkoutErrorMessage(
       apiErr(409, 'conflict', {
         variantId: 'v1',
         productName: 'Foo',
         reason: 'insufficient_stock',
       }),
     );
-    expect(r.message).toContain('"Foo"');
-    expect(r.message).toBe('Not enough stock for "Foo". Your cart has been refreshed.');
-    expect(r.refetchCart).toBe(true);
+    expect(msg).toBe('Not enough stock for "Foo". Your cart has been refreshed.');
   });
 
-  it('names the product on 409 unavailable and refetches the cart', () => {
-    const r = describeCheckoutError(
+  it('names the product on 409 unavailable', () => {
+    const msg = checkoutErrorMessage(
       apiErr(409, 'conflict', { variantId: 'v1', productName: 'Foo', reason: 'unavailable' }),
     );
-    expect(r.message).toBe('"Foo" is no longer available. Your cart has been refreshed.');
-    expect(r.refetchCart).toBe(true);
+    expect(msg).toBe('"Foo" is no longer available. Your cart has been refreshed.');
   });
 
   it('uses the server message on 409 without meta', () => {
-    const r = describeCheckoutError(apiErr(409, 'Your cart changed, please review and try again'));
-    expect(r).toEqual({
-      message: 'Your cart changed, please review and try again',
-      refetchCart: true,
-    });
+    const msg = checkoutErrorMessage(apiErr(409, 'Your cart changed, please review and try again'));
+    expect(msg).toBe('Your cart changed, please review and try again');
   });
 
-  it('refetches the cart on 400 Cart is empty', () => {
-    const r = describeCheckoutError(apiErr(400, 'Cart is empty'));
-    expect(r).toEqual({ message: 'Cart is empty', refetchCart: true });
+  it('uses the server message on 409 with invalid meta', () => {
+    expect(
+      checkoutErrorMessage(apiErr(409, 'conflict msg', { productName: 'Foo', reason: 'weird' })),
+    ).toBe('conflict msg');
+    expect(checkoutErrorMessage(apiErr(409, 'conflict msg', { reason: 'unavailable' }))).toBe(
+      'conflict msg',
+    );
   });
 
-  it('passes through other API errors without refetching', () => {
-    const r = describeCheckoutError(apiErr(500, 'Boom'));
-    expect(r).toEqual({ message: 'Boom', refetchCart: false });
+  it('passes through other API errors', () => {
+    expect(checkoutErrorMessage(apiErr(500, 'Boom'))).toBe('Boom');
+    expect(checkoutErrorMessage(apiErr(400, 'Cart is empty'))).toBe('Cart is empty');
+  });
+
+  it('ignores stock meta on non-409 API errors', () => {
+    const msg = checkoutErrorMessage(
+      apiErr(422, 'Invalid', { variantId: 'v1', productName: 'Foo', reason: 'unavailable' }),
+    );
+    expect(msg).toBe('Invalid');
   });
 
   it('falls back for non-API errors', () => {
-    expect(describeCheckoutError(new Error('x'))).toEqual({
-      message: 'Could not place order',
-      refetchCart: false,
-    });
+    expect(checkoutErrorMessage(new Error('x'))).toBe('Could not place order');
   });
 });
