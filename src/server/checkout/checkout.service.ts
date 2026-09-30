@@ -171,12 +171,33 @@ export const checkoutService = {
       if (cartItems.length === 0) {
         throw new BadRequestError('Cart is empty');
       }
+      // Consume the cart first. A concurrent placeOrder for the same user
+      // blocks on these row deletes (READ COMMITTED row locks) and then
+      // finds 0 rows, so a double submit can only succeed once.
+      const consumed = await tx.cartItem.deleteMany({
+        where: { id: { in: cartItems.map((i) => i.id) } },
+      });
+      if (consumed.count !== cartItems.length) {
+        throw new ConflictError('Your cart changed, please review and try again');
+      }
+
+      const productNameByVariantId = new Map<string, string>();
       for (const item of cartItems) {
+        productNameByVariantId.set(item.variant.id, item.variant.product.name);
+        const productName = item.variant.product.name;
         if (!item.variant.isActive || item.variant.product.status !== 'PUBLISHED') {
-          throw new ValidationError(`"${item.variant.product.name}" is no longer available`);
+          throw new ConflictError(`"${productName}" is no longer available`, {
+            variantId: item.variant.id,
+            productName,
+            reason: 'unavailable',
+          });
         }
         if (item.variant.stock < item.quantity) {
-          throw new ValidationError(`Not enough stock for "${item.variant.product.name}"`);
+          throw new ConflictError(`Not enough stock for "${productName}"`, {
+            variantId: item.variant.id,
+            productName,
+            reason: 'insufficient_stock',
+          });
         }
       }
 
@@ -222,7 +243,11 @@ export const checkoutService = {
       for (const [variantId, requiredQty] of qtyByVariantId.entries()) {
         const variant = cartItems.find((item) => item.variant.id === variantId)?.variant;
         if (!variant || variant.stock < requiredQty) {
-          throw new ValidationError('Not enough stock to complete checkout', { variantId });
+          throw new ConflictError('Not enough stock to complete checkout', {
+            variantId,
+            productName: productNameByVariantId.get(variantId) ?? '',
+            reason: 'insufficient_stock',
+          });
         }
       }
 
@@ -274,7 +299,11 @@ export const checkoutService = {
           data: { stock: { decrement: quantity } },
         });
         if (res.count !== 1) {
-          throw new ConflictError('Not enough stock to complete checkout', { variantId });
+          throw new ConflictError('Not enough stock to complete checkout', {
+            variantId,
+            productName: productNameByVariantId.get(variantId) ?? '',
+            reason: 'insufficient_stock',
+          });
         }
       }
 
@@ -307,8 +336,7 @@ export const checkoutService = {
         },
       });
 
-      // 8. Clear cart and audit.
-      await tx.cartItem.deleteMany({ where: { cart: { userId } } });
+      // 8. Audit (cart was consumed at the top of the transaction).
       await tx.orderEvent.create({
         data: {
           orderId: order.id,
