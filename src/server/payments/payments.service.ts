@@ -299,6 +299,11 @@ export const paymentsService = {
     });
   },
 
+  /** Whether a transaction id is already used (customer txn id or bank ref, case-insensitive). */
+  async txnIdExists(txnId: string): Promise<boolean> {
+    return (await findPaymentByTxnId(prisma, txnId)) !== null;
+  },
+
   /**
    * Customer attaches the transaction id of their manually-paid COD
    * confirmation fee. Add-only: once set it can't be changed by the customer.
