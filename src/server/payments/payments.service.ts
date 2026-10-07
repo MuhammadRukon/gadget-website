@@ -282,7 +282,7 @@ export const paymentsService = {
       // by confirming the order (ordersService.transition) or reopens it.
       if (payment.method === PaymentMethod.COD && payment.feeStatus === CodFeeStatus.REJECTED) {
         throw new ConflictError(
-          'The confirmation fee was rejected. Waive it by changing the order status to Confirmed, or decide the fee first.',
+          'The confirmation fee was rejected. Verify the fee, or waive it by changing the order status to Confirmed.',
         );
       }
 
@@ -448,7 +448,9 @@ export const paymentsService = {
 
   /**
    * Admin decision on a COD confirmation fee (paid manually, outside the
-   * system). VERIFIED confirms the order; REJECTED leaves it PENDING.
+   * system). VERIFIED confirms the order and is allowed from PENDING or from
+   * REJECTED (a customer who paid after being rejected); REJECTED leaves the
+   * order PENDING and is only allowed from PENDING.
    * Lock order matches `ordersService.transition` (order row, then payment
    * row) so the two can't deadlock: both outcomes claim the order row first
    * (REJECTED with a no-op CAS on the same status), then CAS the payment, so
@@ -472,12 +474,19 @@ export const paymentsService = {
       if (payment.method !== PaymentMethod.COD) {
         throw new BadRequestError('Confirmation fee only applies to COD payments');
       }
-      if (payment.feeStatus !== CodFeeStatus.PENDING) {
+      // VERIFIED may follow an earlier rejection (the customer paid after all);
+      // REJECTED is only a first decision.
+      const decidable: CodFeeStatus[] =
+        outcome === 'VERIFIED'
+          ? [CodFeeStatus.PENDING, CodFeeStatus.REJECTED]
+          : [CodFeeStatus.PENDING];
+      if (!decidable.includes(payment.feeStatus)) {
         throw new ConflictError('Confirmation fee already processed');
       }
       if (payment.order.status !== OrderStatus.PENDING) {
         throw new ConflictError('Order is no longer pending');
       }
+      const afterRejection = payment.feeStatus === CodFeeStatus.REJECTED;
 
       // Claim the order row before touching the payment: VERIFIED moves it to
       // CONFIRMED, REJECTED is a no-op CAS (same status) that still serializes
@@ -488,7 +497,7 @@ export const paymentsService = {
       if (!claimed) throw new ConflictError('Order status changed, refresh and retry');
 
       const res = await tx.payment.updateMany({
-        where: { id: paymentId, feeStatus: CodFeeStatus.PENDING },
+        where: { id: paymentId, feeStatus: { in: decidable } },
         data:
           outcome === 'VERIFIED'
             ? {
@@ -502,7 +511,9 @@ export const paymentsService = {
 
       const base =
         outcome === 'VERIFIED'
-          ? 'COD confirmation fee verified by admin'
+          ? afterRejection
+            ? 'COD confirmation fee verified by admin after an earlier rejection'
+            : 'COD confirmation fee verified by admin'
           : 'COD confirmation fee rejected by admin';
       await tx.orderEvent.create({
         data: {

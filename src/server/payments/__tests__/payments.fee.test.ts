@@ -347,24 +347,120 @@ describe('paymentsService.verifyCodFee', () => {
   );
 
   it(
-    'only a PENDING fee on a COD payment can be decided',
+    'VERIFIED is allowed from PENDING or REJECTED only; REJECTED only from PENDING',
     async () => {
       const admin = await createAdminUser();
-      const rejected = await feePending({ feeStatus: CodFeeStatus.REJECTED });
       const none = await createManualOrder();
       const bank = await createManualOrder({ method: PaymentMethod.BANK_TRANSFER });
 
-      for (const f of [rejected, none]) {
+      // VERIFIED from WAIVED / NONE / VERIFIED is a conflict.
+      for (const feeStatus of [CodFeeStatus.WAIVED, CodFeeStatus.VERIFIED]) {
+        const f = await feePending({ feeStatus });
         await expect(
           paymentsService.verifyCodFee(admin.id, f.payment.id, 'VERIFIED'),
         ).rejects.toBeInstanceOf(ConflictError);
       }
+      await expect(
+        paymentsService.verifyCodFee(admin.id, none.payment.id, 'VERIFIED'),
+      ).rejects.toBeInstanceOf(ConflictError);
+
+      // REJECTED from anything but PENDING is a conflict (incl. REJECTED -> REJECTED).
+      for (const feeStatus of [
+        CodFeeStatus.REJECTED,
+        CodFeeStatus.WAIVED,
+        CodFeeStatus.VERIFIED,
+      ]) {
+        const f = await feePending({ feeStatus });
+        await expect(
+          paymentsService.verifyCodFee(admin.id, f.payment.id, 'REJECTED'),
+        ).rejects.toBeInstanceOf(ConflictError);
+        const row = await prisma.payment.findUniqueOrThrow({ where: { id: f.payment.id } });
+        expect(row.feeStatus).toBe(feeStatus);
+      }
+      await expect(
+        paymentsService.verifyCodFee(admin.id, none.payment.id, 'REJECTED'),
+      ).rejects.toBeInstanceOf(ConflictError);
+
       await expect(
         paymentsService.verifyCodFee(admin.id, bank.payment.id, 'VERIFIED'),
       ).rejects.toBeInstanceOf(BadRequestError);
       await expect(
         paymentsService.verifyCodFee(admin.id, 'does-not-exist', 'VERIFIED'),
       ).rejects.toBeInstanceOf(NotFoundError);
+    },
+    TEST_TIMEOUT,
+  );
+});
+
+describe('paymentsService.verifyCodFee after a rejection', () => {
+  it(
+    'VERIFIED from REJECTED confirms the order, records the admin and notes the earlier rejection',
+    async () => {
+      const admin = await createAdminUser();
+      const { order, payment } = await feePending({ feeStatus: CodFeeStatus.REJECTED });
+
+      const updated = await paymentsService.verifyCodFee(admin.id, payment.id, 'VERIFIED');
+
+      expect(updated.feeStatus).toBe(CodFeeStatus.VERIFIED);
+      expect(updated.feeVerifiedById).toBe(admin.id);
+      expect(updated.feeVerifiedAt).not.toBeNull();
+      const row = await prisma.order.findUniqueOrThrow({ where: { id: order.id } });
+      expect(row.status).toBe(OrderStatus.CONFIRMED);
+      const events = await eventsFor(order.id);
+      expect(events).toHaveLength(1);
+      expect(events[0].status).toBe(OrderStatus.CONFIRMED);
+      expect(events[0].actorId).toBe(admin.id);
+      expect(events[0].note).toContain('fee verified');
+      expect(events[0].note).toContain('earlier rejection');
+    },
+    TEST_TIMEOUT,
+  );
+
+  it(
+    'a plain PENDING -> VERIFIED note does not mention a rejection',
+    async () => {
+      const admin = await createAdminUser();
+      const { order, payment } = await feePending();
+
+      await paymentsService.verifyCodFee(admin.id, payment.id, 'VERIFIED');
+
+      const [event] = await eventsFor(order.id);
+      expect(event.note).toContain('fee verified');
+      expect(event.note).not.toContain('rejection');
+    },
+    TEST_TIMEOUT,
+  );
+
+  it(
+    'two concurrent VERIFIED calls on a REJECTED fee: exactly one wins, one event',
+    async () => {
+      const admin = await createAdminUser();
+      const { order, payment } = await feePending({ feeStatus: CodFeeStatus.REJECTED });
+
+      const results = await Promise.allSettled([
+        paymentsService.verifyCodFee(admin.id, payment.id, 'VERIFIED'),
+        paymentsService.verifyCodFee(admin.id, payment.id, 'VERIFIED'),
+      ]);
+
+      expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+      const rejected = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected');
+      expect(rejected).toHaveLength(1);
+      expect(rejected[0].reason).toBeInstanceOf(ConflictError);
+      expect(await eventsFor(order.id)).toHaveLength(1);
+    },
+    TEST_TIMEOUT,
+  );
+
+  it(
+    'cash verify() is still blocked for a PENDING or REJECTED fee until the fee is decided',
+    async () => {
+      const admin = await createAdminUser();
+      for (const feeStatus of [CodFeeStatus.PENDING, CodFeeStatus.REJECTED]) {
+        const { payment } = await feePending({ feeStatus });
+        await expect(
+          paymentsService.verify(admin.id, payment.id, 'SUCCEEDED'),
+        ).rejects.toBeInstanceOf(ConflictError);
+      }
     },
     TEST_TIMEOUT,
   );
