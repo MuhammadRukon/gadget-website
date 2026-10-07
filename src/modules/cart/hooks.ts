@@ -126,7 +126,10 @@ export function useCartMutations() {
         body: { quantity: input.quantity },
       });
     },
-    onSuccess: (snapshot) => syncCartCache(snapshot),
+    onSuccess: (snapshot) => {
+      syncCartCache(snapshot);
+      toast.success('Quantity updated');
+    },
     onError: (err) => toast.error(explainError(err, 'Could not update quantity')),
   });
 

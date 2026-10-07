@@ -34,7 +34,7 @@ export function HeaderAccount() {
   const isDark = mounted && resolvedTheme === 'dark';
 
   if (status === 'loading') {
-    return <div className="h-6 w-20 animate-pulse rounded bg-muted" aria-hidden />;
+    return <div className="h-6 w-6 animate-pulse rounded bg-muted" aria-hidden />;
   }
 
   if (!data?.user) {
