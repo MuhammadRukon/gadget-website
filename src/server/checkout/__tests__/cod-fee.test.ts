@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import { formatBDT } from '@/server/common/money';
 
-import { computeCodConfirmationFee, describeCodFeeRule } from '../cod-fee';
+import { buildCodFeeWarning, computeCodConfirmationFee, describeCodFeeRule } from '../cod-fee';
 
 const FLAT = CodFeeType.FLAT;
 const PERCENT = CodFeeType.PERCENT;
@@ -82,5 +82,44 @@ describe('describeCodFeeRule', () => {
     expect(describeCodFeeRule({ type: PERCENT, value: 25 }, 13_000)).toBe(
       `25% = ${formatBDT(13_000)}`,
     );
+  });
+});
+
+describe('buildCodFeeWarning', () => {
+  it('describes a FLAT rule with the admin contact', () => {
+    expect(
+      buildCodFeeWarning({
+        type: FLAT,
+        value: 10_000,
+        feeCents: 10_000,
+        contactNumber: '01800000000',
+      }),
+    ).toBe(
+      `This order requires a confirmation fee (flat ${formatBDT(10_000)}) to be confirmed. Pay or contact admin at 01800000000.`,
+    );
+  });
+
+  it('describes a PERCENT rule with the computed amount', () => {
+    expect(
+      buildCodFeeWarning({
+        type: PERCENT,
+        value: 25,
+        feeCents: 13_000,
+        contactNumber: '01800000000',
+      }),
+    ).toBe(
+      `This order requires a confirmation fee (25% = ${formatBDT(13_000)}) to be confirmed. Pay or contact admin at 01800000000.`,
+    );
+  });
+
+  it('drops the contact clause when no contact number is set', () => {
+    const msg = buildCodFeeWarning({
+      type: FLAT,
+      value: 10_000,
+      feeCents: 10_000,
+      contactNumber: null,
+    });
+    expect(msg.endsWith('Pay or contact admin.')).toBe(true);
+    expect(msg).not.toContain(' at ');
   });
 });

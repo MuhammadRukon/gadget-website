@@ -53,3 +53,22 @@ export function describeCodFeeRule(rule: CodFeeRule, feeCents: number): string {
     ? `${rule.value}% = ${formatBDT(feeCents)}`
     : `flat ${formatBDT(feeCents)}`;
 }
+
+export interface CodFeeWarningInput extends CodFeeRule {
+  /** Fee amount snapshotted on the Payment. */
+  feeCents: number;
+  contactNumber: string | null;
+}
+
+/**
+ * Customer-facing warning for a COD order that needs its confirmation fee.
+ * Built from the Payment snapshot (`feeType`/`feeValue`/`feeCents`), never
+ * live settings, so it stays correct if the admin later changes the rule.
+ */
+export function buildCodFeeWarning(input: CodFeeWarningInput): string {
+  const rule = describeCodFeeRule({ type: input.type, value: input.value }, input.feeCents);
+  const action = input.contactNumber
+    ? `Pay or contact admin at ${input.contactNumber}.`
+    : 'Pay or contact admin.';
+  return `This order requires a confirmation fee (${rule}) to be confirmed. ${action}`;
+}
