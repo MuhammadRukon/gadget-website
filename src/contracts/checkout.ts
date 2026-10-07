@@ -44,7 +44,8 @@ export interface CheckoutQuote {
 }
 
 /** `meta` of the 400 thrown when the chosen payment method is not currently enabled. */
-export type PaymentMethodUnavailableMeta = {
-  reason: 'payment_method_unavailable';
-  method: z.infer<typeof paymentMethodSchema>;
-};
+export const paymentMethodUnavailableMetaSchema = z.object({
+  reason: z.literal('payment_method_unavailable'),
+  method: paymentMethodSchema,
+});
+export type PaymentMethodUnavailableMeta = z.infer<typeof paymentMethodUnavailableMetaSchema>;

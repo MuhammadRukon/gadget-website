@@ -21,6 +21,8 @@ export const apiErrorSchema = z.object({
     'FORBIDDEN',
     'NOT_FOUND',
     'CONFLICT',
+    'TXN_ID_DUPLICATE',
+    'RATE_LIMITED',
     'VALIDATION_ERROR',
     'INTERNAL_ERROR',
   ]),
