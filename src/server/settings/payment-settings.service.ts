@@ -1,6 +1,6 @@
 import { CodFeeType, PaymentMethod, type Prisma, type PaymentSettings } from '@prisma/client';
 
-import type { PaymentSettingsInput } from '@/contracts/payment-settings';
+import type { PaymentSettingsInput, PublicPaymentConfig } from '@/contracts/payment-settings';
 import { prisma } from '@/lib/prisma';
 import { BadRequestError } from '@/server/common/errors';
 import { log } from '@/server/common/logger';
@@ -47,6 +47,16 @@ function flaggedMethods(flags: MethodFlags): PaymentMethod[] {
   return methods;
 }
 
+/**
+ * Methods a customer may actually use, derived from an already-loaded
+ * settings row: flagged on by the admin AND, for gateways, configured with
+ * credentials. Pure, so callers holding settings (e.g. `placeOrder`) don't
+ * need a second query.
+ */
+export function effectiveMethods(settings: MethodFlags): PaymentMethod[] {
+  return flaggedMethods(settings).filter(gatewayConfigured);
+}
+
 export const paymentSettingsService = {
   /** The settings singleton, or in-memory defaults (COD on, fee off) if the row is missing. */
   async get(client: Db = prisma): Promise<PaymentSettings> {
@@ -60,8 +70,23 @@ export const paymentSettingsService = {
    * fall back to the self-payable sandbox harness).
    */
   async getEffective(client: Db = prisma): Promise<PaymentMethod[]> {
-    const settings = await paymentSettingsService.get(client);
-    return flaggedMethods(settings).filter(gatewayConfigured);
+    return effectiveMethods(await paymentSettingsService.get(client));
+  },
+
+  /**
+   * What the checkout/order UI may see. Contact, QR and note are always
+   * present (nullable) regardless of the fee flag, so orders placed while the
+   * fee was on can still show them after the admin turns it off.
+   */
+  async getPublicConfig(client: Db = prisma): Promise<PublicPaymentConfig> {
+    const s = await paymentSettingsService.get(client);
+    return {
+      methods: effectiveMethods(s),
+      cod: { feeEnabled: s.codFeeEnabled, type: s.codFeeType, value: s.codFeeValue },
+      qrImageUrl: s.qrImageUrl,
+      contactNumber: s.contactNumber,
+      paymentNote: s.paymentNote,
+    };
   },
 
   /**
