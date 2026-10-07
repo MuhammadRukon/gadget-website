@@ -22,13 +22,20 @@ interface AdminImageUploaderProps {
   single?: boolean;
   disabled?: boolean;
   folder?: string;
+  /**
+   * When true, removing an image only calls `onChange`; the remote asset is
+   * NOT deleted here. Use it when the owner of the form deletes the old asset
+   * server-side on save (so an unsaved removal never orphans the saved record).
+   * Defaults to false: remove immediately, as the catalog forms expect.
+   */
+  deferDelete?: boolean;
 }
 
 /**
  * Calls the admin-only upload endpoint and tracks the Cloudinary
  * `publicId` for each asset so deletes are unambiguous. Removing an
  * image both updates local state and asks the server to drop the
- * remote asset.
+ * remote asset (unless `deferDelete` is set).
  */
 export function AdminImageUploader({
   value,
@@ -37,6 +44,7 @@ export function AdminImageUploader({
   single = false,
   disabled = false,
   folder = 'catalog',
+  deferDelete = false,
 }: AdminImageUploaderProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
@@ -72,6 +80,7 @@ export function AdminImageUploader({
   async function removeAt(index: number) {
     const target = value[index];
     onChange(value.filter((_, i) => i !== index));
+    if (deferDelete) return;
     try {
       await fetch('/api/admin/media/delete', {
         method: 'POST',
