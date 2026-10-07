@@ -103,6 +103,53 @@ describe('paymentSettingsInputSchema', () => {
     }
   });
 
+  it('rejects Cloudinary URLs that are not plain image uploads', () => {
+    for (const qrImageUrl of [
+      // fetch-type delivery proxies an arbitrary remote URL through the account
+      'https://res.cloudinary.com/demo/image/fetch/https://evil.com/x.png',
+      'https://res.cloudinary.com/demo/video/upload/v1/settings/qr.png',
+      'https://res.cloudinary.com/demo/image/private/v1/settings/qr.png',
+      // not the Cloudinary host, despite starting with its name
+      'https://res.cloudinary.com.evil.com/demo/image/upload/v1/settings/qr.png',
+      'https://res.cloudinary.com@evil.com/demo/image/upload/v1/settings/qr.png',
+      'https://res.cloudinary.com:8443/demo/image/upload/v1/settings/qr.png',
+      'not a url',
+    ]) {
+      const input = { ...valid, qrImageUrl };
+      expect(paymentSettingsInputSchema.safeParse(input).success, qrImageUrl).toBe(false);
+    }
+  });
+
+  it('requires qrImageUrl and qrImagePublicId to be set together', () => {
+    const urlOnly = { ...valid, qrImagePublicId: null };
+    const idOnly = { ...valid, qrImageUrl: null };
+    expect(paymentSettingsInputSchema.safeParse(urlOnly).success).toBe(false);
+    expect(paymentSettingsInputSchema.safeParse(idOnly).success).toBe(false);
+    expect(issuePaths(urlOnly)).toContain('qrImagePublicId');
+    expect(issuePaths(idOnly)).toContain('qrImageUrl');
+  });
+
+  it('rejects a qrImagePublicId that does not match the URL', () => {
+    for (const qrImagePublicId of ['settings/other', 'settings/qr.png/extra', 'qr', 'a/../b']) {
+      const input = { ...valid, qrImagePublicId };
+      expect(paymentSettingsInputSchema.safeParse(input).success, qrImagePublicId).toBe(false);
+      expect(issuePaths(input)).toContain('qrImagePublicId');
+    }
+  });
+
+  it('accepts a matching URL and publicId, with or without a version segment', () => {
+    for (const qrImageUrl of [
+      'https://res.cloudinary.com/demo/image/upload/v1/settings/qr.png',
+      'https://res.cloudinary.com/demo/image/upload/settings/qr.png',
+      'https://res.cloudinary.com/demo/image/upload/settings/qr',
+    ]) {
+      expect(
+        paymentSettingsInputSchema.safeParse({ ...valid, qrImageUrl }).success,
+        qrImageUrl,
+      ).toBe(true);
+    }
+  });
+
   it('accepts a null qrImageUrl', () => {
     const res = paymentSettingsInputSchema.safeParse({
       ...valid,

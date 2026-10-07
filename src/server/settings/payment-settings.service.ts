@@ -1,9 +1,14 @@
 import { CodFeeType, PaymentMethod, type Prisma, type PaymentSettings } from '@prisma/client';
 
-import type { PaymentSettingsInput, PublicPaymentConfig } from '@/contracts/payment-settings';
+import {
+  parseCloudinaryUploadUrl,
+  type PaymentSettingsInput,
+  type PublicPaymentConfig,
+} from '@/contracts/payment-settings';
 import { prisma } from '@/lib/prisma';
 import { BadRequestError } from '@/server/common/errors';
 import { log } from '@/server/common/logger';
+import { CLOUDINARY_FOLDER } from '@/server/media/cloudinary';
 import { mediaService } from '@/server/media/media.service';
 import { gatewayConfigured } from '@/server/payments/registry';
 
@@ -11,6 +16,38 @@ import { gatewayConfigured } from '@/server/payments/registry';
 type Db = typeof prisma | Prisma.TransactionClient;
 
 export const PAYMENT_SETTINGS_ID = 'singleton';
+
+/** Folder segment (under CLOUDINARY_FOLDER) the admin uploader uses for the QR. */
+const QR_FOLDER = 'settings';
+
+/**
+ * Server-side half of the QR validation (the contract only checks shape):
+ * the image must live on OUR Cloudinary cloud and its public id must sit in
+ * the folder the uploader writes to. The public id is later passed to
+ * `mediaService.deleteImage`, so an arbitrary value would let an admin
+ * session delete unrelated assets.
+ */
+function assertTrustedQrImage(input: Pick<PaymentSettingsInput, 'qrImageUrl' | 'qrImagePublicId'>) {
+  const { qrImageUrl, qrImagePublicId } = input;
+  if (!qrImageUrl && !qrImagePublicId) return;
+  if (!qrImageUrl || !qrImagePublicId) {
+    throw new BadRequestError('QR image URL and image id must be set together');
+  }
+
+  const parsed = parseCloudinaryUploadUrl(qrImageUrl);
+  if (!parsed) throw new BadRequestError('QR image must be an uploaded Cloudinary image');
+  if (parsed.publicId !== qrImagePublicId) {
+    throw new BadRequestError('QR image id does not match the image URL');
+  }
+
+  const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+  if (!cloudName || parsed.cloudName !== cloudName) {
+    throw new BadRequestError('QR image must be hosted on the configured Cloudinary account');
+  }
+  if (!qrImagePublicId.startsWith(`${CLOUDINARY_FOLDER}/${QR_FOLDER}/`)) {
+    throw new BadRequestError('QR image must be uploaded through the settings page');
+  }
+}
 
 /** Matches the migration's seeded row; returned (never written) when the row is missing. */
 function defaultSettings(): PaymentSettings {
@@ -96,6 +133,8 @@ export const paymentSettingsService = {
    * does not fail the save.
    */
   async update(adminId: string, input: PaymentSettingsInput): Promise<PaymentSettings> {
+    assertTrustedQrImage(input);
+
     const data = {
       codEnabled: input.codEnabled,
       bkashEnabled: input.bkashEnabled,

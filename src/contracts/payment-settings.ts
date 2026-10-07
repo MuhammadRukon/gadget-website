@@ -10,7 +10,40 @@ import { z } from 'zod';
  */
 
 const BD_MOBILE = /^(\+?88)?01[3-9]\d{8}$/;
-const CLOUDINARY_PREFIX = 'https://res.cloudinary.com/';
+const CLOUDINARY_HOST = 'res.cloudinary.com';
+/** Characters our uploader produces in a public id (path segments joined by '/'). */
+const PUBLIC_ID = /^[A-Za-z0-9_-]+(\/[A-Za-z0-9_-]+)*$/;
+
+/**
+ * Structural parse of a Cloudinary plain-upload delivery URL:
+ * `https://res.cloudinary.com/<cloud>/image/upload/[v123/]<publicId>[.ext]`.
+ * Rejects other schemes, hosts (incl. userinfo/port tricks), resource types
+ * and delivery types (notably `fetch`, which proxies arbitrary remote URLs).
+ * Cloud-name pinning needs server env, so it lives in the settings service.
+ */
+export function parseCloudinaryUploadUrl(
+  value: string,
+): { cloudName: string; publicId: string } | null {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return null;
+  }
+  if (url.protocol !== 'https:' || url.hostname !== CLOUDINARY_HOST) return null;
+  if (url.port || url.username || url.password || url.search || url.hash) return null;
+
+  let path: string;
+  try {
+    path = decodeURIComponent(url.pathname);
+  } catch {
+    return null;
+  }
+  const m = path.match(/^\/([^/]+)\/image\/upload\/(?:v\d+\/)?(.+)$/);
+  if (!m) return null;
+  // Drop the file extension from the last segment to get the public id.
+  return { cloudName: m[1], publicId: m[2].replace(/\.[A-Za-z0-9]+$/, '') };
+}
 
 export const PAYMENT_NOTE_MAX = 500;
 
@@ -34,12 +67,17 @@ export const paymentSettingsInputSchema = z
     qrImageUrl: z
       .string()
       .max(2048)
-      .refine((v) => v.startsWith(CLOUDINARY_PREFIX), {
-        message: 'QR image must be hosted on Cloudinary',
+      .refine((v) => parseCloudinaryUploadUrl(v) !== null, {
+        message: 'QR image must be an uploaded Cloudinary image',
       })
       .nullable()
       .optional(),
-    qrImagePublicId: z.string().max(512).nullable().optional(),
+    qrImagePublicId: z
+      .string()
+      .max(512)
+      .regex(PUBLIC_ID, 'Invalid image id')
+      .nullable()
+      .optional(),
     contactNumber: z
       .string()
       .trim()
@@ -49,6 +87,31 @@ export const paymentSettingsInputSchema = z
     paymentNote: z.string().max(PAYMENT_NOTE_MAX).nullable().optional(),
   })
   .superRefine((v, ctx) => {
+    // The QR url and its Cloudinary public id are set together and must agree
+    // (the public id is what gets deleted when the QR is replaced).
+    if (v.qrImageUrl && !v.qrImagePublicId) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['qrImagePublicId'],
+        message: 'Image id is required with the QR image',
+      });
+    } else if (!v.qrImageUrl && v.qrImagePublicId) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['qrImageUrl'],
+        message: 'QR image is required with the image id',
+      });
+    } else if (v.qrImageUrl && v.qrImagePublicId) {
+      const parsed = parseCloudinaryUploadUrl(v.qrImageUrl);
+      if (parsed && parsed.publicId !== v.qrImagePublicId) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['qrImagePublicId'],
+          message: 'Image id does not match the QR image URL',
+        });
+      }
+    }
+
     if (v.codFeeType === CodFeeType.PERCENT) {
       if (v.codFeeValue < 1 || v.codFeeValue > 100) {
         ctx.addIssue({

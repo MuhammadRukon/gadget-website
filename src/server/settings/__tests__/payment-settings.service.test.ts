@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } fr
 import type { PaymentSettingsInput } from '@/contracts/payment-settings';
 import { prisma } from '@/lib/prisma';
 import { BadRequestError } from '@/server/common/errors';
+import { CLOUDINARY_FOLDER } from '@/server/media/cloudinary';
 import { mediaService } from '@/server/media/media.service';
 
 import { paymentSettingsService } from '../payment-settings.service';
@@ -52,9 +53,13 @@ function input(overrides: Partial<PaymentSettingsInput> = {}): PaymentSettingsIn
   };
 }
 
-function qr(publicId: string) {
+const CLOUD = 'test-cloud';
+
+/** A QR as the uploader produces it: `<CLOUDINARY_FOLDER>/settings/<id>` on our cloud. */
+function qr(id: string, cloud = CLOUD) {
+  const publicId = `${CLOUDINARY_FOLDER}/settings/${id}`;
   return {
-    qrImageUrl: `https://res.cloudinary.com/demo/image/upload/${publicId}.png`,
+    qrImageUrl: `https://res.cloudinary.com/${cloud}/image/upload/v1/${publicId}.png`,
     qrImagePublicId: publicId,
   };
 }
@@ -70,6 +75,7 @@ beforeEach(async () => {
   original = await prisma.paymentSettings.findUnique({ where: { id: SINGLETON } });
   deleteImage = vi.spyOn(mediaService, 'deleteImage').mockResolvedValue(undefined);
   clearGatewayEnv();
+  vi.stubEnv('CLOUDINARY_CLOUD_NAME', CLOUD);
 }, TEST_TIMEOUT);
 
 afterEach(async () => {
@@ -209,15 +215,94 @@ describe('paymentSettingsService.update', () => {
   it(
     'deletes the old QR exactly once when qrImagePublicId changes from A to B',
     async () => {
-      const a = randomId('settings/qr-a');
-      const b = randomId('settings/qr-b');
+      const a = qr(randomId('qr-a'));
+      const b = qr(randomId('qr-b'));
 
-      await paymentSettingsService.update('admin-1', input(qr(a)));
+      await paymentSettingsService.update('admin-1', input(a));
       expect(deleteImage).not.toHaveBeenCalled();
 
-      await paymentSettingsService.update('admin-1', input(qr(b)));
+      await paymentSettingsService.update('admin-1', input(b));
       expect(deleteImage).toHaveBeenCalledTimes(1);
-      expect(deleteImage).toHaveBeenCalledWith(a);
+      expect(deleteImage).toHaveBeenCalledWith(a.qrImagePublicId);
+    },
+    TEST_TIMEOUT,
+  );
+
+  it(
+    'accepts a QR on our cloud under <folder>/settings/',
+    async () => {
+      const a = qr(randomId('qr-ok'));
+      const saved = await paymentSettingsService.update('admin-1', input(a));
+      expect(saved.qrImageUrl).toBe(a.qrImageUrl);
+      expect(saved.qrImagePublicId).toBe(a.qrImagePublicId);
+    },
+    TEST_TIMEOUT,
+  );
+
+  it(
+    'rejects a QR hosted on another Cloudinary cloud and saves nothing',
+    async () => {
+      const before = await paymentSettingsService.get();
+
+      await expect(
+        paymentSettingsService.update('admin-1', input(qr(randomId('qr-x'), 'attacker-cloud'))),
+      ).rejects.toBeInstanceOf(BadRequestError);
+
+      const after = await paymentSettingsService.get();
+      expect(after.qrImageUrl).toBe(before.qrImageUrl);
+      expect(deleteImage).not.toHaveBeenCalled();
+    },
+    TEST_TIMEOUT,
+  );
+
+  it(
+    'rejects a QR whose public id is outside <folder>/settings/ (it would be deleted later)',
+    async () => {
+      const publicId = `${CLOUDINARY_FOLDER}/catalog/${randomId('product')}`;
+      const qrImageUrl = `https://res.cloudinary.com/${CLOUD}/image/upload/v1/${publicId}.png`;
+
+      await expect(
+        paymentSettingsService.update(
+          'admin-1',
+          input({ qrImageUrl, qrImagePublicId: publicId }),
+        ),
+      ).rejects.toBeInstanceOf(BadRequestError);
+    },
+    TEST_TIMEOUT,
+  );
+
+  it(
+    'rejects a public id that does not match the URL, and fetch-type URLs (service level)',
+    async () => {
+      const a = qr(randomId('qr-a'));
+      const b = qr(randomId('qr-b'));
+      await expect(
+        paymentSettingsService.update(
+          'admin-1',
+          input({ qrImageUrl: a.qrImageUrl, qrImagePublicId: b.qrImagePublicId }),
+        ),
+      ).rejects.toBeInstanceOf(BadRequestError);
+
+      await expect(
+        paymentSettingsService.update(
+          'admin-1',
+          input({
+            qrImageUrl: `https://res.cloudinary.com/${CLOUD}/image/fetch/https://evil.com/x.png`,
+            qrImagePublicId: a.qrImagePublicId,
+          }),
+        ),
+      ).rejects.toBeInstanceOf(BadRequestError);
+    },
+    TEST_TIMEOUT,
+  );
+
+  it(
+    'fails closed when the server has no CLOUDINARY_CLOUD_NAME',
+    async () => {
+      vi.stubEnv('CLOUDINARY_CLOUD_NAME', '');
+      await expect(
+        paymentSettingsService.update('admin-1', input(qr(randomId('qr-a')))),
+      ).rejects.toBeInstanceOf(BadRequestError);
     },
     TEST_TIMEOUT,
   );
@@ -225,10 +310,10 @@ describe('paymentSettingsService.update', () => {
   it(
     'does not delete the QR when the publicId is unchanged',
     async () => {
-      const a = randomId('settings/qr-a');
+      const a = qr(randomId('qr-a'));
 
-      await paymentSettingsService.update('admin-1', input(qr(a)));
-      await paymentSettingsService.update('admin-1', input({ ...qr(a), paymentNote: 'changed' }));
+      await paymentSettingsService.update('admin-1', input(a));
+      await paymentSettingsService.update('admin-1', input({ ...a, paymentNote: 'changed' }));
       expect(deleteImage).not.toHaveBeenCalled();
     },
     TEST_TIMEOUT,
@@ -237,8 +322,8 @@ describe('paymentSettingsService.update', () => {
   it(
     'deletes the old QR exactly once when the QR is cleared',
     async () => {
-      const a = randomId('settings/qr-a');
-      await paymentSettingsService.update('admin-1', input(qr(a)));
+      const a = qr(randomId('qr-a'));
+      await paymentSettingsService.update('admin-1', input(a));
 
       const saved = await paymentSettingsService.update(
         'admin-1',
@@ -246,7 +331,7 @@ describe('paymentSettingsService.update', () => {
       );
       expect(saved.qrImagePublicId).toBeNull();
       expect(deleteImage).toHaveBeenCalledTimes(1);
-      expect(deleteImage).toHaveBeenCalledWith(a);
+      expect(deleteImage).toHaveBeenCalledWith(a.qrImagePublicId);
     },
     TEST_TIMEOUT,
   );
@@ -254,8 +339,8 @@ describe('paymentSettingsService.update', () => {
   it(
     'still saves when deleting the old QR fails',
     async () => {
-      const a = randomId('settings/qr-a');
-      await paymentSettingsService.update('admin-1', input(qr(a)));
+      const a = qr(randomId('qr-a'));
+      await paymentSettingsService.update('admin-1', input(a));
       deleteImage.mockRejectedValueOnce(new Error('cloudinary down'));
       vi.spyOn(console, 'warn').mockImplementation(() => undefined);
 
