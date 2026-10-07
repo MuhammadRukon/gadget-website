@@ -48,3 +48,20 @@ export function useCancelOrder(id: string) {
       toast.error(err instanceof Error ? err.message : 'Could not cancel order'),
   });
 }
+
+/**
+ * Adds the customer's transaction id to a COD confirmation-fee payment
+ * (add-only: the server rejects a second submission). Errors are left to the
+ * caller so the duplicate case can render its own copy.
+ */
+export function useSubmitTxnId() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { paymentId: string; txnId: string }) =>
+      apiFetch<{ payment: Payment }>('/api/payments/txn-id', { method: 'POST', body: input }),
+    onSuccess: () => {
+      toast.success('Transaction ID submitted');
+      void qc.invalidateQueries({ queryKey: ['orders'] });
+    },
+  });
+}
