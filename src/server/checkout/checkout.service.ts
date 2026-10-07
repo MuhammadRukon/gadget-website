@@ -203,16 +203,16 @@ export const checkoutService = {
   /**
    * Place an order. Single Prisma transaction does:
    *   1. Consume the cart first (count-checked delete) to serialize
-   *      duplicate submits for the same user.
+   *      duplicate submits for the same user. Right after that, and before
+   *      any stock mutation, the chosen payment method is checked against
+   *      the admin's effective settings (a throw rolls back the consume).
    *   2. Re-validate every line against current availability/stock to
    *      avoid overselling between quote and confirm.
    *   3. Re-validate the coupon and compute totals + shipping.
    *   4. Create the `Order`, snapshotting every line into `OrderItem`
    *      (price, name, sku, image, buying price) so future catalog
-   *      changes never alter past orders.
-   *      Before any stock is touched, the chosen payment method is checked
-   *      against the admin's effective settings, and the COD confirmation
-   *      fee (if any) is resolved and snapshotted on the `Payment`.
+   *      changes never alter past orders. The COD confirmation fee (if
+   *      any) is resolved and snapshotted on the `Payment`.
    *   5. Decrement variant stock atomically (in sorted variantId order);
    *      the conditional update is the real oversell guard.
    *   6. Bump coupon `usedCount` if applied.
@@ -335,6 +335,8 @@ export const checkoutService = {
           discountCents,
           shippingCents,
           totalCents,
+          // Placement-time snapshot only. Payment.feeCents / feeStatus are
+          // authoritative: a waived or rejected fee never rewrites this value.
           codFeeCents: codFee?.feeCents ?? 0,
           couponId,
           couponCode,
