@@ -41,10 +41,10 @@ function signedOut() {
   mockedAuth.mockResolvedValue(null);
 }
 
-function post(url: string, body: unknown) {
+function post(url: string, body: unknown, ip = '203.0.113.7') {
   return new Request(`http://localhost${url}`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json', 'x-forwarded-for': '203.0.113.7' },
+    headers: { 'content-type': 'application/json', 'x-forwarded-for': ip },
     body: JSON.stringify(body),
   });
 }
@@ -216,6 +216,27 @@ describe('POST /api/payments/txn-check', () => {
   );
 
   it(
+    'rotating IPs does not evade the per-user cap: the 31st call is 429',
+    async () => {
+      signInAs(`txn-check-user-cap-${Math.random().toString(36).slice(2, 8)}`);
+
+      for (let i = 0; i < 30; i++) {
+        const res = await txnCheckPOST(
+          post('/api/payments/txn-check', { txnId: 'NOPE123456' }, `198.51.100.${i + 1}`),
+        );
+        expect(res.status).toBe(200);
+      }
+      const limited = await txnCheckPOST(
+        post('/api/payments/txn-check', { txnId: 'NOPE123456' }, '198.51.100.200'),
+      );
+
+      expect(limited.status).toBe(429);
+      expect(Number(limited.headers.get('retry-after'))).toBeGreaterThan(0);
+    },
+    TEST_TIMEOUT,
+  );
+
+  it(
     'a malformed id is a 422',
     async () => {
       signInAs('txn-check-user-3');
@@ -227,6 +248,23 @@ describe('POST /api/payments/txn-check', () => {
 });
 
 describe('POST /api/payments/txn-id', () => {
+  it(
+    'rotating IPs does not evade the per-user cap: the 31st call is 429',
+    async () => {
+      signInAs(`txn-id-user-cap-${Math.random().toString(36).slice(2, 8)}`);
+      const body = { paymentId: 'no-such-payment', txnId: 'ABC12345' };
+
+      for (let i = 0; i < 30; i++) {
+        const res = await txnIdPOST(post('/api/payments/txn-id', body, `198.51.100.${i + 1}`));
+        expect(res.status).not.toBe(429);
+      }
+      const limited = await txnIdPOST(post('/api/payments/txn-id', body, '198.51.100.200'));
+
+      expect(limited.status).toBe(429);
+    },
+    TEST_TIMEOUT,
+  );
+
   it(
     'unauthenticated -> 401',
     async () => {

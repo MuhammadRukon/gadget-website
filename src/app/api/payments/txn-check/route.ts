@@ -17,6 +17,11 @@ export async function POST(request: Request) {
       max: 10,
       windowMs: 10 * 60 * 1000,
     });
+    // Per-user cap as well: the user+IP bucket alone is evaded by rotating IPs.
+    await enforceRateLimit(`txn-check-user:${user.id}`, {
+      max: 30,
+      windowMs: 10 * 60 * 1000,
+    });
     const { txnId } = txnCheckSchema.parse(await request.json());
     const body: TxnCheckResult = { exists: await paymentsService.txnIdExists(txnId) };
     return NextResponse.json(body);
