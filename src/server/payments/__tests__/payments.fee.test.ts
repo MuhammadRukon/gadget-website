@@ -1,5 +1,5 @@
 /**
- * Live-DB tests for the COD confirmation fee flows in paymentsService
+ * Live-DB tests for the COD confirmation fee flows in codFeeService / paymentsService
  * (customer txn id, admin txn id, fee verify/reject, cash-verify guard).
  * Orders/payments are hand-built via `createManualOrder`, so these never
  * depend on (or touch) the PaymentSettings singleton.
@@ -23,6 +23,7 @@ import {
 
 import { cancelOrderInTx, ordersService } from '@/server/orders/orders.service';
 
+import { codFeeService } from '../cod-fee.service';
 import { paymentsService } from '../payments.service';
 
 afterEach(async () => {
@@ -38,11 +39,11 @@ function feePending(overrides: Parameters<typeof createManualOrder>[0] = {}) {
   });
 }
 
-describe('paymentsService.submitCustomerTxnId', () => {
+describe('codFeeService.submitCustomerTxnId', () => {
   it('sets the normalized id once, stamps txnSubmittedAt and writes an OrderEvent', async () => {
     const { userId, order, payment } = await feePending();
 
-    const updated = await paymentsService.submitCustomerTxnId(userId, payment.id, ' abc12345 ');
+    const updated = await codFeeService.submitCustomerTxnId(userId, payment.id, ' abc12345 ');
 
     expect(updated.customerTxnId).toBe('ABC12345');
     expect(updated.txnSubmittedAt).not.toBeNull();
@@ -55,10 +56,10 @@ describe('paymentsService.submitCustomerTxnId', () => {
 
   it('a second call with a different id is a ConflictError and the value is unchanged', async () => {
     const { userId, payment } = await feePending();
-    await paymentsService.submitCustomerTxnId(userId, payment.id, 'FIRST12345');
+    await codFeeService.submitCustomerTxnId(userId, payment.id, 'FIRST12345');
 
     await expect(
-      paymentsService.submitCustomerTxnId(userId, payment.id, 'SECOND12345'),
+      codFeeService.submitCustomerTxnId(userId, payment.id, 'SECOND12345'),
     ).rejects.toBeInstanceOf(ConflictError);
 
     const row = await prisma.payment.findUniqueOrThrow({ where: { id: payment.id } });
@@ -70,7 +71,7 @@ describe('paymentsService.submitCustomerTxnId', () => {
     const stranger = await createManualOrder();
 
     await expect(
-      paymentsService.submitCustomerTxnId(stranger.userId, payment.id, 'ABC12345'),
+      codFeeService.submitCustomerTxnId(stranger.userId, payment.id, 'ABC12345'),
     ).rejects.toBeInstanceOf(NotFoundError);
   });
 
@@ -81,7 +82,7 @@ describe('paymentsService.submitCustomerTxnId', () => {
 
     for (const f of [none, cancelled, bank]) {
       await expect(
-        paymentsService.submitCustomerTxnId(f.userId, f.payment.id, 'ABC12345'),
+        codFeeService.submitCustomerTxnId(f.userId, f.payment.id, 'ABC12345'),
       ).rejects.toBeInstanceOf(ConflictError);
       const row = await prisma.payment.findUniqueOrThrow({ where: { id: f.payment.id } });
       expect(row.customerTxnId).toBeNull();
@@ -92,7 +93,7 @@ describe('paymentsService.submitCustomerTxnId', () => {
     const taken = await feePending({ customerTxnId: 'TAKEN12345' });
     const mine = await feePending();
 
-    const err = await paymentsService
+    const err = await codFeeService
       .submitCustomerTxnId(mine.userId, mine.payment.id, 'taken12345')
       .catch((e) => e);
 
@@ -110,7 +111,7 @@ describe('paymentsService.submitCustomerTxnId', () => {
     const mine = await feePending();
 
     await expect(
-      paymentsService.submitCustomerTxnId(mine.userId, mine.payment.id, 'BANKREF9999'),
+      codFeeService.submitCustomerTxnId(mine.userId, mine.payment.id, 'BANKREF9999'),
     ).rejects.toBeInstanceOf(TxnIdDuplicateError);
   });
 
@@ -119,8 +120,8 @@ describe('paymentsService.submitCustomerTxnId', () => {
     const b = await feePending();
 
     const results = await Promise.allSettled([
-      paymentsService.submitCustomerTxnId(a.userId, a.payment.id, 'RACE123456'),
-      paymentsService.submitCustomerTxnId(b.userId, b.payment.id, 'RACE123456'),
+      codFeeService.submitCustomerTxnId(a.userId, a.payment.id, 'RACE123456'),
+      codFeeService.submitCustomerTxnId(b.userId, b.payment.id, 'RACE123456'),
     ]);
 
     expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
@@ -131,15 +132,15 @@ describe('paymentsService.submitCustomerTxnId', () => {
   });
 });
 
-describe('paymentsService.adminSetTxnId', () => {
+describe('codFeeService.adminSetTxnId', () => {
   it('sets, then replaces, the id and writes an event each time', async () => {
     const admin = await createAdminUser();
     const { order, payment } = await feePending();
 
-    const first = await paymentsService.adminSetTxnId(admin.id, payment.id, 'adm1111111');
+    const first = await codFeeService.adminSetTxnId(admin.id, payment.id, 'adm1111111');
     expect(first.customerTxnId).toBe('ADM1111111');
 
-    const second = await paymentsService.adminSetTxnId(admin.id, payment.id, 'ADM2222222');
+    const second = await codFeeService.adminSetTxnId(admin.id, payment.id, 'ADM2222222');
     expect(second.customerTxnId).toBe('ADM2222222');
 
     const events = await eventsFor(order.id);
@@ -152,8 +153,8 @@ describe('paymentsService.adminSetTxnId', () => {
     const admin = await createAdminUser();
     const { payment } = await feePending({ feeStatus: CodFeeStatus.REJECTED });
 
-    await paymentsService.adminSetTxnId(admin.id, payment.id, 'REJ1234567');
-    const again = await paymentsService.adminSetTxnId(admin.id, payment.id, 'rej1234567');
+    await codFeeService.adminSetTxnId(admin.id, payment.id, 'REJ1234567');
+    const again = await codFeeService.adminSetTxnId(admin.id, payment.id, 'rej1234567');
     expect(again.customerTxnId).toBe('REJ1234567');
   });
 
@@ -162,7 +163,7 @@ describe('paymentsService.adminSetTxnId', () => {
     const taken = await feePending({ customerTxnId: 'TAKEN99999' });
     const mine = await feePending({ customerTxnId: 'MINE123456' });
 
-    const err = await paymentsService
+    const err = await codFeeService
       .adminSetTxnId(admin.id, mine.payment.id, 'taken99999')
       .catch((e) => e);
 
@@ -184,21 +185,21 @@ describe('paymentsService.adminSetTxnId', () => {
 
     for (const f of [verified, none, cancelled]) {
       await expect(
-        paymentsService.adminSetTxnId(admin.id, f.payment.id, 'ABC12345'),
+        codFeeService.adminSetTxnId(admin.id, f.payment.id, 'ABC12345'),
       ).rejects.toBeInstanceOf(ConflictError);
     }
     await expect(
-      paymentsService.adminSetTxnId(admin.id, 'does-not-exist', 'ABC12345'),
+      codFeeService.adminSetTxnId(admin.id, 'does-not-exist', 'ABC12345'),
     ).rejects.toBeInstanceOf(NotFoundError);
   });
 });
 
-describe('paymentsService.verifyCodFee', () => {
+describe('codFeeService.verifyFee', () => {
   it('VERIFIED: fee VERIFIED, admin recorded, order CONFIRMED, CONFIRMED event by the admin', async () => {
     const admin = await createAdminUser();
     const { order, payment } = await feePending();
 
-    const updated = await paymentsService.verifyCodFee(admin.id, payment.id, 'VERIFIED');
+    const updated = await codFeeService.verifyFee(admin.id, payment.id, 'VERIFIED');
 
     expect(updated.feeStatus).toBe(CodFeeStatus.VERIFIED);
     expect(updated.feeVerifiedById).toBe(admin.id);
@@ -217,11 +218,11 @@ describe('paymentsService.verifyCodFee', () => {
   it('a second VERIFIED call is a ConflictError and adds no event', async () => {
     const admin = await createAdminUser();
     const { order, payment } = await feePending();
-    await paymentsService.verifyCodFee(admin.id, payment.id, 'VERIFIED');
+    await codFeeService.verifyFee(admin.id, payment.id, 'VERIFIED');
 
-    await expect(
-      paymentsService.verifyCodFee(admin.id, payment.id, 'VERIFIED'),
-    ).rejects.toBeInstanceOf(ConflictError);
+    await expect(codFeeService.verifyFee(admin.id, payment.id, 'VERIFIED')).rejects.toBeInstanceOf(
+      ConflictError,
+    );
     expect(await eventsFor(order.id)).toHaveLength(1);
   });
 
@@ -229,9 +230,9 @@ describe('paymentsService.verifyCodFee', () => {
     const admin = await createAdminUser();
     const { order, payment } = await feePending({ orderStatus: OrderStatus.CANCELLED });
 
-    await expect(
-      paymentsService.verifyCodFee(admin.id, payment.id, 'VERIFIED'),
-    ).rejects.toBeInstanceOf(ConflictError);
+    await expect(codFeeService.verifyFee(admin.id, payment.id, 'VERIFIED')).rejects.toBeInstanceOf(
+      ConflictError,
+    );
 
     const row = await prisma.order.findUniqueOrThrow({ where: { id: order.id } });
     expect(row.status).toBe(OrderStatus.CANCELLED);
@@ -244,8 +245,8 @@ describe('paymentsService.verifyCodFee', () => {
     const { order, payment } = await feePending();
 
     const results = await Promise.allSettled([
-      paymentsService.verifyCodFee(admin.id, payment.id, 'VERIFIED'),
-      paymentsService.verifyCodFee(admin.id, payment.id, 'VERIFIED'),
+      codFeeService.verifyFee(admin.id, payment.id, 'VERIFIED'),
+      codFeeService.verifyFee(admin.id, payment.id, 'VERIFIED'),
     ]);
 
     expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
@@ -259,7 +260,7 @@ describe('paymentsService.verifyCodFee', () => {
     const admin = await createAdminUser();
     const { order, payment } = await feePending();
 
-    const updated = await paymentsService.verifyCodFee(admin.id, payment.id, 'REJECTED', 'no txn');
+    const updated = await codFeeService.verifyFee(admin.id, payment.id, 'REJECTED', 'no txn');
 
     expect(updated.feeStatus).toBe(CodFeeStatus.REJECTED);
     const row = await prisma.order.findUniqueOrThrow({ where: { id: order.id } });
@@ -281,41 +282,41 @@ describe('paymentsService.verifyCodFee', () => {
     for (const feeStatus of [CodFeeStatus.WAIVED, CodFeeStatus.VERIFIED]) {
       const f = await feePending({ feeStatus });
       await expect(
-        paymentsService.verifyCodFee(admin.id, f.payment.id, 'VERIFIED'),
+        codFeeService.verifyFee(admin.id, f.payment.id, 'VERIFIED'),
       ).rejects.toBeInstanceOf(ConflictError);
     }
     await expect(
-      paymentsService.verifyCodFee(admin.id, none.payment.id, 'VERIFIED'),
+      codFeeService.verifyFee(admin.id, none.payment.id, 'VERIFIED'),
     ).rejects.toBeInstanceOf(ConflictError);
 
     // REJECTED from anything but PENDING is a conflict (incl. REJECTED -> REJECTED).
     for (const feeStatus of [CodFeeStatus.REJECTED, CodFeeStatus.WAIVED, CodFeeStatus.VERIFIED]) {
       const f = await feePending({ feeStatus });
       await expect(
-        paymentsService.verifyCodFee(admin.id, f.payment.id, 'REJECTED'),
+        codFeeService.verifyFee(admin.id, f.payment.id, 'REJECTED'),
       ).rejects.toBeInstanceOf(ConflictError);
       const row = await prisma.payment.findUniqueOrThrow({ where: { id: f.payment.id } });
       expect(row.feeStatus).toBe(feeStatus);
     }
     await expect(
-      paymentsService.verifyCodFee(admin.id, none.payment.id, 'REJECTED'),
+      codFeeService.verifyFee(admin.id, none.payment.id, 'REJECTED'),
     ).rejects.toBeInstanceOf(ConflictError);
 
     await expect(
-      paymentsService.verifyCodFee(admin.id, bank.payment.id, 'VERIFIED'),
+      codFeeService.verifyFee(admin.id, bank.payment.id, 'VERIFIED'),
     ).rejects.toBeInstanceOf(BadRequestError);
     await expect(
-      paymentsService.verifyCodFee(admin.id, 'does-not-exist', 'VERIFIED'),
+      codFeeService.verifyFee(admin.id, 'does-not-exist', 'VERIFIED'),
     ).rejects.toBeInstanceOf(NotFoundError);
   });
 });
 
-describe('paymentsService.verifyCodFee after a rejection', () => {
+describe('codFeeService.verifyFee after a rejection', () => {
   it('VERIFIED from REJECTED confirms the order, records the admin and notes the earlier rejection', async () => {
     const admin = await createAdminUser();
     const { order, payment } = await feePending({ feeStatus: CodFeeStatus.REJECTED });
 
-    const updated = await paymentsService.verifyCodFee(admin.id, payment.id, 'VERIFIED');
+    const updated = await codFeeService.verifyFee(admin.id, payment.id, 'VERIFIED');
 
     expect(updated.feeStatus).toBe(CodFeeStatus.VERIFIED);
     expect(updated.feeVerifiedById).toBe(admin.id);
@@ -334,7 +335,7 @@ describe('paymentsService.verifyCodFee after a rejection', () => {
     const admin = await createAdminUser();
     const { order, payment } = await feePending();
 
-    await paymentsService.verifyCodFee(admin.id, payment.id, 'VERIFIED');
+    await codFeeService.verifyFee(admin.id, payment.id, 'VERIFIED');
 
     const [event] = await eventsFor(order.id);
     expect(event.note).toContain('fee verified');
@@ -346,8 +347,8 @@ describe('paymentsService.verifyCodFee after a rejection', () => {
     const { order, payment } = await feePending({ feeStatus: CodFeeStatus.REJECTED });
 
     const results = await Promise.allSettled([
-      paymentsService.verifyCodFee(admin.id, payment.id, 'VERIFIED'),
-      paymentsService.verifyCodFee(admin.id, payment.id, 'VERIFIED'),
+      codFeeService.verifyFee(admin.id, payment.id, 'VERIFIED'),
+      codFeeService.verifyFee(admin.id, payment.id, 'VERIFIED'),
     ]);
 
     expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
@@ -368,13 +369,13 @@ describe('paymentsService.verifyCodFee after a rejection', () => {
   });
 });
 
-describe('verifyCodFee racing an admin PENDING -> CONFIRMED', () => {
+describe('verifyFee racing an admin PENDING -> CONFIRMED', () => {
   it('no deadlock: exactly one wins and the fee status matches the winner', async () => {
     const admin = await createAdminUser();
     const { order, payment } = await feePending();
 
     const results = await Promise.allSettled([
-      paymentsService.verifyCodFee(admin.id, payment.id, 'VERIFIED'),
+      codFeeService.verifyFee(admin.id, payment.id, 'VERIFIED'),
       ordersService.transition(admin.id, order.id, OrderStatus.CONFIRMED),
     ]);
 
@@ -434,7 +435,7 @@ describe('paymentsService.verify (cash) guard', () => {
   it('COD succeeds once the fee has been verified', async () => {
     const admin = await createAdminUser();
     const { payment } = await feePending();
-    await paymentsService.verifyCodFee(admin.id, payment.id, 'VERIFIED');
+    await codFeeService.verifyFee(admin.id, payment.id, 'VERIFIED');
 
     const updated = await paymentsService.verify(admin.id, payment.id, 'SUCCEEDED');
     expect(updated.status).toBe(PaymentStatus.SUCCEEDED);
@@ -470,12 +471,12 @@ describe('fee writes racing an order cancel', () => {
     return (await pending) as { value?: unknown; error?: unknown };
   }
 
-  it('verifyCodFee REJECTED loses to a concurrent cancel (ConflictError, fee stays PENDING)', async () => {
+  it('verifyFee REJECTED loses to a concurrent cancel (ConflictError, fee stays PENDING)', async () => {
     const admin = await createAdminUser();
     const { order, payment } = await feePending();
 
     const res = await actionRacingCancel(order.id, () =>
-      paymentsService.verifyCodFee(admin.id, payment.id, 'REJECTED'),
+      codFeeService.verifyFee(admin.id, payment.id, 'REJECTED'),
     );
 
     expect(res.error).toBeInstanceOf(ConflictError);
@@ -490,7 +491,7 @@ describe('fee writes racing an order cancel', () => {
     const { order, payment } = await feePending();
 
     const res = await actionRacingCancel(order.id, () =>
-      paymentsService.adminSetTxnId(admin.id, payment.id, 'RACECANCEL1'),
+      codFeeService.adminSetTxnId(admin.id, payment.id, 'RACECANCEL1'),
     );
 
     expect(res.error).toBeInstanceOf(ConflictError);

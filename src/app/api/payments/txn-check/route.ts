@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { txnCheckSchema, type TxnCheckResult } from '@/contracts/payments';
 import { jsonError, requireSession } from '@/server/common/http';
 import { enforceUserRateLimits } from '@/server/common/rate-limit';
-import { paymentsService } from '@/server/payments/payments.service';
+import { codFeeService } from '@/server/payments/cod-fee.service';
 
 /**
  * Tells a customer whether a transaction id is already in use. Boolean-only
@@ -16,7 +16,7 @@ export async function POST(request: Request) {
     // Per-user cap as well as user+IP: the IP bucket alone is evaded by rotating IPs.
     await enforceUserRateLimits('txn-check', user.id, request);
     const { txnId } = txnCheckSchema.parse(await request.json());
-    const body: TxnCheckResult = { exists: await paymentsService.txnIdExists(txnId) };
+    const body: TxnCheckResult = { exists: await codFeeService.txnIdExists(txnId) };
     return NextResponse.json(body);
   } catch (err) {
     return jsonError(err);

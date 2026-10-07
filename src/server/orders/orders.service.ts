@@ -207,7 +207,7 @@ export const ordersService = {
       }
 
       // Lock order is order row (claimed above) then payment row, matching
-      // paymentsService.verifyCodFee.
+      // codFeeService.verifyFee.
       let eventNote = note ?? null;
       if (order.status === OrderStatus.PENDING && status === OrderStatus.CONFIRMED) {
         const waived = await tx.payment.updateMany({

@@ -14,6 +14,7 @@ import {
   createAdminUser,
   createManualOrder,
 } from '@/server/checkout/__tests__/fixtures';
+import { codFeeService } from '@/server/payments/cod-fee.service';
 import { paymentsService } from '@/server/payments/payments.service';
 
 import { ordersService } from '../orders.service';
@@ -79,7 +80,7 @@ describe('customer order responses', () => {
   it('the customer txn-id response carries no internal fields', async () => {
     const { userId, payment } = await loadedOrder();
 
-    const updated = await paymentsService.submitCustomerTxnId(userId, payment.id, 'abc12345');
+    const updated = await codFeeService.submitCustomerTxnId(userId, payment.id, 'abc12345');
 
     expectCustomerShape(updated);
     expect(updated.customerTxnId).toBe('ABC12345');

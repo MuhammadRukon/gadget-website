@@ -442,7 +442,7 @@ export const checkoutService = {
       });
 
       if (codFee) {
-        // Stays PENDING until an admin verifies the fee (paymentsService.verifyCodFee).
+        // Stays PENDING until an admin verifies the fee (codFeeService.verifyFee).
         await tx.orderEvent.create({
           data: {
             orderId: order.id,

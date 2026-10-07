@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 
 import { adminSetTxnIdSchema } from '@/contracts/payments';
 import { jsonError, requireAdminSession } from '@/server/common/http';
-import { paymentsService } from '@/server/payments/payments.service';
+import { codFeeService } from '@/server/payments/cod-fee.service';
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -13,7 +13,7 @@ export async function POST(request: Request, { params }: RouteContext) {
     const admin = await requireAdminSession();
     const { id } = await params;
     const { txnId } = adminSetTxnIdSchema.parse(await request.json());
-    const payment = await paymentsService.adminSetTxnId(admin.id, id, txnId);
+    const payment = await codFeeService.adminSetTxnId(admin.id, id, txnId);
     return NextResponse.json({ payment });
   } catch (err) {
     return jsonError(err);
