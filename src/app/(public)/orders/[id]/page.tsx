@@ -15,15 +15,12 @@ import { Loader } from '@/app/common/loader/loader';
 import { Textarea } from '@/components/ui/textarea';
 import type { CustomerPayment } from '@/contracts/payments';
 import { formatBDT } from '@/server/common/money';
-import { buildCodFeeWarning, dueOnDeliveryCents } from '@/server/checkout/cod-fee';
+import { dueOnDeliveryCents } from '@/lib/cod-fee/compute';
+import { buildCodFeeWarning, buildFeeRejectedMessage } from '@/lib/cod-fee/copy';
 import { AddTxnIdCard } from '@/modules/checkout/components/add-txn-id-card';
 import { CodFeeNotice } from '@/modules/checkout/components/cod-fee-notice';
 import { PaymentConfigError } from '@/modules/checkout/components/payment-config-error';
-import {
-  buildFeeRejectedMessage,
-  getFeeNoticeState,
-  type FeeNoticeState,
-} from '@/modules/checkout/fee-state';
+import { getFeeNoticeState, type FeeNoticeState } from '@/modules/checkout/fee-state';
 import { usePaymentConfig } from '@/modules/checkout/hooks';
 import { useCancelOrder, useOrderDetail } from '@/modules/orders/hooks';
 import { OrderStatusBadge } from '@/modules/orders/components/order-status-badge';

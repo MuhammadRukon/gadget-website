@@ -2,7 +2,7 @@ import { PaymentMethod, type PaymentSettings } from '@prisma/client';
 
 import type { CodFeeRule } from '@/contracts/payment-settings';
 
-import { computeCodConfirmationFee } from './cod-fee';
+import { computeCodConfirmationFee } from '@/lib/cod-fee/compute';
 
 /**
  * Single source of truth for order total math, shared by `quote()` and

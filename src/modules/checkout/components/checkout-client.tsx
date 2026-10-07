@@ -14,7 +14,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Loader } from '@/app/common/loader/loader';
 import { ApiClientError, apiFetch } from '@/lib/fetcher';
 import { formatBDT } from '@/server/common/money';
-import { buildCodFeeWarning } from '@/server/checkout/cod-fee';
+import { buildCodFeeWarning } from '@/lib/cod-fee/copy';
 import type { CheckoutInput, CheckoutQuote } from '@/contracts/checkout';
 import { queryKeys } from '@/constants/queryKeys';
 import {

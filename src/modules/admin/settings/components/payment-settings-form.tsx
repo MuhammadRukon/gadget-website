@@ -37,7 +37,7 @@ import {
   type PaymentSettingsInput,
 } from '@/contracts/payment-settings';
 import { formatBDT } from '@/server/common/money';
-import { computeCodConfirmationFee } from '@/server/checkout/cod-fee';
+import { computeCodConfirmationFee } from '@/lib/cod-fee/compute';
 import {
   AdminImageUploader,
   type UploadedImage,

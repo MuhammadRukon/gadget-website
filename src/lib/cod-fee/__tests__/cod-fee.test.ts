@@ -3,13 +3,8 @@ import { describe, expect, it } from 'vitest';
 
 import { formatBDT } from '@/server/common/money';
 
-import {
-  buildCodFeeWarning,
-  computeCodConfirmationFee,
-  describeCodFeeRule,
-  dueOnDeliveryCents,
-  isFeeUnverified,
-} from '../cod-fee';
+import { computeCodConfirmationFee, dueOnDeliveryCents, isFeeUnverified } from '../compute';
+import { buildCodFeeWarning, buildFeeRejectedMessage, describeCodFeeRule } from '../copy';
 
 const FLAT = CodFeeType.FLAT;
 const PERCENT = CodFeeType.PERCENT;
@@ -152,5 +147,16 @@ describe('isFeeUnverified', () => {
     expect(isFeeUnverified(CodFeeStatus.VERIFIED)).toBe(false);
     expect(isFeeUnverified(CodFeeStatus.WAIVED)).toBe(false);
     expect(isFeeUnverified(CodFeeStatus.NONE)).toBe(false);
+  });
+});
+
+describe('buildFeeRejectedMessage', () => {
+  it('points the customer at admin', () => {
+    expect(buildFeeRejectedMessage('01800000000')).toBe(
+      'Your confirmation fee could not be verified. Contact admin at 01800000000.',
+    );
+    expect(buildFeeRejectedMessage(null)).toBe(
+      'Your confirmation fee could not be verified. Contact admin.',
+    );
   });
 });

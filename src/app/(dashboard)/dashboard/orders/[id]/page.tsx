@@ -12,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader } from '@/app/common/loader/loader';
 import { Textarea } from '@/components/ui/textarea';
 import { formatBDT } from '@/server/common/money';
-import { dueOnDeliveryCents, isFeeUnverified } from '@/server/checkout/cod-fee';
+import { dueOnDeliveryCents, isFeeUnverified } from '@/lib/cod-fee/compute';
 import { OrderStatusBadge } from '@/modules/orders/components/order-status-badge';
 import { CodFeePanel, hasCodFee } from '@/modules/admin/payments/components/cod-fee-panel';
 

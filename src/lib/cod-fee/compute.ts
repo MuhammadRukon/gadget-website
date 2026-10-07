@@ -1,11 +1,13 @@
 import { CodFeeStatus, CodFeeType } from '@prisma/client';
 
-import type { CodFeeRule } from '@/contracts/payment-settings';
-import { adminClause } from '@/lib/contact-admin';
-import { formatBDT } from '@/server/common/money';
+import {
+  COD_PERCENT_MAX,
+  COD_PERCENT_MIN,
+  isValidCodFeeValue,
+} from '@/contracts/payment-settings';
 
 /**
- * COD confirmation fee calculation (pure, integer cents).
+ * COD confirmation fee calculation (pure, integer cents, client-safe).
  *
  * The fee is an advance credit against the order total: `totalCents` is
  * unchanged and the COD amount due on delivery is `total - fee`.
@@ -34,8 +36,10 @@ export function computeCodConfirmationFee(input: CodFeeInput): number {
   }
 
   if (type === CodFeeType.PERCENT) {
-    if (value < 1 || value > 100) {
-      throw new Error('COD fee percent must be between 1 and 100');
+    if (!isValidCodFeeValue(CodFeeType.PERCENT, value)) {
+      throw new Error(
+        `COD fee percent must be between ${COD_PERCENT_MIN} and ${COD_PERCENT_MAX}`,
+      );
     }
     const raw = Math.ceil((totalCents * value) / 100);
     const rounded = Math.ceil(raw / ROUND_STEP_CENTS) * ROUND_STEP_CENTS;
@@ -73,28 +77,4 @@ export const FEE_UNVERIFIED_STATUSES = [CodFeeStatus.PENDING, CodFeeStatus.REJEC
 
 export function isFeeUnverified(status: CodFeeStatus): boolean {
   return (FEE_UNVERIFIED_STATUSES as readonly CodFeeStatus[]).includes(status);
-}
-
-/** Human-readable rule text, e.g. `flat Tk 100` or `25% = Tk 130`. */
-export function describeCodFeeRule(rule: CodFeeRule, feeCents: number): string {
-  return rule.type === CodFeeType.PERCENT
-    ? `${rule.value}% = ${formatBDT(feeCents)}`
-    : `flat ${formatBDT(feeCents)}`;
-}
-
-export interface CodFeeWarningInput extends CodFeeRule {
-  /** Fee amount snapshotted on the Payment. */
-  feeCents: number;
-  contactNumber: string | null;
-}
-
-/**
- * Customer-facing warning for a COD order that needs its confirmation fee.
- * Built from the Payment snapshot (`feeType`/`feeValue`/`feeCents`), never
- * live settings, so it stays correct if the admin later changes the rule.
- */
-export function buildCodFeeWarning(input: CodFeeWarningInput): string {
-  const rule = describeCodFeeRule({ type: input.type, value: input.value }, input.feeCents);
-  const action = `Pay or ${adminClause(input.contactNumber)}.`;
-  return `This order requires a confirmation fee (${rule}) to be confirmed. ${action}`;
 }

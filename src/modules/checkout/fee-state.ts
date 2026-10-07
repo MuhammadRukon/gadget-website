@@ -25,10 +25,3 @@ export function getFeeNoticeState(
       return 'none';
   }
 }
-
-/** Order-page alert for a fee the admin could not verify. */
-export function buildFeeRejectedMessage(contactNumber: string | null): string {
-  return `Your confirmation fee could not be verified. ${
-    contactNumber ? `Contact admin at ${contactNumber}.` : 'Contact admin.'
-  }`;
-}

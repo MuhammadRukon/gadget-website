@@ -1,5 +1,5 @@
 import { TXN_ID_MAX, TXN_ID_MIN, txnIdSchema } from '@/contracts/payments';
-import { adminClause } from '@/lib/contact-admin';
+import { adminClause } from '@/lib/cod-fee/copy';
 
 export type TxnIdInput =
   | { status: 'empty' }

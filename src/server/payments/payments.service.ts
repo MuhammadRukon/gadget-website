@@ -8,7 +8,7 @@ import {
   NotFoundError,
   TxnIdDuplicateError,
 } from '@/server/common/errors';
-import { FEE_UNVERIFIED_STATUSES, isFeeUnverified } from '@/server/checkout/cod-fee';
+import { FEE_UNVERIFIED_STATUSES, isFeeUnverified } from '@/lib/cod-fee/compute';
 import { log } from '@/server/common/logger';
 import { orderStatusEmail, paymentResultEmail, sendMail } from '@/server/common/mailer';
 import {

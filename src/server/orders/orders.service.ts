@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { ConflictError, ForbiddenError, NotFoundError } from '@/server/common/errors';
 import { orderStatusEmail, sendMail } from '@/server/common/mailer';
 import { CUSTOMER_PAYMENT_FIELDS, type CustomerPaymentField } from '@/contracts/payments';
-import { FEE_UNVERIFIED_STATUSES } from '@/server/checkout/cod-fee';
+import { FEE_UNVERIFIED_STATUSES } from '@/lib/cod-fee/compute';
 
 /** Payment columns safe to return to the customer (see CUSTOMER_PAYMENT_FIELDS). */
 export const customerPaymentSelect = Object.fromEntries(
