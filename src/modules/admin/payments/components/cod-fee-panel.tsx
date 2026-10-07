@@ -217,6 +217,9 @@ export function CodFeePanel({ order, payment }: CodFeePanelProps) {
                 value={rejectNote}
                 onChange={(e) => setRejectNote(e.target.value)}
               />
+              <p className="text-xs text-muted-foreground">
+                This note is visible to the customer on their order timeline.
+              </p>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setRejectOpen(false)}>
