@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { CodFeeStatus, PaymentMethod } from '@prisma/client';
+import { OrderStatus } from '@prisma/client';
 
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Loader } from '@/app/common/loader/loader';
+import { feeView } from '@/lib/cod-fee/view';
 import { formatBDT } from '@/server/common/money';
 
 import { FeeStatusBadge } from '@/modules/admin/payments/components/fee-status-badge';
@@ -120,10 +121,14 @@ export default function AdminPaymentsPage() {
               <TableBody>
                 {(pending.data ?? []).map((p) => {
                   const busy = actingId === p.id && (verify.isPending || verifyFee.isPending);
-                  const isCod = p.method === PaymentMethod.COD;
-                  const feePending = isCod && p.feeStatus === CodFeeStatus.PENDING;
-                  const feeRejected = isCod && p.feeStatus === CodFeeStatus.REJECTED;
-                  const hasFee = p.feeStatus !== CodFeeStatus.NONE;
+                  // The list excludes cancelled orders and carries no order status;
+                  // the server re-checks that the order is still PENDING.
+                  const fee = feeView(p, {
+                    status: OrderStatus.PENDING,
+                    totalCents: p.order.totalCents,
+                  });
+                  const { canVerify, canReject } = fee.admin;
+                  const hasFee = fee.show;
                   return (
                     <TableRow key={p.id}>
                       <TableCell className="font-medium">{p.order.orderNumber}</TableCell>
@@ -149,7 +154,7 @@ export default function AdminPaymentsPage() {
                         {new Date(p.createdAt).toLocaleString()}
                       </TableCell>
                       <TableCell className="text-right space-x-2">
-                        {feePending || feeRejected ? (
+                        {canVerify ? (
                           <>
                             <Button
                               size="sm"
@@ -167,7 +172,7 @@ export default function AdminPaymentsPage() {
                               Verify fee
                             </Button>
                             {/* A rejected fee can still be verified but not rejected again. */}
-                            {feePending ? (
+                            {canReject ? (
                               <Button
                                 size="sm"
                                 variant="ghost"

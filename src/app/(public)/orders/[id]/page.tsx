@@ -15,14 +15,14 @@ import { Loader } from '@/app/common/loader/loader';
 import { Textarea } from '@/components/ui/textarea';
 import type { CustomerPayment } from '@/contracts/payments';
 import { formatBDT } from '@/server/common/money';
-import { dueOnDeliveryCents } from '@/lib/cod-fee/compute';
 import { buildCodFeeWarning, buildFeeRejectedMessage } from '@/lib/cod-fee/copy';
+import { feeView, type FeeNoticeState } from '@/lib/cod-fee/view';
 import { AddTxnIdCard } from '@/modules/checkout/components/add-txn-id-card';
 import { CodFeeNotice } from '@/modules/checkout/components/cod-fee-notice';
 import { PaymentConfigError } from '@/modules/checkout/components/payment-config-error';
-import { getFeeNoticeState, type FeeNoticeState } from '@/modules/checkout/fee-state';
 import { usePaymentConfig } from '@/modules/checkout/hooks';
 import { useCancelOrder, useOrderDetail } from '@/modules/orders/hooks';
+import { FeeSummaryRows } from '@/modules/orders/components/fee-summary-rows';
 import { OrderStatusBadge } from '@/modules/orders/components/order-status-badge';
 import { useSubmitWarranty } from '@/modules/warranty/hooks';
 
@@ -130,7 +130,8 @@ export default function OrderDetailPage() {
   const { status } = useSession();
   const order = useOrderDetail(id);
   const feePayment = order.data?.payments[0];
-  const feeState = order.data ? getFeeNoticeState(order.data.status, feePayment) : 'none';
+  const fee = order.data ? feeView(feePayment, order.data) : null;
+  const feeState = fee?.customerNotice ?? 'none';
   // Contact/QR/note are only needed while the fee is actionable.
   const config = usePaymentConfig({ enabled: feeState === 'pending' || feeState === 'rejected' });
   const cancel = useCancelOrder(id ?? '');
@@ -253,24 +254,7 @@ export default function OrderDetailPage() {
               <span>Total</span>
               <span>{formatBDT(o.totalCents)}</span>
             </div>
-            {feePayment && feePayment.feeCents > 0 && feePayment.feeStatus !== 'WAIVED' ? (
-              <>
-                <div className="flex justify-between">
-                  <span>Confirmation fee (advance)</span>
-                  <span>{formatBDT(feePayment.feeCents)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Due on delivery</span>
-                  <span>{formatBDT(
-                      dueOnDeliveryCents({
-                        totalCents: o.totalCents,
-                        feeCents: feePayment.feeCents,
-                        feeStatus: feePayment.feeStatus,
-                      }),
-                    )}</span>
-                </div>
-              </>
-            ) : null}
+            {fee ? <FeeSummaryRows view={fee} /> : null}
             <p className="pt-2 text-xs text-muted-foreground">
               Payment:{' '}
               {o.payments[0]

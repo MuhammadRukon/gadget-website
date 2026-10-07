@@ -23,6 +23,7 @@ import {
   isTxnIdDuplicate,
 } from '@/modules/checkout/checkout-error';
 import { usePaymentConfig, usePlaceOrder } from '@/modules/checkout/hooks';
+import { FeeSummaryRows } from '@/modules/orders/components/fee-summary-rows';
 import {
   PAYMENT_METHOD_INFO,
   defaultPaymentMethod,
@@ -410,16 +411,13 @@ export function CheckoutClient() {
                 <span>{quote ? formatBDT(quote.totalCents) : '...'}</span>
               </div>
               {feeActive && quote ? (
-                <>
-                  <div className="flex justify-between">
-                    <span>Confirmation fee (advance)</span>
-                    <span>{formatBDT(quote.codFeeCents)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Due on delivery</span>
-                    <span>{formatBDT(quote.dueOnDeliveryCents)}</span>
-                  </div>
-                </>
+                <FeeSummaryRows
+                  view={{
+                    showSummaryRows: true,
+                    feeCents: quote.codFeeCents,
+                    dueCents: quote.dueOnDeliveryCents,
+                  }}
+                />
               ) : null}
             </div>
             <Button

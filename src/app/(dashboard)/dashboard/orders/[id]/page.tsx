@@ -12,10 +12,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader } from '@/app/common/loader/loader';
 import { Textarea } from '@/components/ui/textarea';
 import { formatBDT } from '@/server/common/money';
-import { dueOnDeliveryCents } from '@/lib/cod-fee/compute';
-import { canFee } from '@/lib/cod-fee/policy';
+import { feeView } from '@/lib/cod-fee/view';
+import { FeeSummaryRows } from '@/modules/orders/components/fee-summary-rows';
 import { OrderStatusBadge } from '@/modules/orders/components/order-status-badge';
-import { CodFeePanel, hasCodFee } from '@/modules/admin/payments/components/cod-fee-panel';
+import { CodFeePanel } from '@/modules/admin/payments/components/cod-fee-panel';
 
 import { useAdminOrderDetail, useTransitionOrder } from '@/modules/admin/orders/hooks';
 
@@ -61,10 +61,10 @@ export default function AdminOrderDetailPage() {
 
   const o = order.data;
   const nextStatus = getNextStatus(o.status);
-  const feePayment = hasCodFee(o.payments[0]) ? o.payments[0] : null;
+  const fee = feeView(o.payments[0], o);
+  const feePayment = fee.show ? o.payments[0] : null;
   // Confirming by hand while the fee is unverified (or rejected) waives it server-side.
-  const confirmWaivesFee =
-    o.status === OrderStatus.PENDING && !!feePayment && canFee('waive', feePayment.feeStatus);
+  const confirmWaivesFee = fee.admin.confirmWaivesFee;
 
   function runTransition(status: OrderStatus) {
     transition.mutate({ status, note: note || undefined }, { onSuccess: () => setNote('') });
@@ -161,24 +161,7 @@ export default function AdminOrderDetailPage() {
               <span>Total</span>
               <span>{formatBDT(o.totalCents)}</span>
             </div>
-            {feePayment && feePayment.feeCents > 0 ? (
-              <>
-                <div className="flex justify-between text-muted-foreground">
-                  <span>Confirmation fee (advance)</span>
-                  <span>{formatBDT(feePayment.feeCents)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Due on delivery</span>
-                  <span>{formatBDT(
-                      dueOnDeliveryCents({
-                        totalCents: o.totalCents,
-                        feeCents: feePayment.feeCents,
-                        feeStatus: feePayment.feeStatus,
-                      }),
-                    )}</span>
-                </div>
-              </>
-            ) : null}
+            <FeeSummaryRows view={fee} muted />
             <p className="pt-2 text-xs text-muted-foreground">
               Payment: {o.payments.map((p) => `${p.method} (${p.status})`).join(', ') || 'Pending'}
             </p>

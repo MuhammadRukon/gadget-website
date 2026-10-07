@@ -18,9 +18,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { TXN_ID_MAX, TXN_ID_MIN, txnIdSchema } from '@/contracts/payments';
-import { dueOnDeliveryCents } from '@/lib/cod-fee/compute';
 import { describeCodFeeRule } from '@/lib/cod-fee/copy';
-import { canFee } from '@/lib/cod-fee/policy';
+import { feeView } from '@/lib/cod-fee/view';
 import { formatBDT } from '@/server/common/money';
 import { DuplicateTxnDialog } from '@/modules/admin/payments/components/duplicate-txn-dialog';
 import { FeeStatusBadge } from '@/modules/admin/payments/components/fee-status-badge';
@@ -34,11 +33,6 @@ import {
 interface CodFeePanelProps {
   order: Pick<Order, 'status' | 'totalCents' | 'orderNumber'>;
   payment: Payment;
-}
-
-/** True when this payment carries a confirmation fee worth showing a panel for. */
-export function hasCodFee(payment: Payment | undefined): payment is Payment {
-  return !!payment && payment.feeStatus !== CodFeeStatus.NONE;
 }
 
 /**
@@ -61,10 +55,8 @@ export function CodFeePanel({ order, payment }: CodFeePanelProps) {
   const [duplicate, setDuplicate] = useState<DuplicateTxnInfo | null>(null);
 
   const orderPending = order.status === OrderStatus.PENDING;
-  // Verifying and editing the txn id are allowed in exactly the same states.
-  const canVerify = orderPending && canFee('verify', payment.feeStatus);
-  const canEditTxn = canVerify;
-  const canReject = orderPending && canFee('reject', payment.feeStatus);
+  const view = feeView(payment, order);
+  const { canVerify, canReject, canEditTxn } = view.admin;
 
   const rule =
     payment.feeType && payment.feeValue !== null
@@ -118,13 +110,7 @@ export function CodFeePanel({ order, payment }: CodFeePanelProps) {
           </div>
           <div>
             <dt className="text-xs text-muted-foreground">Due on delivery</dt>
-            <dd className="font-medium">{formatBDT(
-                dueOnDeliveryCents({
-                  totalCents: order.totalCents,
-                  feeCents: payment.feeCents,
-                  feeStatus: payment.feeStatus,
-                }),
-              )}</dd>
+            <dd className="font-medium">{formatBDT(view.dueCents)}</dd>
           </div>
           <div>
             <dt className="text-xs text-muted-foreground">Customer transaction ID</dt>
