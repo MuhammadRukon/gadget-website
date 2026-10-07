@@ -8,8 +8,12 @@ type Db = typeof prisma | Prisma.TransactionClient;
 
 /**
  * Finds a payment that already uses this transaction id, as a customer-
- * submitted id or a bank-transfer reference (case-insensitive). Optionally
- * ignores one payment (the one being edited).
+ * submitted id or a bank-transfer reference. Optionally ignores one payment
+ * (the one being edited).
+ *
+ * `customerTxnId` is always stored normalized (trimmed, uppercase), so it is
+ * matched exactly: that keeps its unique index usable. `bankRef` is free text
+ * entered before normalization existed, so it stays case-insensitive.
  */
 export function findPaymentByTxnId(client: Db, txnId: string, excludePaymentId?: string) {
   const id = normalizeTxnId(txnId);
@@ -17,7 +21,7 @@ export function findPaymentByTxnId(client: Db, txnId: string, excludePaymentId?:
     where: {
       ...(excludePaymentId ? { id: { not: excludePaymentId } } : {}),
       OR: [
-        { customerTxnId: { equals: id, mode: 'insensitive' } },
+        { customerTxnId: id },
         { bankRef: { equals: id, mode: 'insensitive' } },
       ],
     },
