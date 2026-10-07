@@ -24,9 +24,10 @@ export interface PlaceOrderResult {
  * Enabled payment methods, COD fee rule, QR, contact and note. Never served
  * from cache: the admin can change it at any time, so every mount refetches.
  */
-export function usePaymentConfig() {
+export function usePaymentConfig({ enabled = true }: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: queryKeys.paymentConfig,
+    enabled,
     queryFn: () => apiFetch<PublicPaymentConfig>('/api/checkout/config'),
     staleTime: 0,
     refetchOnMount: 'always',

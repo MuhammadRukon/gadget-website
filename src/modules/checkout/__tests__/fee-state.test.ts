@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { getFeeNoticeState } from '../fee-state';
+import { buildFeeRejectedMessage, getFeeNoticeState } from '../fee-state';
 
 const pay = (feeStatus: string, method = 'COD') => ({ method, feeStatus }) as never;
 
@@ -27,5 +27,16 @@ describe('getFeeNoticeState', () => {
     expect(getFeeNoticeState('PENDING', pay('NONE'))).toBe('none');
     expect(getFeeNoticeState('PENDING', pay('PENDING', 'BKASH'))).toBe('none');
     expect(getFeeNoticeState('PENDING', undefined)).toBe('none');
+  });
+});
+
+describe('buildFeeRejectedMessage', () => {
+  it('points the customer at admin', () => {
+    expect(buildFeeRejectedMessage('01800000000')).toBe(
+      'Your confirmation fee could not be verified. Contact admin at 01800000000.',
+    );
+    expect(buildFeeRejectedMessage(null)).toBe(
+      'Your confirmation fee could not be verified. Contact admin.',
+    );
   });
 });

@@ -5,18 +5,115 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
-import { OrderStatus } from '@prisma/client';
+import { CheckCircle2Icon } from 'lucide-react';
+import { OrderStatus, type Payment } from '@prisma/client';
 
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader } from '@/app/common/loader/loader';
 import { Textarea } from '@/components/ui/textarea';
 import { formatBDT } from '@/server/common/money';
+import { buildCodFeeWarning } from '@/server/checkout/cod-fee';
+import { AddTxnIdCard } from '@/modules/checkout/components/add-txn-id-card';
+import { CodFeeNotice } from '@/modules/checkout/components/cod-fee-notice';
+import {
+  buildFeeRejectedMessage,
+  getFeeNoticeState,
+  type FeeNoticeState,
+} from '@/modules/checkout/fee-state';
+import { usePaymentConfig } from '@/modules/checkout/hooks';
 import { useCancelOrder, useOrderDetail } from '@/modules/orders/hooks';
 import { OrderStatusBadge } from '@/modules/orders/components/order-status-badge';
 import { useSubmitWarranty } from '@/modules/warranty/hooks';
 
 const CANCELLABLE: OrderStatus[] = ['PENDING', 'CONFIRMED', 'PROCESSING'];
+
+type PaymentConfigQuery = ReturnType<typeof usePaymentConfig>;
+
+/** Read-only display of the submitted id. Never an input: it is add-only. */
+function SubmittedTxnId({ payment }: { payment: Payment }) {
+  if (!payment.customerTxnId) return null;
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Transaction ID</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-1 text-sm">
+        <p className="break-all font-mono">{payment.customerTxnId}</p>
+        {payment.txnSubmittedAt ? (
+          <p className="text-xs text-muted-foreground">
+            Submitted {new Date(payment.txnSubmittedAt).toLocaleString()}
+          </p>
+        ) : null}
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
+ * COD confirmation-fee state. The warning is built from the Payment snapshot
+ * (feeType/feeValue/feeCents), so it stays correct if the admin later changes
+ * or disables the fee; only contact, QR and note come from live config.
+ */
+function FeeSection({
+  state,
+  payment,
+  config,
+}: {
+  state: Exclude<FeeNoticeState, 'none'>;
+  payment: Payment;
+  config: PaymentConfigQuery;
+}) {
+  const contact = config.data?.contactNumber ?? null;
+
+  if (state === 'verified') {
+    return (
+      <Alert>
+        <CheckCircle2Icon />
+        <AlertTitle className="line-clamp-none">Confirmation fee verified</AlertTitle>
+      </Alert>
+    );
+  }
+
+  if (state === 'rejected') {
+    return (
+      <div className="space-y-4">
+        <Alert variant="destructive">
+          <AlertDescription className="text-destructive">
+            {buildFeeRejectedMessage(contact)}
+          </AlertDescription>
+        </Alert>
+        <SubmittedTxnId payment={payment} />
+      </div>
+    );
+  }
+
+  if (config.isLoading) {
+    return <p className="text-sm text-muted-foreground">Loading payment details...</p>;
+  }
+
+  return (
+    <div className="space-y-4">
+      <CodFeeNotice
+        warning={buildCodFeeWarning({
+          type: payment.feeType ?? 'FLAT',
+          value: payment.feeValue ?? payment.feeCents,
+          feeCents: payment.feeCents,
+          contactNumber: contact,
+        })}
+        qrImageUrl={config.data?.qrImageUrl ?? null}
+        contactNumber={contact}
+        paymentNote={config.data?.paymentNote ?? null}
+      />
+      {payment.customerTxnId ? (
+        <SubmittedTxnId payment={payment} />
+      ) : (
+        <AddTxnIdCard paymentId={payment.id} contactNumber={contact} />
+      )}
+    </div>
+  );
+}
 
 export default function OrderDetailPage() {
   const router = useRouter();
@@ -24,6 +121,10 @@ export default function OrderDetailPage() {
   const id = params?.id;
   const { status } = useSession();
   const order = useOrderDetail(id);
+  const feePayment = order.data?.payments[0];
+  const feeState = order.data ? getFeeNoticeState(order.data.status, feePayment) : 'none';
+  // Contact/QR/note are only needed while the fee is actionable.
+  const config = usePaymentConfig({ enabled: feeState === 'pending' || feeState === 'rejected' });
   const cancel = useCancelOrder(id ?? '');
   const warranty = useSubmitWarranty(id ?? '');
   const [reason, setReason] = useState('');
@@ -71,6 +172,10 @@ export default function OrderDetailPage() {
         </div>
         <OrderStatusBadge status={o.status} />
       </div>
+
+      {feeState !== 'none' && feePayment ? (
+        <FeeSection state={feeState} payment={feePayment} config={config} />
+      ) : null}
 
       <Card>
         <CardHeader>
@@ -140,6 +245,18 @@ export default function OrderDetailPage() {
               <span>Total</span>
               <span>{formatBDT(o.totalCents)}</span>
             </div>
+            {feePayment && feePayment.feeCents > 0 && feePayment.feeStatus !== 'WAIVED' ? (
+              <>
+                <div className="flex justify-between">
+                  <span>Confirmation fee (advance)</span>
+                  <span>{formatBDT(feePayment.feeCents)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Due on delivery</span>
+                  <span>{formatBDT(o.totalCents - feePayment.feeCents)}</span>
+                </div>
+              </>
+            ) : null}
             <p className="pt-2 text-xs text-muted-foreground">
               Payment:{' '}
               {o.payments[0]
