@@ -265,10 +265,17 @@ export const paymentsService = {
       if (payment.status !== PaymentStatus.PENDING) {
         throw new ConflictError('Payment already processed');
       }
-      // A COD order with an unverified confirmation fee must go through
+      // A COD order with an undecided confirmation fee must go through
       // verifyCodFee first (or be confirmed/waived via ordersService.transition).
       if (payment.method === PaymentMethod.COD && payment.feeStatus === CodFeeStatus.PENDING) {
         throw new ConflictError('Verify the confirmation fee first');
+      }
+      // A rejected fee is a decision already made: the admin either waives it
+      // by confirming the order (ordersService.transition) or reopens it.
+      if (payment.method === PaymentMethod.COD && payment.feeStatus === CodFeeStatus.REJECTED) {
+        throw new ConflictError(
+          'The confirmation fee was rejected. Waive it by changing the order status to Confirmed, or decide the fee first.',
+        );
       }
 
       const updated = await tx.payment.update({
@@ -388,6 +395,13 @@ export const paymentsService = {
           throw new ConflictError('Order is no longer pending');
         }
 
+        // Claim the order row first (no-op CAS, same status) so a concurrent
+        // cancel/confirm can't interleave with the payment write.
+        const claimed = await claimOrderStatus(tx, payment.order, {
+          status: payment.order.status,
+        });
+        if (!claimed) throw new ConflictError('Order status changed, refresh and retry');
+
         const existing = await findPaymentByTxnId(tx, txnId, paymentId);
         if (existing) throw duplicate(existing.order);
 
@@ -425,8 +439,10 @@ export const paymentsService = {
    * Admin decision on a COD confirmation fee (paid manually, outside the
    * system). VERIFIED confirms the order; REJECTED leaves it PENDING.
    * Lock order matches `ordersService.transition` (order row, then payment
-   * row) so the two can't deadlock, and both decisions are compare-and-set so
-   * exactly one concurrent caller wins.
+   * row) so the two can't deadlock: both outcomes claim the order row first
+   * (REJECTED with a no-op CAS on the same status), then CAS the payment, so
+   * exactly one concurrent caller wins. `adminSetTxnId` takes the same
+   * order-then-payment path.
    */
   async verifyCodFee(
     adminId: string,
@@ -452,12 +468,13 @@ export const paymentsService = {
         throw new ConflictError('Order is no longer pending');
       }
 
-      if (outcome === 'VERIFIED') {
-        const claimed = await claimOrderStatus(tx, payment.order, {
-          status: OrderStatus.CONFIRMED,
-        });
-        if (!claimed) throw new ConflictError('Order status changed, refresh and retry');
-      }
+      // Claim the order row before touching the payment: VERIFIED moves it to
+      // CONFIRMED, REJECTED is a no-op CAS (same status) that still serializes
+      // against a concurrent cancel, so a CANCELLED order can't end up REJECTED.
+      const claimed = await claimOrderStatus(tx, payment.order, {
+        status: outcome === 'VERIFIED' ? OrderStatus.CONFIRMED : payment.order.status,
+      });
+      if (!claimed) throw new ConflictError('Order status changed, refresh and retry');
 
       const res = await tx.payment.updateMany({
         where: { id: paymentId, feeStatus: CodFeeStatus.PENDING },
@@ -508,6 +525,8 @@ export const paymentsService = {
       where: {
         status: PaymentStatus.PENDING,
         method: { in: [PaymentMethod.COD, PaymentMethod.BANK_TRANSFER] },
+        // A cancelled order has nothing left to verify.
+        order: { status: { not: OrderStatus.CANCELLED } },
       },
       orderBy: { createdAt: 'desc' },
       include: {

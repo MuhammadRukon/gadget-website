@@ -20,7 +20,7 @@ import {
   createManualOrder,
 } from '@/server/checkout/__tests__/fixtures';
 
-import { ordersService } from '@/server/orders/orders.service';
+import { cancelOrderInTx, ordersService } from '@/server/orders/orders.service';
 
 import { paymentsService } from '../payments.service';
 
@@ -417,6 +417,24 @@ describe('paymentsService.verify (cash) guard', () => {
   );
 
   it(
+    'COD with a REJECTED fee is a ConflictError telling the admin to waive or decide the fee',
+    async () => {
+      const admin = await createAdminUser();
+      const { order, payment } = await feePending({ feeStatus: CodFeeStatus.REJECTED });
+
+      const err = await paymentsService.verify(admin.id, payment.id, 'SUCCEEDED').catch((e) => e);
+
+      expect(err).toBeInstanceOf(ConflictError);
+      expect(err.message).toMatch(/rejected/i);
+      expect(err.message).toMatch(/waive/i);
+      const row = await prisma.payment.findUniqueOrThrow({ where: { id: payment.id } });
+      expect(row.status).toBe(PaymentStatus.PENDING);
+      expect(await eventsFor(order.id)).toHaveLength(0);
+    },
+    TEST_TIMEOUT,
+  );
+
+  it(
     'COD with feeStatus NONE behaves as before',
     async () => {
       const admin = await createAdminUser();
@@ -440,6 +458,72 @@ describe('paymentsService.verify (cash) guard', () => {
 
       const updated = await paymentsService.verify(admin.id, payment.id, 'SUCCEEDED');
       expect(updated.status).toBe(PaymentStatus.SUCCEEDED);
+    },
+    TEST_TIMEOUT,
+  );
+});
+
+describe('fee writes racing an order cancel', () => {
+  /**
+   * Holds an open transaction that has cancelled the order (row locked, not
+   * yet committed), starts `action`, then commits. Without a claim on the
+   * order row the action would write to the payment and leave a CANCELLED
+   * order with a changed fee.
+   */
+  async function actionRacingCancel(orderId: string, action: () => Promise<unknown>) {
+    let pending: Promise<unknown> = Promise.resolve();
+    await prisma.$transaction(async (tx) => {
+      const order = await tx.order.findUniqueOrThrow({
+        where: { id: orderId },
+        include: { items: true },
+      });
+      const ok = await cancelOrderInTx(tx, order, {
+        reason: 'race',
+        event: { note: 'cancelled in race test' },
+      });
+      expect(ok).toBe(true);
+      pending = action().then(
+        (value) => ({ value }),
+        (error) => ({ error }),
+      );
+      // Let the action run up to its (blocked) order claim.
+      await new Promise((r) => setTimeout(r, 400));
+    });
+    return (await pending) as { value?: unknown; error?: unknown };
+  }
+
+  it(
+    'verifyCodFee REJECTED loses to a concurrent cancel (ConflictError, fee stays PENDING)',
+    async () => {
+      const admin = await createAdminUser();
+      const { order, payment } = await feePending();
+
+      const res = await actionRacingCancel(order.id, () =>
+        paymentsService.verifyCodFee(admin.id, payment.id, 'REJECTED'),
+      );
+
+      expect(res.error).toBeInstanceOf(ConflictError);
+      const pay = await prisma.payment.findUniqueOrThrow({ where: { id: payment.id } });
+      expect(pay.feeStatus).toBe(CodFeeStatus.PENDING);
+      const row = await prisma.order.findUniqueOrThrow({ where: { id: order.id } });
+      expect(row.status).toBe(OrderStatus.CANCELLED);
+    },
+    TEST_TIMEOUT,
+  );
+
+  it(
+    'adminSetTxnId loses to a concurrent cancel (ConflictError, txn id not written)',
+    async () => {
+      const admin = await createAdminUser();
+      const { order, payment } = await feePending();
+
+      const res = await actionRacingCancel(order.id, () =>
+        paymentsService.adminSetTxnId(admin.id, payment.id, 'RACECANCEL1'),
+      );
+
+      expect(res.error).toBeInstanceOf(ConflictError);
+      const pay = await prisma.payment.findUniqueOrThrow({ where: { id: payment.id } });
+      expect(pay.customerTxnId).toBeNull();
     },
     TEST_TIMEOUT,
   );

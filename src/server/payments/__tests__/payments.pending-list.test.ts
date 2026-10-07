@@ -2,7 +2,7 @@
  * `listPendingForVerification` feeds the admin payments page. Live-DB test;
  * does not touch the PaymentSettings singleton, so it runs in the parallel project.
  */
-import { CodFeeStatus, PaymentMethod } from '@prisma/client';
+import { CodFeeStatus, OrderStatus, PaymentMethod } from '@prisma/client';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {
@@ -53,6 +53,23 @@ describe('paymentsService.listPendingForVerification', () => {
       expect(row?.feeStatus).toBe(CodFeeStatus.NONE);
       expect(row?.feeCents).toBe(0);
       expect(row?.customerTxnId).toBeNull();
+    },
+    TEST_TIMEOUT,
+  );
+
+  it(
+    'excludes payments of cancelled orders',
+    async () => {
+      const live = await createManualOrder({ method: PaymentMethod.COD });
+      const cancelled = await createManualOrder({
+        method: PaymentMethod.COD,
+        orderStatus: OrderStatus.CANCELLED,
+      });
+
+      const ids = (await paymentsService.listPendingForVerification()).map((p) => p.id);
+
+      expect(ids).toContain(live.payment.id);
+      expect(ids).not.toContain(cancelled.payment.id);
     },
     TEST_TIMEOUT,
   );
