@@ -43,7 +43,7 @@ export function WriteReviewForm({ orderItemId, onSubmitted }: WriteReviewFormPro
 
   return (
     <form onSubmit={onSubmit} className="space-y-3">
-      <div>
+      <div className="space-y-3">
         <Label className="block mb-1">Rating</Label>
         <div className="flex items-center gap-1" onMouseLeave={() => setHover(0)}>
           {[1, 2, 3, 4, 5].map((n) => (
@@ -66,7 +66,7 @@ export function WriteReviewForm({ orderItemId, onSubmitted }: WriteReviewFormPro
         </div>
       </div>
 
-      <div>
+      <div className="space-y-3">
         <Label htmlFor={`title-${orderItemId}`}>Title (optional)</Label>
         <Input
           id={`title-${orderItemId}`}
@@ -75,7 +75,7 @@ export function WriteReviewForm({ orderItemId, onSubmitted }: WriteReviewFormPro
           maxLength={120}
         />
       </div>
-      <div>
+      <div className="space-y-3">
         <Label htmlFor={`body-${orderItemId}`}>Your review</Label>
         <Textarea
           id={`body-${orderItemId}`}
@@ -86,10 +86,7 @@ export function WriteReviewForm({ orderItemId, onSubmitted }: WriteReviewFormPro
           placeholder="What did you like or dislike about this product?"
         />
       </div>
-      <Button
-        type="submit"
-        disabled={rating < 1 || body.trim().length < 10 || submit.isPending}
-      >
+      <Button type="submit" disabled={rating < 1 || body.trim().length < 10 || submit.isPending}>
         {submit.isPending ? 'Submitting...' : 'Submit review'}
       </Button>
     </form>
