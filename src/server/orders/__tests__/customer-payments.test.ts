@@ -18,8 +18,6 @@ import { paymentsService } from '@/server/payments/payments.service';
 
 import { ordersService } from '../orders.service';
 
-const TEST_TIMEOUT = 60_000;
-
 const SENSITIVE = [
   'rawPayload',
   'bankRef',
@@ -32,7 +30,7 @@ const SENSITIVE = [
 
 afterEach(async () => {
   await cleanupCheckoutFixtures();
-}, TEST_TIMEOUT);
+});
 
 /** A fee-pending COD order whose payment row carries every internal field. */
 async function loadedOrder() {
@@ -61,66 +59,50 @@ function expectCustomerShape(payment: Record<string, unknown>) {
 }
 
 describe('customer order responses', () => {
-  it(
-    'getOwned, listByUser and cancelByCustomer return trimmed payments',
-    async () => {
-      const { userId, order, payment } = await loadedOrder();
+  it('getOwned, listByUser and cancelByCustomer return trimmed payments', async () => {
+    const { userId, order, payment } = await loadedOrder();
 
-      const detail = await ordersService.getOwned(userId, order.id);
-      expect(detail.payments).toHaveLength(1);
-      expectCustomerShape(detail.payments[0]);
-      expect(detail.payments[0].id).toBe(payment.id);
-      expect(detail.payments[0].feeStatus).toBe(CodFeeStatus.PENDING);
-      expect(detail.payments[0].feeCents).toBe(10_000);
+    const detail = await ordersService.getOwned(userId, order.id);
+    expect(detail.payments).toHaveLength(1);
+    expectCustomerShape(detail.payments[0]);
+    expect(detail.payments[0].id).toBe(payment.id);
+    expect(detail.payments[0].feeStatus).toBe(CodFeeStatus.PENDING);
+    expect(detail.payments[0].feeCents).toBe(10_000);
 
-      const list = await ordersService.listByUser(userId);
-      expectCustomerShape(list[0].payments[0]);
+    const list = await ordersService.listByUser(userId);
+    expectCustomerShape(list[0].payments[0]);
 
-      const cancelled = await ordersService.cancelByCustomer(userId, order.id, 'changed my mind');
-      expectCustomerShape(cancelled!.payments[0]);
-    },
-    TEST_TIMEOUT,
-  );
+    const cancelled = await ordersService.cancelByCustomer(userId, order.id, 'changed my mind');
+    expectCustomerShape(cancelled!.payments[0]);
+  });
 
-  it(
-    'the customer txn-id response carries no internal fields',
-    async () => {
-      const { userId, payment } = await loadedOrder();
+  it('the customer txn-id response carries no internal fields', async () => {
+    const { userId, payment } = await loadedOrder();
 
-      const updated = await paymentsService.submitCustomerTxnId(userId, payment.id, 'abc12345');
+    const updated = await paymentsService.submitCustomerTxnId(userId, payment.id, 'abc12345');
 
-      expectCustomerShape(updated);
-      expect(updated.customerTxnId).toBe('ABC12345');
-    },
-    TEST_TIMEOUT,
-  );
+    expectCustomerShape(updated);
+    expect(updated.customerTxnId).toBe('ABC12345');
+  });
 
-  it(
-    'the bank reference response carries no internal fields',
-    async () => {
-      const { userId, payment } = await createManualOrder({ method: PaymentMethod.BANK_TRANSFER });
-      await prisma.payment.update({
-        where: { id: payment.id },
-        data: { rawPayload: { gateway: 'secret-internals' } },
-      });
+  it('the bank reference response carries no internal fields', async () => {
+    const { userId, payment } = await createManualOrder({ method: PaymentMethod.BANK_TRANSFER });
+    await prisma.payment.update({
+      where: { id: payment.id },
+      data: { rawPayload: { gateway: 'secret-internals' } },
+    });
 
-      const updated = await paymentsService.submitBankReference(userId, payment.id, 'BANKREF0001');
+    const updated = await paymentsService.submitBankReference(userId, payment.id, 'BANKREF0001');
 
-      expectCustomerShape(updated);
-    },
-    TEST_TIMEOUT,
-  );
+    expectCustomerShape(updated);
+  });
 
-  it(
-    'admin order detail keeps the full payment row',
-    async () => {
-      const { order } = await loadedOrder();
+  it('admin order detail keeps the full payment row', async () => {
+    const { order } = await loadedOrder();
 
-      const detail = await ordersService.getAdmin(order.id);
+    const detail = await ordersService.getAdmin(order.id);
 
-      for (const key of SENSITIVE) expect(detail.payments[0], key).toHaveProperty(key);
-      expect(detail.payments[0].bankRef).toBe('INTERNALREF1');
-    },
-    TEST_TIMEOUT,
-  );
+    for (const key of SENSITIVE) expect(detail.payments[0], key).toHaveProperty(key);
+    expect(detail.payments[0].bankRef).toBe('INTERNALREF1');
+  });
 });

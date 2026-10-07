@@ -1,6 +1,7 @@
 import { CodFeeStatus, CodFeeType } from '@prisma/client';
 
 import type { CodFeeRule } from '@/contracts/payment-settings';
+import { adminClause } from '@/lib/contact-admin';
 import { formatBDT } from '@/server/common/money';
 
 /**
@@ -63,6 +64,17 @@ export function dueOnDeliveryCents(input: {
   return credited ? input.totalCents - input.feeCents : input.totalCents;
 }
 
+/**
+ * Fee states where the admin has not (yet) accepted the fee: it is still
+ * expected, or was rejected and may yet be paid, so the txn id can be set,
+ * the fee verified, or the fee waived by confirming the order.
+ */
+export const FEE_UNVERIFIED_STATUSES = [CodFeeStatus.PENDING, CodFeeStatus.REJECTED] as const;
+
+export function isFeeUnverified(status: CodFeeStatus): boolean {
+  return (FEE_UNVERIFIED_STATUSES as readonly CodFeeStatus[]).includes(status);
+}
+
 /** Human-readable rule text, e.g. `flat Tk 100` or `25% = Tk 130`. */
 export function describeCodFeeRule(rule: CodFeeRule, feeCents: number): string {
   return rule.type === CodFeeType.PERCENT
@@ -83,8 +95,6 @@ export interface CodFeeWarningInput extends CodFeeRule {
  */
 export function buildCodFeeWarning(input: CodFeeWarningInput): string {
   const rule = describeCodFeeRule({ type: input.type, value: input.value }, input.feeCents);
-  const action = input.contactNumber
-    ? `Pay or contact admin at ${input.contactNumber}.`
-    : 'Pay or contact admin.';
+  const action = `Pay or ${adminClause(input.contactNumber)}.`;
   return `This order requires a confirmation fee (${rule}) to be confirmed. ${action}`;
 }

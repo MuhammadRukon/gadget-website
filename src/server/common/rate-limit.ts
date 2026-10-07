@@ -84,6 +84,30 @@ export async function enforceRateLimit(key: string, policy: RateLimitPolicy): Pr
   if (!result.ok) throw new RateLimitedError(result.resetAt);
 }
 
+const USER_RATE_WINDOW_MS = 10 * 60 * 1000;
+
+/**
+ * Two-tier cap for an authenticated per-user endpoint: first a tight
+ * `${prefix}:${userId}:${ip}` bucket (10 per 10 min), then a looser
+ * `${prefix}-user:${userId}` bucket (30 per 10 min) so rotating IPs does not
+ * evade the first. Sequential on purpose: the second bucket is only charged
+ * when the first passes.
+ */
+export async function enforceUserRateLimits(
+  prefix: string,
+  userId: string,
+  request: Request,
+): Promise<void> {
+  await enforceRateLimit(`${prefix}:${userId}:${clientIp(request)}`, {
+    max: 10,
+    windowMs: USER_RATE_WINDOW_MS,
+  });
+  await enforceRateLimit(`${prefix}-user:${userId}`, {
+    max: 30,
+    windowMs: USER_RATE_WINDOW_MS,
+  });
+}
+
 /**
  * Drop the bucket for a key. Call after a successful action (login,
  * password change) so a run of failures doesn't count against the user

@@ -10,37 +10,27 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { CheckoutInput } from '@/contracts/checkout';
 import { prisma } from '@/lib/prisma';
-import { BadRequestError, ConflictError, TxnIdDuplicateError, statusFromError } from '@/server/common/errors';
+import {
+  BadRequestError,
+  ConflictError,
+  TxnIdDuplicateError,
+  statusFromError,
+} from '@/server/common/errors';
 
 import { checkoutService } from '../checkout.service';
 import {
   cleanupCheckoutFixtures,
+  clearGatewayEnv,
   createCheckoutFixture,
   deletePaymentSettings,
+  eventsFor,
   setPaymentSettings,
 } from './fixtures';
-
-const TEST_TIMEOUT = 60_000;
 
 afterEach(async () => {
   vi.unstubAllEnvs();
   await cleanupCheckoutFixtures();
-}, TEST_TIMEOUT);
-
-const GATEWAY_ENV_KEYS = [
-  'BKASH_BASE_URL',
-  'BKASH_APP_KEY',
-  'BKASH_APP_SECRET',
-  'BKASH_USERNAME',
-  'BKASH_PASSWORD',
-  'SSLCOMMERZ_STORE_ID',
-  'SSLCOMMERZ_STORE_PASSWORD',
-];
-
-/** Blank values are falsy, so every gateway reads as "no credentials". */
-function clearGatewayEnv() {
-  for (const key of GATEWAY_ENV_KEYS) vi.stubEnv(key, '');
-}
+});
 
 const FEE_ON = {
   codFeeEnabled: true,
@@ -53,141 +43,113 @@ function codInput(addressId: string, extra: Partial<CheckoutInput> = {}): Checko
   return { addressId, paymentMethod: 'COD', ...extra };
 }
 
-async function eventsFor(orderId: string) {
-  return prisma.orderEvent.findMany({ where: { orderId }, orderBy: { createdAt: 'asc' } });
-}
-
 describe('placeOrder: COD confirmation fee', () => {
-  it(
-    'fee off: auto-confirms exactly as before',
-    async () => {
-      await setPaymentSettings({ codFeeEnabled: false });
-      const fx = await createCheckoutFixture({ stock: 5, cartQty: 1 });
+  it('fee off: auto-confirms exactly as before', async () => {
+    await setPaymentSettings({ codFeeEnabled: false });
+    const fx = await createCheckoutFixture({ stock: 5, cartQty: 1 });
 
-      const { order, feeRequired } = await checkoutService.placeOrder(
-        fx.user.id,
-        codInput(fx.address.id),
-      );
+    const { order, feeRequired } = await checkoutService.placeOrder(
+      fx.user.id,
+      codInput(fx.address.id),
+    );
 
-      expect(feeRequired).toBe(false);
-      const row = await prisma.order.findUniqueOrThrow({
-        where: { id: order.id },
-        include: { payments: true },
-      });
-      expect(row.status).toBe(OrderStatus.CONFIRMED);
-      expect(row.codFeeCents).toBe(0);
-      expect(row.payments[0].feeStatus).toBe(CodFeeStatus.NONE);
-      expect(row.payments[0].feeCents).toBe(0);
-      const notes = (await eventsFor(order.id)).map((e) => e.note ?? '');
-      expect(notes.some((n) => n.includes('COD order auto-confirmed'))).toBe(true);
-    },
-    TEST_TIMEOUT,
-  );
+    expect(feeRequired).toBe(false);
+    const row = await prisma.order.findUniqueOrThrow({
+      where: { id: order.id },
+      include: { payments: true },
+    });
+    expect(row.status).toBe(OrderStatus.CONFIRMED);
+    expect(row.codFeeCents).toBe(0);
+    expect(row.payments[0].feeStatus).toBe(CodFeeStatus.NONE);
+    expect(row.payments[0].feeCents).toBe(0);
+    const notes = (await eventsFor(order.id)).map((e) => e.note ?? '');
+    expect(notes.some((n) => n.includes('COD order auto-confirmed'))).toBe(true);
+  });
 
-  it(
-    'flat fee: order stays PENDING, fee snapshotted, amount unchanged, no CONFIRMED event',
-    async () => {
-      await setPaymentSettings(FEE_ON);
-      const fx = await createCheckoutFixture({ stock: 5, cartQty: 1 });
+  it('flat fee: order stays PENDING, fee snapshotted, amount unchanged, no CONFIRMED event', async () => {
+    await setPaymentSettings(FEE_ON);
+    const fx = await createCheckoutFixture({ stock: 5, cartQty: 1 });
 
-      const { order, feeRequired } = await checkoutService.placeOrder(
-        fx.user.id,
-        codInput(fx.address.id),
-      );
+    const { order, feeRequired } = await checkoutService.placeOrder(
+      fx.user.id,
+      codInput(fx.address.id),
+    );
 
-      expect(feeRequired).toBe(true);
-      const row = await prisma.order.findUniqueOrThrow({
-        where: { id: order.id },
-        include: { payments: true },
-      });
-      const payment = row.payments[0];
-      expect(row.status).toBe(OrderStatus.PENDING);
-      expect(row.codFeeCents).toBe(10_000);
-      expect(payment.feeCents).toBe(10_000);
-      expect(payment.feeType).toBe(CodFeeType.FLAT);
-      expect(payment.feeValue).toBe(10_000);
-      expect(payment.feeStatus).toBe(CodFeeStatus.PENDING);
-      expect(payment.amountCents).toBe(row.totalCents);
+    expect(feeRequired).toBe(true);
+    const row = await prisma.order.findUniqueOrThrow({
+      where: { id: order.id },
+      include: { payments: true },
+    });
+    const payment = row.payments[0];
+    expect(row.status).toBe(OrderStatus.PENDING);
+    expect(row.codFeeCents).toBe(10_000);
+    expect(payment.feeCents).toBe(10_000);
+    expect(payment.feeType).toBe(CodFeeType.FLAT);
+    expect(payment.feeValue).toBe(10_000);
+    expect(payment.feeStatus).toBe(CodFeeStatus.PENDING);
+    expect(payment.amountCents).toBe(row.totalCents);
 
-      const events = await eventsFor(order.id);
-      expect(events).toHaveLength(2);
-      expect(events.every((e) => e.status === OrderStatus.PENDING)).toBe(true);
-      expect(events.map((e) => e.note).sort()).toEqual(
-        ['COD confirmation fee pending', 'Order placed'].sort(),
-      );
-      expect(events.some((e) => e.status === OrderStatus.CONFIRMED)).toBe(false);
-    },
-    TEST_TIMEOUT,
-  );
+    const events = await eventsFor(order.id);
+    expect(events).toHaveLength(2);
+    expect(events.every((e) => e.status === OrderStatus.PENDING)).toBe(true);
+    expect(events.map((e) => e.note).sort()).toEqual(
+      ['COD confirmation fee pending', 'Order placed'].sort(),
+    );
+    expect(events.some((e) => e.status === OrderStatus.CONFIRMED)).toBe(false);
+  });
 
-  it(
-    'percent fee rounds up to the next 10 BDT (total 49840 -> 13000)',
-    async () => {
-      await setPaymentSettings({ ...FEE_ON, codFeeType: CodFeeType.PERCENT, codFeeValue: 25 });
-      // 43840 + 6000 Dhaka shipping = 49840
-      const fx = await createCheckoutFixture({ stock: 5, cartQty: 1, unitPriceCents: 43_840 });
+  it('percent fee rounds up to the next 10 BDT (total 49840 -> 13000)', async () => {
+    await setPaymentSettings({ ...FEE_ON, codFeeType: CodFeeType.PERCENT, codFeeValue: 25 });
+    // 43840 + 6000 Dhaka shipping = 49840
+    const fx = await createCheckoutFixture({ stock: 5, cartQty: 1, unitPriceCents: 43_840 });
 
-      const { order } = await checkoutService.placeOrder(fx.user.id, codInput(fx.address.id));
+    const { order } = await checkoutService.placeOrder(fx.user.id, codInput(fx.address.id));
 
-      expect(order.totalCents).toBe(49_840);
-      const payment = await prisma.payment.findFirstOrThrow({ where: { orderId: order.id } });
-      expect(payment.feeCents).toBe(13_000);
-      expect(payment.feeType).toBe(CodFeeType.PERCENT);
-      expect(payment.feeValue).toBe(25);
-    },
-    TEST_TIMEOUT,
-  );
+    expect(order.totalCents).toBe(49_840);
+    const payment = await prisma.payment.findFirstOrThrow({ where: { orderId: order.id } });
+    expect(payment.feeCents).toBe(13_000);
+    expect(payment.feeType).toBe(CodFeeType.PERCENT);
+    expect(payment.feeValue).toBe(25);
+  });
 
-  it(
-    'caps the fee at the order total (total 6000, flat 10000 -> 6000)',
-    async () => {
-      await setPaymentSettings(FEE_ON);
-      // Free item + 6000 Dhaka shipping = 6000
-      const fx = await createCheckoutFixture({ stock: 5, cartQty: 1, unitPriceCents: 0 });
+  it('caps the fee at the order total (total 6000, flat 10000 -> 6000)', async () => {
+    await setPaymentSettings(FEE_ON);
+    // Free item + 6000 Dhaka shipping = 6000
+    const fx = await createCheckoutFixture({ stock: 5, cartQty: 1, unitPriceCents: 0 });
 
-      const { order } = await checkoutService.placeOrder(fx.user.id, codInput(fx.address.id));
+    const { order } = await checkoutService.placeOrder(fx.user.id, codInput(fx.address.id));
 
-      expect(order.totalCents).toBe(6_000);
-      const payment = await prisma.payment.findFirstOrThrow({ where: { orderId: order.id } });
-      expect(payment.feeCents).toBe(6_000);
-      expect(order.status).toBe(OrderStatus.PENDING);
-    },
-    TEST_TIMEOUT,
-  );
+    expect(order.totalCents).toBe(6_000);
+    const payment = await prisma.payment.findFirstOrThrow({ where: { orderId: order.id } });
+    expect(payment.feeCents).toBe(6_000);
+    expect(order.status).toBe(OrderStatus.PENDING);
+  });
 
-  it(
-    'snapshots the rule: later settings changes do not alter a placed order',
-    async () => {
-      await setPaymentSettings({ ...FEE_ON, codFeeType: CodFeeType.PERCENT, codFeeValue: 25 });
-      const fx = await createCheckoutFixture({ stock: 5, cartQty: 1, unitPriceCents: 43_840 });
-      const { order } = await checkoutService.placeOrder(fx.user.id, codInput(fx.address.id));
-      const before = await prisma.payment.findFirstOrThrow({ where: { orderId: order.id } });
+  it('snapshots the rule: later settings changes do not alter a placed order', async () => {
+    await setPaymentSettings({ ...FEE_ON, codFeeType: CodFeeType.PERCENT, codFeeValue: 25 });
+    const fx = await createCheckoutFixture({ stock: 5, cartQty: 1, unitPriceCents: 43_840 });
+    const { order } = await checkoutService.placeOrder(fx.user.id, codInput(fx.address.id));
+    const before = await prisma.payment.findFirstOrThrow({ where: { orderId: order.id } });
 
-      await setPaymentSettings({ ...FEE_ON, codFeeType: CodFeeType.FLAT, codFeeValue: 5_000 });
+    await setPaymentSettings({ ...FEE_ON, codFeeType: CodFeeType.FLAT, codFeeValue: 5_000 });
 
-      const after = await prisma.payment.findFirstOrThrow({ where: { orderId: order.id } });
-      expect(after.feeType).toBe(CodFeeType.PERCENT);
-      expect(after.feeValue).toBe(25);
-      expect(after.feeCents).toBe(before.feeCents);
-      expect(after.feeCents).toBe(13_000);
-    },
-    TEST_TIMEOUT,
-  );
+    const after = await prisma.payment.findFirstOrThrow({ where: { orderId: order.id } });
+    expect(after.feeType).toBe(CodFeeType.PERCENT);
+    expect(after.feeValue).toBe(25);
+    expect(after.feeCents).toBe(before.feeCents);
+    expect(after.feeCents).toBe(13_000);
+  });
 
-  it(
-    'missing settings row: COD succeeds on defaults (auto-confirmed, no fee)',
-    async () => {
-      await deletePaymentSettings();
-      const fx = await createCheckoutFixture({ stock: 5, cartQty: 1 });
+  it('missing settings row: COD succeeds on defaults (auto-confirmed, no fee)', async () => {
+    await deletePaymentSettings();
+    const fx = await createCheckoutFixture({ stock: 5, cartQty: 1 });
 
-      const { order } = await checkoutService.placeOrder(fx.user.id, codInput(fx.address.id));
+    const { order } = await checkoutService.placeOrder(fx.user.id, codInput(fx.address.id));
 
-      const row = await prisma.order.findUniqueOrThrow({ where: { id: order.id } });
-      expect(row.status).toBe(OrderStatus.CONFIRMED);
-      expect(row.codFeeCents).toBe(0);
-    },
-    TEST_TIMEOUT,
-  );
+    const row = await prisma.order.findUniqueOrThrow({ where: { id: order.id } });
+    expect(row.status).toBe(OrderStatus.CONFIRMED);
+    expect(row.codFeeCents).toBe(0);
+  });
 });
 
 describe('placeOrder: payment method enforcement', () => {
@@ -207,208 +169,164 @@ describe('placeOrder: payment method enforcement', () => {
     expect(variant.stock).toBe(5);
   }
 
-  it(
-    'bkashEnabled=false: BKASH is rejected, nothing created or consumed',
-    async () => {
-      clearGatewayEnv();
-      await setPaymentSettings({ bkashEnabled: false });
-      const fx = await createCheckoutFixture({ stock: 5, cartQty: 1 });
-      await expectRejectedUntouched(fx, 'BKASH');
-    },
-    TEST_TIMEOUT,
-  );
+  it('bkashEnabled=false: BKASH is rejected, nothing created or consumed', async () => {
+    clearGatewayEnv();
+    await setPaymentSettings({ bkashEnabled: false });
+    const fx = await createCheckoutFixture({ stock: 5, cartQty: 1 });
+    await expectRejectedUntouched(fx, 'BKASH');
+  });
 
-  it(
-    'bkashEnabled=true without credentials is rejected the same way',
-    async () => {
-      clearGatewayEnv();
-      await setPaymentSettings({ bkashEnabled: true });
-      const fx = await createCheckoutFixture({ stock: 5, cartQty: 1 });
-      await expectRejectedUntouched(fx, 'BKASH');
-    },
-    TEST_TIMEOUT,
-  );
+  it('bkashEnabled=true without credentials is rejected the same way', async () => {
+    clearGatewayEnv();
+    await setPaymentSettings({ bkashEnabled: true });
+    const fx = await createCheckoutFixture({ stock: 5, cartQty: 1 });
+    await expectRejectedUntouched(fx, 'BKASH');
+  });
 
-  it(
-    'codEnabled=false: COD is rejected',
-    async () => {
-      clearGatewayEnv();
-      await setPaymentSettings({ codEnabled: false, bankTransferEnabled: true });
-      const fx = await createCheckoutFixture({ stock: 5, cartQty: 1 });
-      await expectRejectedUntouched(fx, 'COD');
-    },
-    TEST_TIMEOUT,
-  );
+  it('codEnabled=false: COD is rejected', async () => {
+    clearGatewayEnv();
+    await setPaymentSettings({ codEnabled: false, bankTransferEnabled: true });
+    const fx = await createCheckoutFixture({ stock: 5, cartQty: 1 });
+    await expectRejectedUntouched(fx, 'COD');
+  });
 
-  it(
-    'an enabled non-COD method is allowed and gets no fee',
-    async () => {
-      await setPaymentSettings({ ...FEE_ON, bankTransferEnabled: true });
-      const fx = await createCheckoutFixture({ stock: 5, cartQty: 1 });
+  it('an enabled non-COD method is allowed and gets no fee', async () => {
+    await setPaymentSettings({ ...FEE_ON, bankTransferEnabled: true });
+    const fx = await createCheckoutFixture({ stock: 5, cartQty: 1 });
 
-      const { order, feeRequired } = await checkoutService.placeOrder(fx.user.id, {
-        addressId: fx.address.id,
-        paymentMethod: 'BANK_TRANSFER',
-      });
+    const { order, feeRequired } = await checkoutService.placeOrder(fx.user.id, {
+      addressId: fx.address.id,
+      paymentMethod: 'BANK_TRANSFER',
+    });
 
-      expect(feeRequired).toBe(false);
-      const row = await prisma.order.findUniqueOrThrow({
-        where: { id: order.id },
-        include: { payments: true },
-      });
-      expect(row.status).toBe(OrderStatus.PENDING);
-      expect(row.codFeeCents).toBe(0);
-      expect(row.payments[0].feeStatus).toBe(CodFeeStatus.NONE);
-    },
-    TEST_TIMEOUT,
-  );
+    expect(feeRequired).toBe(false);
+    const row = await prisma.order.findUniqueOrThrow({
+      where: { id: order.id },
+      include: { payments: true },
+    });
+    expect(row.status).toBe(OrderStatus.PENDING);
+    expect(row.codFeeCents).toBe(0);
+    expect(row.payments[0].feeStatus).toBe(CodFeeStatus.NONE);
+  });
 });
 
 describe('placeOrder: customer transaction id', () => {
-  it(
-    'stores a messy id normalized (trim + uppercase) with txnSubmittedAt',
-    async () => {
-      await setPaymentSettings(FEE_ON);
-      const fx = await createCheckoutFixture({ stock: 5, cartQty: 1 });
+  it('stores a messy id normalized (trim + uppercase) with txnSubmittedAt', async () => {
+    await setPaymentSettings(FEE_ON);
+    const fx = await createCheckoutFixture({ stock: 5, cartQty: 1 });
 
-      const { order } = await checkoutService.placeOrder(
-        fx.user.id,
-        codInput(fx.address.id, { customerTxnId: ' abc12345 ' }),
-      );
+    const { order } = await checkoutService.placeOrder(
+      fx.user.id,
+      codInput(fx.address.id, { customerTxnId: ' abc12345 ' }),
+    );
 
-      const payment = await prisma.payment.findFirstOrThrow({ where: { orderId: order.id } });
-      expect(payment.customerTxnId).toBe('ABC12345');
-      expect(payment.txnSubmittedAt).not.toBeNull();
-    },
-    TEST_TIMEOUT,
-  );
+    const payment = await prisma.payment.findFirstOrThrow({ where: { orderId: order.id } });
+    expect(payment.customerTxnId).toBe('ABC12345');
+    expect(payment.txnSubmittedAt).not.toBeNull();
+  });
 
-  it(
-    'a duplicate id throws TXN_ID_DUPLICATE, creates no order, leaves the cart intact',
-    async () => {
-      await setPaymentSettings(FEE_ON);
-      const fx = await createCheckoutFixture({ stock: 5, cartQty: 1 });
-      const other = await fx.addShopper(1);
-      const first = await checkoutService.placeOrder(
-        fx.user.id,
-        codInput(fx.address.id, { customerTxnId: 'DUP123456' }),
-      );
+  it('a duplicate id throws TXN_ID_DUPLICATE, creates no order, leaves the cart intact', async () => {
+    await setPaymentSettings(FEE_ON);
+    const fx = await createCheckoutFixture({ stock: 5, cartQty: 1 });
+    const other = await fx.addShopper(1);
+    const first = await checkoutService.placeOrder(
+      fx.user.id,
+      codInput(fx.address.id, { customerTxnId: 'DUP123456' }),
+    );
 
-      const err = await checkoutService
-        .placeOrder(other.user.id, codInput(other.address.id, { customerTxnId: 'dup123456' }))
-        .catch((e) => e);
+    const err = await checkoutService
+      .placeOrder(other.user.id, codInput(other.address.id, { customerTxnId: 'dup123456' }))
+      .catch((e) => e);
 
-      expect(err).toBeInstanceOf(TxnIdDuplicateError);
-      expect(err).toBeInstanceOf(ConflictError);
-      expect(err.code).toBe('TXN_ID_DUPLICATE');
-      expect(statusFromError(err)).toBe(409);
-      expect(err.meta).toBeUndefined();
-      expect(err.message).not.toContain(first.order.orderNumber);
-      expect(await prisma.order.count({ where: { userId: other.user.id } })).toBe(0);
-      expect(await prisma.cartItem.count({ where: { cart: { userId: other.user.id } } })).toBe(1);
-      const variant = await prisma.productVariant.findUniqueOrThrow({
-        where: { id: fx.variant.id },
-      });
-      expect(variant.stock).toBe(4);
-    },
-    TEST_TIMEOUT,
-  );
+    expect(err).toBeInstanceOf(TxnIdDuplicateError);
+    expect(err).toBeInstanceOf(ConflictError);
+    expect(err.code).toBe('TXN_ID_DUPLICATE');
+    expect(statusFromError(err)).toBe(409);
+    expect(err.meta).toBeUndefined();
+    expect(err.message).not.toContain(first.order.orderNumber);
+    expect(await prisma.order.count({ where: { userId: other.user.id } })).toBe(0);
+    expect(await prisma.cartItem.count({ where: { cart: { userId: other.user.id } } })).toBe(1);
+    const variant = await prisma.productVariant.findUniqueOrThrow({
+      where: { id: fx.variant.id },
+    });
+    expect(variant.stock).toBe(4);
+  });
 
-  it(
-    'fee off: a supplied txn id is ignored (customerTxnId stays NULL)',
-    async () => {
-      await setPaymentSettings({ codFeeEnabled: false });
-      const fx = await createCheckoutFixture({ stock: 5, cartQty: 1 });
+  it('fee off: a supplied txn id is ignored (customerTxnId stays NULL)', async () => {
+    await setPaymentSettings({ codFeeEnabled: false });
+    const fx = await createCheckoutFixture({ stock: 5, cartQty: 1 });
 
-      const { order } = await checkoutService.placeOrder(
-        fx.user.id,
-        codInput(fx.address.id, { customerTxnId: 'ABC12345' }),
-      );
+    const { order } = await checkoutService.placeOrder(
+      fx.user.id,
+      codInput(fx.address.id, { customerTxnId: 'ABC12345' }),
+    );
 
-      const payment = await prisma.payment.findFirstOrThrow({ where: { orderId: order.id } });
-      expect(payment.customerTxnId).toBeNull();
-      expect(payment.txnSubmittedAt).toBeNull();
-    },
-    TEST_TIMEOUT,
-  );
+    const payment = await prisma.payment.findFirstOrThrow({ where: { orderId: order.id } });
+    expect(payment.customerTxnId).toBeNull();
+    expect(payment.txnSubmittedAt).toBeNull();
+  });
 });
 
 describe('checkoutService.quote: COD fee', () => {
-  it(
-    'COD with the fee on returns fee, due-on-delivery and rule; total unchanged',
-    async () => {
-      await setPaymentSettings(FEE_ON);
-      const fx = await createCheckoutFixture({ stock: 5, cartQty: 1 });
+  it('COD with the fee on returns fee, due-on-delivery and rule; total unchanged', async () => {
+    await setPaymentSettings(FEE_ON);
+    const fx = await createCheckoutFixture({ stock: 5, cartQty: 1 });
 
-      const quote = await checkoutService.quote({
+    const quote = await checkoutService.quote({
+      userId: fx.user.id,
+      addressId: fx.address.id,
+      paymentMethod: 'COD',
+    });
+
+    expect(quote.codFeeCents).toBe(10_000);
+    expect(quote.dueOnDeliveryCents).toBe(quote.totalCents - 10_000);
+    expect(quote.codFeeRule).toEqual({ type: CodFeeType.FLAT, value: 10_000 });
+  });
+
+  it('omitting paymentMethod, or BANK_TRANSFER, returns no fee', async () => {
+    await setPaymentSettings({ ...FEE_ON, bankTransferEnabled: true });
+    const fx = await createCheckoutFixture({ stock: 5, cartQty: 1 });
+    const base = { userId: fx.user.id, addressId: fx.address.id };
+
+    for (const paymentMethod of [undefined, 'BANK_TRANSFER' as const]) {
+      const quote = await checkoutService.quote({ ...base, paymentMethod });
+      expect(quote.codFeeCents).toBe(0);
+      expect(quote.dueOnDeliveryCents).toBe(quote.totalCents);
+      expect(quote.codFeeRule).toBeNull();
+    }
+  });
+
+  it('rejects a method that is not currently enabled', async () => {
+    clearGatewayEnv();
+    await setPaymentSettings({ bkashEnabled: true });
+    const fx = await createCheckoutFixture({ stock: 5, cartQty: 1 });
+
+    await expect(
+      checkoutService.quote({
         userId: fx.user.id,
         addressId: fx.address.id,
-        paymentMethod: 'COD',
-      });
+        paymentMethod: 'BKASH',
+      }),
+    ).rejects.toBeInstanceOf(BadRequestError);
+  });
 
-      expect(quote.codFeeCents).toBe(10_000);
-      expect(quote.dueOnDeliveryCents).toBe(quote.totalCents - 10_000);
-      expect(quote.codFeeRule).toEqual({ type: CodFeeType.FLAT, value: 10_000 });
-    },
-    TEST_TIMEOUT,
-  );
+  it('quote total equals placeOrder total for the same cart', async () => {
+    await setPaymentSettings(FEE_ON);
+    const fx = await createCheckoutFixture({ stock: 5, cartQty: 2, couponPerUserLimit: 1 });
+    const code = fx.coupon!.code;
 
-  it(
-    'omitting paymentMethod, or BANK_TRANSFER, returns no fee',
-    async () => {
-      await setPaymentSettings({ ...FEE_ON, bankTransferEnabled: true });
-      const fx = await createCheckoutFixture({ stock: 5, cartQty: 1 });
-      const base = { userId: fx.user.id, addressId: fx.address.id };
+    const quote = await checkoutService.quote({
+      userId: fx.user.id,
+      addressId: fx.address.id,
+      couponCode: code,
+      paymentMethod: 'COD',
+    });
+    const { order } = await checkoutService.placeOrder(
+      fx.user.id,
+      codInput(fx.address.id, { couponCode: code }),
+    );
 
-      for (const paymentMethod of [undefined, 'BANK_TRANSFER' as const]) {
-        const quote = await checkoutService.quote({ ...base, paymentMethod });
-        expect(quote.codFeeCents).toBe(0);
-        expect(quote.dueOnDeliveryCents).toBe(quote.totalCents);
-        expect(quote.codFeeRule).toBeNull();
-      }
-    },
-    TEST_TIMEOUT,
-  );
-
-  it(
-    'rejects a method that is not currently enabled',
-    async () => {
-      clearGatewayEnv();
-      await setPaymentSettings({ bkashEnabled: true });
-      const fx = await createCheckoutFixture({ stock: 5, cartQty: 1 });
-
-      await expect(
-        checkoutService.quote({
-          userId: fx.user.id,
-          addressId: fx.address.id,
-          paymentMethod: 'BKASH',
-        }),
-      ).rejects.toBeInstanceOf(BadRequestError);
-    },
-    TEST_TIMEOUT,
-  );
-
-  it(
-    'quote total equals placeOrder total for the same cart',
-    async () => {
-      await setPaymentSettings(FEE_ON);
-      const fx = await createCheckoutFixture({ stock: 5, cartQty: 2, couponPerUserLimit: 1 });
-      const code = fx.coupon!.code;
-
-      const quote = await checkoutService.quote({
-        userId: fx.user.id,
-        addressId: fx.address.id,
-        couponCode: code,
-        paymentMethod: 'COD',
-      });
-      const { order } = await checkoutService.placeOrder(
-        fx.user.id,
-        codInput(fx.address.id, { couponCode: code }),
-      );
-
-      expect(order.totalCents).toBe(quote.totalCents);
-      expect(order.codFeeCents).toBe(quote.codFeeCents);
-    },
-    TEST_TIMEOUT,
-  );
+    expect(order.totalCents).toBe(quote.totalCents);
+    expect(order.codFeeCents).toBe(quote.codFeeCents);
+  });
 });

@@ -20,7 +20,6 @@ export const checkoutQuoteSchema = z.object({
   couponCode: z.string().optional(),
   paymentMethod: paymentMethodSchema.optional(),
 });
-export type CheckoutQuoteInput = z.infer<typeof checkoutQuoteSchema>;
 
 export const stockConflictMetaSchema = z.object({
   variantId: z.string(),

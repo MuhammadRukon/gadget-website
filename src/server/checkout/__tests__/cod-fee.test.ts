@@ -8,6 +8,7 @@ import {
   computeCodConfirmationFee,
   describeCodFeeRule,
   dueOnDeliveryCents,
+  isFeeUnverified,
 } from '../cod-fee';
 
 const FLAT = CodFeeType.FLAT;
@@ -141,5 +142,15 @@ describe('dueOnDeliveryCents', () => {
     expect(dueOnDeliveryCents({ ...base, feeStatus: CodFeeStatus.WAIVED })).toBe(500_000);
     expect(dueOnDeliveryCents({ ...base, feeStatus: CodFeeStatus.REJECTED })).toBe(500_000);
     expect(dueOnDeliveryCents({ ...base, feeStatus: CodFeeStatus.NONE })).toBe(500_000);
+  });
+});
+
+describe('isFeeUnverified', () => {
+  it('is true only for PENDING and REJECTED', () => {
+    expect(isFeeUnverified(CodFeeStatus.PENDING)).toBe(true);
+    expect(isFeeUnverified(CodFeeStatus.REJECTED)).toBe(true);
+    expect(isFeeUnverified(CodFeeStatus.VERIFIED)).toBe(false);
+    expect(isFeeUnverified(CodFeeStatus.WAIVED)).toBe(false);
+    expect(isFeeUnverified(CodFeeStatus.NONE)).toBe(false);
   });
 });

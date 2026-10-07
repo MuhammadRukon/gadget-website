@@ -19,7 +19,6 @@ import { gatewayConfigured } from '@/server/payments/registry';
 
 import { GET, PUT } from '@/app/api/admin/settings/payments/route';
 
-const TEST_TIMEOUT = 60_000;
 const mockedAuth = vi.mocked(auth) as unknown as ReturnType<typeof vi.fn>;
 
 function signInAs(id: string, role: 'ADMIN' | 'CUSTOMER') {
@@ -55,158 +54,126 @@ beforeEach(() => {
 afterEach(async () => {
   mockedAuth.mockReset();
   await cleanupCheckoutFixtures();
-}, TEST_TIMEOUT);
+});
 
 describe('GET /api/admin/settings/payments', () => {
-  it(
-    'no session -> 401, customer -> 403',
-    async () => {
-      expect((await GET()).status).toBe(401);
-      signInAs('customer-1', 'CUSTOMER');
-      expect((await GET()).status).toBe(403);
-    },
-    TEST_TIMEOUT,
-  );
+  it('no session -> 401, customer -> 403', async () => {
+    expect((await GET()).status).toBe(401);
+    signInAs('customer-1', 'CUSTOMER');
+    expect((await GET()).status).toBe(403);
+  });
 
-  it(
-    'admin -> 200 with every settings field and boolean gatewayConfigured, no env values',
-    async () => {
-      await setPaymentSettings({ contactNumber: '01800000000', paymentNote: 'hello' });
-      const admin = await createAdminUser();
-      signInAs(admin.id, 'ADMIN');
+  it('admin -> 200 with every settings field and boolean gatewayConfigured, no env values', async () => {
+    await setPaymentSettings({ contactNumber: '01800000000', paymentNote: 'hello' });
+    const admin = await createAdminUser();
+    signInAs(admin.id, 'ADMIN');
 
-      const res = await GET();
-      const body = await res.json();
+    const res = await GET();
+    const body = await res.json();
 
-      expect(res.status).toBe(200);
-      expect(res.headers.get('cache-control')).toBe('no-store');
-      expect(Object.keys(body.settings).sort()).toEqual(
-        [
-          'id',
-          'codEnabled',
-          'bkashEnabled',
-          'sslcommerzEnabled',
-          'bankTransferEnabled',
-          'codFeeEnabled',
-          'codFeeType',
-          'codFeeValue',
-          'qrImageUrl',
-          'qrImagePublicId',
-          'contactNumber',
-          'paymentNote',
-          'updatedAt',
-          'updatedById',
-        ].sort(),
-      );
-      expect(body.settings.contactNumber).toBe('01800000000');
-      expect(body.gatewayConfigured).toEqual({
-        COD: true,
-        BANK_TRANSFER: true,
-        BKASH: gatewayConfigured(PaymentMethod.BKASH),
-        SSLCOMMERZ: gatewayConfigured(PaymentMethod.SSLCOMMERZ),
-      });
-      for (const v of Object.values(body.gatewayConfigured)) expect(typeof v).toBe('boolean');
-      for (const secret of [
-        process.env.SSLCOMMERZ_STORE_PASSWORD,
-        process.env.BKASH_PASSWORD,
-        process.env.BKASH_APP_SECRET,
-      ]) {
-        if (secret) expect(JSON.stringify(body)).not.toContain(secret);
-      }
-    },
-    TEST_TIMEOUT,
-  );
+    expect(res.status).toBe(200);
+    expect(res.headers.get('cache-control')).toBe('no-store');
+    expect(Object.keys(body.settings).sort()).toEqual(
+      [
+        'id',
+        'codEnabled',
+        'bkashEnabled',
+        'sslcommerzEnabled',
+        'bankTransferEnabled',
+        'codFeeEnabled',
+        'codFeeType',
+        'codFeeValue',
+        'qrImageUrl',
+        'qrImagePublicId',
+        'contactNumber',
+        'paymentNote',
+        'updatedAt',
+        'updatedById',
+      ].sort(),
+    );
+    expect(body.settings.contactNumber).toBe('01800000000');
+    expect(body.gatewayConfigured).toEqual({
+      COD: true,
+      BANK_TRANSFER: true,
+      BKASH: gatewayConfigured(PaymentMethod.BKASH),
+      SSLCOMMERZ: gatewayConfigured(PaymentMethod.SSLCOMMERZ),
+    });
+    for (const v of Object.values(body.gatewayConfigured)) expect(typeof v).toBe('boolean');
+    for (const secret of [
+      process.env.SSLCOMMERZ_STORE_PASSWORD,
+      process.env.BKASH_PASSWORD,
+      process.env.BKASH_APP_SECRET,
+    ]) {
+      if (secret) expect(JSON.stringify(body)).not.toContain(secret);
+    }
+  });
 });
 
 describe('PUT /api/admin/settings/payments', () => {
-  it(
-    'no session -> 401, customer -> 403',
-    async () => {
-      expect((await PUT(put(VALID))).status).toBe(401);
-      signInAs('customer-2', 'CUSTOMER');
-      expect((await PUT(put(VALID))).status).toBe(403);
-    },
-    TEST_TIMEOUT,
-  );
+  it('no session -> 401, customer -> 403', async () => {
+    expect((await PUT(put(VALID))).status).toBe(401);
+    signInAs('customer-2', 'CUSTOMER');
+    expect((await PUT(put(VALID))).status).toBe(403);
+  });
 
-  it(
-    'a valid body -> 200 and the row reads back with updatedById',
-    async () => {
-      await setPaymentSettings();
-      const admin = await createAdminUser();
-      signInAs(admin.id, 'ADMIN');
+  it('a valid body -> 200 and the row reads back with updatedById', async () => {
+    await setPaymentSettings();
+    const admin = await createAdminUser();
+    signInAs(admin.id, 'ADMIN');
 
-      const res = await PUT(put(VALID));
+    const res = await PUT(put(VALID));
 
-      expect(res.status).toBe(200);
-      const row = await prisma.paymentSettings.findUniqueOrThrow({ where: { id: 'singleton' } });
-      expect(row.bankTransferEnabled).toBe(true);
-      expect(row.codFeeEnabled).toBe(true);
-      expect(row.codFeeValue).toBe(10_000);
-      expect(row.contactNumber).toBe('01800000000');
-      expect(row.paymentNote).toBe('Send to this number');
-      expect(row.updatedById).toBe(admin.id);
-      expect((await res.json()).settings.codFeeValue).toBe(10_000);
-    },
-    TEST_TIMEOUT,
-  );
+    expect(res.status).toBe(200);
+    const row = await prisma.paymentSettings.findUniqueOrThrow({ where: { id: 'singleton' } });
+    expect(row.bankTransferEnabled).toBe(true);
+    expect(row.codFeeEnabled).toBe(true);
+    expect(row.codFeeValue).toBe(10_000);
+    expect(row.contactNumber).toBe('01800000000');
+    expect(row.paymentNote).toBe('Send to this number');
+    expect(row.updatedById).toBe(admin.id);
+    expect((await res.json()).settings.codFeeValue).toBe(10_000);
+  });
 
-  it(
-    'all four methods off -> 400 with a message',
-    async () => {
-      await setPaymentSettings();
-      const admin = await createAdminUser();
-      signInAs(admin.id, 'ADMIN');
+  it('all four methods off -> 400 with a message', async () => {
+    await setPaymentSettings();
+    const admin = await createAdminUser();
+    signInAs(admin.id, 'ADMIN');
 
-      const res = await PUT(
-        put({ ...VALID, codEnabled: false, bankTransferEnabled: false, codFeeEnabled: false }),
-      );
-      const body = await res.json();
+    const res = await PUT(
+      put({ ...VALID, codEnabled: false, bankTransferEnabled: false, codFeeEnabled: false }),
+    );
+    const body = await res.json();
 
-      expect(res.status).toBe(400);
-      expect(body.message).toMatch(/at least one payment method/i);
-    },
-    TEST_TIMEOUT,
-  );
+    expect(res.status).toBe(400);
+    expect(body.message).toMatch(/at least one payment method/i);
+  });
 
-  it(
-    'PERCENT value 0 -> 422 VALIDATION_ERROR',
-    async () => {
-      const admin = await createAdminUser();
-      signInAs(admin.id, 'ADMIN');
+  it('PERCENT value 0 -> 422 VALIDATION_ERROR', async () => {
+    const admin = await createAdminUser();
+    signInAs(admin.id, 'ADMIN');
 
-      const res = await PUT(put({ ...VALID, codFeeType: CodFeeType.PERCENT, codFeeValue: 0 }));
+    const res = await PUT(put({ ...VALID, codFeeType: CodFeeType.PERCENT, codFeeValue: 0 }));
 
-      expect(res.status).toBe(422);
-      expect((await res.json()).code).toBe('VALIDATION_ERROR');
-    },
-    TEST_TIMEOUT,
-  );
+    expect(res.status).toBe(422);
+    expect((await res.json()).code).toBe('VALIDATION_ERROR');
+  });
 
-  it(
-    'codFeeEnabled=true with codEnabled=false -> 422',
-    async () => {
-      const admin = await createAdminUser();
-      signInAs(admin.id, 'ADMIN');
+  it('codFeeEnabled=true with codEnabled=false -> 422', async () => {
+    const admin = await createAdminUser();
+    signInAs(admin.id, 'ADMIN');
 
-      const res = await PUT(put({ ...VALID, codEnabled: false }));
+    const res = await PUT(put({ ...VALID, codEnabled: false }));
 
-      expect(res.status).toBe(422);
-      expect((await res.json()).code).toBe('VALIDATION_ERROR');
-    },
-    TEST_TIMEOUT,
-  );
+    expect(res.status).toBe(422);
+    expect((await res.json()).code).toBe('VALIDATION_ERROR');
+  });
 
-  it(
-    'a non-Cloudinary qrImageUrl -> 422',
-    async () => {
-      const admin = await createAdminUser();
-      signInAs(admin.id, 'ADMIN');
+  it('a non-Cloudinary qrImageUrl -> 422', async () => {
+    const admin = await createAdminUser();
+    signInAs(admin.id, 'ADMIN');
 
-      const res = await PUT(put({ ...VALID, qrImageUrl: 'https://evil.com/x.png' }));
+    const res = await PUT(put({ ...VALID, qrImageUrl: 'https://evil.com/x.png' }));
 
-      expect(res.status).toBe(422);
-    },
-    TEST_TIMEOUT,
-  );
+    expect(res.status).toBe(422);
+  });
 });

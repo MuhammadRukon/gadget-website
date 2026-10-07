@@ -9,7 +9,7 @@ import { PaymentMethod } from '@prisma/client';
  * sandbox harness, so "configured" must be checked before a gateway is
  * offered to customers.
  */
-export type EnvLike = Readonly<Record<string, string | undefined>>;
+type EnvLike = Readonly<Record<string, string | undefined>>;
 
 const REQUIRED_ENV: Partial<Record<PaymentMethod, readonly string[]>> = {
   [PaymentMethod.BKASH]: [
@@ -21,6 +21,9 @@ const REQUIRED_ENV: Partial<Record<PaymentMethod, readonly string[]>> = {
   ],
   [PaymentMethod.SSLCOMMERZ]: ['SSLCOMMERZ_STORE_ID', 'SSLCOMMERZ_STORE_PASSWORD'],
 };
+
+/** Every gateway credential env var (for tests that need a "no credentials" environment). */
+export const GATEWAY_ENV_KEYS: readonly string[] = Object.values(REQUIRED_ENV).flat();
 
 /** Methods with no entry above (COD, BANK_TRANSFER) need no credentials. */
 export function hasGatewayCreds(method: PaymentMethod, env: EnvLike): boolean {

@@ -1,4 +1,5 @@
-import { txnIdSchema } from '@/contracts/payments';
+import { TXN_ID_MAX, TXN_ID_MIN, txnIdSchema } from '@/contracts/payments';
+import { adminClause } from '@/lib/contact-admin';
 
 export type TxnIdInput =
   | { status: 'empty' }
@@ -16,14 +17,10 @@ export function parseTxnIdInput(raw: string): TxnIdInput {
   return parsed.success ? { status: 'valid', value: parsed.data } : { status: 'invalid' };
 }
 
-export const TXN_ID_FORMAT_HINT = 'Use 6 to 30 letters and numbers, no spaces or symbols.';
+export const TXN_ID_FORMAT_HINT = `Use ${TXN_ID_MIN} to ${TXN_ID_MAX} letters and numbers, no spaces or symbols.`;
 
 export const TXN_CHECK_UNAVAILABLE_MESSAGE =
   'Could not check this transaction ID right now. You can still place your order.';
-
-function adminClause(contactNumber: string | null): string {
-  return contactNumber ? `contact admin at ${contactNumber}` : 'contact admin';
-}
 
 /** Body of the confirm dialog shown before the add-only txn id is submitted. */
 export function buildTxnConfirmText(contactNumber: string | null): string {

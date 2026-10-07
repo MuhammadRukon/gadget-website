@@ -15,7 +15,7 @@ import { gatewayConfigured } from '@/server/payments/registry';
 /** Either the global client or an in-flight `prisma.$transaction` callback client. */
 type Db = typeof prisma | Prisma.TransactionClient;
 
-export const PAYMENT_SETTINGS_ID = 'singleton';
+const PAYMENT_SETTINGS_ID = 'singleton';
 
 /** Folder segment (under CLOUDINARY_FOLDER) the admin uploader uses for the QR. */
 const QR_FOLDER = 'settings';

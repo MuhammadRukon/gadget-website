@@ -1,7 +1,7 @@
 import type { PaymentMethod } from '@prisma/client';
 
 /** Display copy only. Which methods exist is decided by the server (`/api/checkout/config`). */
-export const PAYMENT_METHOD_INFO: Record<PaymentMethod, { label: string; hint?: string }> = {
+export const PAYMENT_METHOD_INFO: Record<PaymentMethod, { label: string }> = {
   COD: { label: 'Cash on delivery (COD)' },
   BKASH: { label: 'bKash' },
   SSLCOMMERZ: { label: 'Card / mobile banking (SSLCommerz)' },

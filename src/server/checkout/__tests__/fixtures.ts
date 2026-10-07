@@ -13,8 +13,10 @@ import {
   type PaymentSettings,
   UserRole,
 } from '@prisma/client';
+import { vi } from 'vitest';
 
 import { prisma } from '@/lib/prisma';
+import { GATEWAY_ENV_KEYS } from '@/server/payments/gateway-creds';
 
 const createdUserIds: string[] = [];
 const createdProductIds: string[] = [];
@@ -42,6 +44,19 @@ async function snapshotSettings() {
       row: await prisma.paymentSettings.findUnique({ where: { id: SETTINGS_ID } }),
     };
   }
+}
+
+/**
+ * Blanks every gateway credential env var so every gateway reads as "no
+ * credentials" (blank values are falsy). Tests must `vi.unstubAllEnvs()` after.
+ */
+export function clearGatewayEnv() {
+  for (const key of GATEWAY_ENV_KEYS) vi.stubEnv(key, '');
+}
+
+/** An order's audit trail, oldest first. */
+export async function eventsFor(orderId: string) {
+  return prisma.orderEvent.findMany({ where: { orderId }, orderBy: { createdAt: 'asc' } });
 }
 
 /** Upserts the singleton as the migration defaults (COD on, fee off) overlaid with `patch`. */

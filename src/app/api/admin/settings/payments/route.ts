@@ -11,12 +11,9 @@ export const dynamic = 'force-dynamic';
 
 /** Booleans only: which methods are usable. Never exposes env values. */
 function gatewayStatus(): Record<PaymentMethod, boolean> {
-  return {
-    [PaymentMethod.COD]: gatewayConfigured(PaymentMethod.COD),
-    [PaymentMethod.BANK_TRANSFER]: gatewayConfigured(PaymentMethod.BANK_TRANSFER),
-    [PaymentMethod.BKASH]: gatewayConfigured(PaymentMethod.BKASH),
-    [PaymentMethod.SSLCOMMERZ]: gatewayConfigured(PaymentMethod.SSLCOMMERZ),
-  };
+  return Object.fromEntries(
+    Object.values(PaymentMethod).map((method) => [method, gatewayConfigured(method)]),
+  ) as Record<PaymentMethod, boolean>;
 }
 
 const NO_STORE = { 'Cache-Control': 'no-store' };

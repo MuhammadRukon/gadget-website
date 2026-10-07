@@ -47,6 +47,20 @@ export function parseCloudinaryUploadUrl(
 
 export const PAYMENT_NOTE_MAX = 500;
 
+/** PERCENT fee bounds (whole percent of the order grand total). */
+export const COD_PERCENT_MIN = 1;
+export const COD_PERCENT_MAX = 100;
+/** FLAT fee is a whole BDT amount: a multiple of this many cents, at least one step. */
+export const COD_FLAT_STEP_CENTS = 100;
+
+/** Whether `value` is an acceptable COD fee for `type` (units per the header comment). */
+export function isValidCodFeeValue(type: CodFeeType, value: number): boolean {
+  if (!Number.isInteger(value)) return false;
+  return type === CodFeeType.PERCENT
+    ? value >= COD_PERCENT_MIN && value <= COD_PERCENT_MAX
+    : value >= COD_FLAT_STEP_CENTS && value % COD_FLAT_STEP_CENTS === 0;
+}
+
 export const codFeeRuleSchema = z.object({
   type: z.enum(CodFeeType),
   value: z.number().int(),
@@ -112,19 +126,14 @@ export const paymentSettingsInputSchema = z
       }
     }
 
-    if (v.codFeeType === CodFeeType.PERCENT) {
-      if (v.codFeeValue < 1 || v.codFeeValue > 100) {
-        ctx.addIssue({
-          code: 'custom',
-          path: ['codFeeValue'],
-          message: 'Percentage must be a whole number from 1 to 100',
-        });
-      }
-    } else if (v.codFeeValue < 100 || v.codFeeValue % 100 !== 0) {
+    if (!isValidCodFeeValue(v.codFeeType, v.codFeeValue)) {
       ctx.addIssue({
         code: 'custom',
         path: ['codFeeValue'],
-        message: 'Flat fee must be a whole BDT amount of at least 1 BDT',
+        message:
+          v.codFeeType === CodFeeType.PERCENT
+            ? 'Percentage must be a whole number from 1 to 100'
+            : 'Flat fee must be a whole BDT amount of at least 1 BDT',
       });
     }
 

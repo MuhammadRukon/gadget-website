@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 
 import { txnCheckSchema, type TxnCheckResult } from '@/contracts/payments';
 import { jsonError, requireSession } from '@/server/common/http';
-import { clientIp, enforceRateLimit } from '@/server/common/rate-limit';
+import { enforceUserRateLimits } from '@/server/common/rate-limit';
 import { paymentsService } from '@/server/payments/payments.service';
 
 /**
@@ -13,15 +13,8 @@ import { paymentsService } from '@/server/payments/payments.service';
 export async function POST(request: Request) {
   try {
     const user = await requireSession();
-    await enforceRateLimit(`txn-check:${user.id}:${clientIp(request)}`, {
-      max: 10,
-      windowMs: 10 * 60 * 1000,
-    });
-    // Per-user cap as well: the user+IP bucket alone is evaded by rotating IPs.
-    await enforceRateLimit(`txn-check-user:${user.id}`, {
-      max: 30,
-      windowMs: 10 * 60 * 1000,
-    });
+    // Per-user cap as well as user+IP: the IP bucket alone is evaded by rotating IPs.
+    await enforceUserRateLimits('txn-check', user.id, request);
     const { txnId } = txnCheckSchema.parse(await request.json());
     const body: TxnCheckResult = { exists: await paymentsService.txnIdExists(txnId) };
     return NextResponse.json(body);

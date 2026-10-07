@@ -31,6 +31,7 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 
 import {
+  isValidCodFeeValue,
   PAYMENT_NOTE_MAX,
   paymentSettingsInputSchema,
   type PaymentSettingsInput,
@@ -82,12 +83,6 @@ const METHODS: {
   },
 ];
 
-function isValidFeeValue(type: CodFeeType, value: number): boolean {
-  return type === CodFeeType.PERCENT
-    ? Number.isInteger(value) && value >= 1 && value <= 100
-    : Number.isInteger(value) && value >= 100 && value % 100 === 0;
-}
-
 function defaultFeeValue(type: CodFeeType): number {
   return type === CodFeeType.PERCENT ? DEFAULT_PERCENT : DEFAULT_FLAT_CENTS;
 }
@@ -105,7 +100,7 @@ function toFormValues(settings: AdminPaymentSettingsResponse['settings']): Payme
     bankTransferEnabled: settings.bankTransferEnabled,
     codFeeEnabled: settings.codFeeEnabled,
     codFeeType: settings.codFeeType,
-    codFeeValue: isValidFeeValue(settings.codFeeType, settings.codFeeValue)
+    codFeeValue: isValidCodFeeValue(settings.codFeeType, settings.codFeeValue)
       ? settings.codFeeValue
       : defaultFeeValue(settings.codFeeType),
     qrImageUrl: settings.qrImageUrl,
@@ -334,7 +329,7 @@ export function PaymentSettingsForm({ data }: PaymentSettingsFormProps) {
                       onValueChange={(next) => {
                         const type = next as CodFeeType;
                         field.onChange(type);
-                        if (!isValidFeeValue(type, form.getValues('codFeeValue'))) {
+                        if (!isValidCodFeeValue(type, form.getValues('codFeeValue'))) {
                           form.setValue('codFeeValue', defaultFeeValue(type), {
                             shouldDirty: true,
                             shouldValidate: true,

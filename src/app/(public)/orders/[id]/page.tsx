@@ -18,6 +18,7 @@ import { formatBDT } from '@/server/common/money';
 import { buildCodFeeWarning, dueOnDeliveryCents } from '@/server/checkout/cod-fee';
 import { AddTxnIdCard } from '@/modules/checkout/components/add-txn-id-card';
 import { CodFeeNotice } from '@/modules/checkout/components/cod-fee-notice';
+import { PaymentConfigError } from '@/modules/checkout/components/payment-config-error';
 import {
   buildFeeRejectedMessage,
   getFeeNoticeState,
@@ -96,20 +97,10 @@ function FeeSection({
 
   if (config.isError || !config.data) {
     return (
-      <Alert variant="destructive">
-        <AlertDescription className="items-start gap-2 text-destructive">
-          <p>We could not load the payment details for your confirmation fee.</p>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => void config.refetch()}
-            disabled={config.isFetching}
-          >
-            {config.isFetching ? 'Retrying...' : 'Retry'}
-          </Button>
-        </AlertDescription>
-      </Alert>
+      <PaymentConfigError
+        message="We could not load the payment details for your confirmation fee."
+        query={config}
+      />
     );
   }
 
@@ -122,9 +113,9 @@ function FeeSection({
           feeCents: payment.feeCents,
           contactNumber: contact,
         })}
-        qrImageUrl={config.data.qrImageUrl ?? null}
+        qrImageUrl={config.data.qrImageUrl}
         contactNumber={contact}
-        paymentNote={config.data.paymentNote ?? null}
+        paymentNote={config.data.paymentNote}
       />
       {payment.customerTxnId ? (
         <SubmittedTxnId payment={payment} />

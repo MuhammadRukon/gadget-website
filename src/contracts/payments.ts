@@ -63,7 +63,6 @@ export function normalizeTxnId(raw: string): string {
 }
 
 export const txnCheckSchema = z.object({ txnId: txnIdSchema });
-export type TxnCheckInput = z.infer<typeof txnCheckSchema>;
 /** Response body of `POST /api/payments/txn-check`: exactly this, nothing else. */
 export interface TxnCheckResult {
   exists: boolean;
@@ -73,16 +72,13 @@ export const submitCustomerTxnIdSchema = z.object({
   paymentId: z.string().min(1),
   txnId: txnIdSchema,
 });
-export type SubmitCustomerTxnIdInput = z.infer<typeof submitCustomerTxnIdSchema>;
 
 export const adminSetTxnIdSchema = z.object({ txnId: txnIdSchema });
-export type AdminSetTxnIdInput = z.infer<typeof adminSetTxnIdSchema>;
 
 export const verifyCodFeeSchema = z.object({
   outcome: z.enum(['VERIFIED', 'REJECTED']),
   note: z.string().max(300).optional(),
 });
-export type VerifyCodFeeInput = z.infer<typeof verifyCodFeeSchema>;
 
 export interface InitiatedPayment {
   paymentId: string;

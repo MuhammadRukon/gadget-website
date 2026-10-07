@@ -17,8 +17,8 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { txnIdSchema } from '@/contracts/payments';
-import { describeCodFeeRule, dueOnDeliveryCents } from '@/server/checkout/cod-fee';
+import { TXN_ID_MAX, TXN_ID_MIN, txnIdSchema } from '@/contracts/payments';
+import { describeCodFeeRule, dueOnDeliveryCents, isFeeUnverified } from '@/server/checkout/cod-fee';
 import { formatBDT } from '@/server/common/money';
 import { DuplicateTxnDialog } from '@/modules/admin/payments/components/duplicate-txn-dialog';
 import { FeeStatusBadge } from '@/modules/admin/payments/components/fee-status-badge';
@@ -59,13 +59,10 @@ export function CodFeePanel({ order, payment }: CodFeePanelProps) {
   const [duplicate, setDuplicate] = useState<DuplicateTxnInfo | null>(null);
 
   const orderPending = order.status === OrderStatus.PENDING;
-  const canVerify =
-    orderPending &&
-    (payment.feeStatus === CodFeeStatus.PENDING || payment.feeStatus === CodFeeStatus.REJECTED);
+  // Verifying and editing the txn id are allowed in exactly the same states.
+  const canVerify = orderPending && isFeeUnverified(payment.feeStatus);
+  const canEditTxn = canVerify;
   const canReject = orderPending && payment.feeStatus === CodFeeStatus.PENDING;
-  const canEditTxn =
-    orderPending &&
-    (payment.feeStatus === CodFeeStatus.PENDING || payment.feeStatus === CodFeeStatus.REJECTED);
 
   const rule =
     payment.feeType && payment.feeValue !== null
@@ -244,8 +241,8 @@ export function CodFeePanel({ order, payment }: CodFeePanelProps) {
                 {payment.customerTxnId ? 'Edit transaction ID' : 'Add transaction ID'}
               </DialogTitle>
               <DialogDescription>
-                6 to 30 letters and numbers. It is stored in upper case and must not be used on
-                another order.
+                {TXN_ID_MIN} to {TXN_ID_MAX} letters and numbers. It is stored in upper case and
+                must not be used on another order.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-2">

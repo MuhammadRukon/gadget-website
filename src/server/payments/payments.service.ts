@@ -8,6 +8,7 @@ import {
   NotFoundError,
   TxnIdDuplicateError,
 } from '@/server/common/errors';
+import { FEE_UNVERIFIED_STATUSES, isFeeUnverified } from '@/server/checkout/cod-fee';
 import { log } from '@/server/common/logger';
 import { orderStatusEmail, paymentResultEmail, sendMail } from '@/server/common/mailer';
 import {
@@ -395,11 +396,7 @@ export const paymentsService = {
           include: { order: true },
         });
         if (!payment) throw new NotFoundError('Payment');
-        if (
-          payment.method !== PaymentMethod.COD ||
-          (payment.feeStatus !== CodFeeStatus.PENDING &&
-            payment.feeStatus !== CodFeeStatus.REJECTED)
-        ) {
+        if (payment.method !== PaymentMethod.COD || !isFeeUnverified(payment.feeStatus)) {
           throw new ConflictError('Transaction ID can only be set while the fee is unverified');
         }
         if (payment.order.status !== OrderStatus.PENDING) {
@@ -419,7 +416,7 @@ export const paymentsService = {
         const res = await tx.payment.updateMany({
           where: {
             id: paymentId,
-            feeStatus: { in: [CodFeeStatus.PENDING, CodFeeStatus.REJECTED] },
+            feeStatus: { in: [...FEE_UNVERIFIED_STATUSES] },
           },
           data: { customerTxnId: txnId, txnSubmittedAt: new Date() },
         });
@@ -477,9 +474,7 @@ export const paymentsService = {
       // VERIFIED may follow an earlier rejection (the customer paid after all);
       // REJECTED is only a first decision.
       const decidable: CodFeeStatus[] =
-        outcome === 'VERIFIED'
-          ? [CodFeeStatus.PENDING, CodFeeStatus.REJECTED]
-          : [CodFeeStatus.PENDING];
+        outcome === 'VERIFIED' ? [...FEE_UNVERIFIED_STATUSES] : [CodFeeStatus.PENDING];
       if (!decidable.includes(payment.feeStatus)) {
         throw new ConflictError('Confirmation fee already processed');
       }

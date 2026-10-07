@@ -4,7 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
-import { CodFeeStatus, OrderStatus } from '@prisma/client';
+import { OrderStatus } from '@prisma/client';
 
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Button } from '@/components/ui/button';
@@ -12,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader } from '@/app/common/loader/loader';
 import { Textarea } from '@/components/ui/textarea';
 import { formatBDT } from '@/server/common/money';
-import { dueOnDeliveryCents } from '@/server/checkout/cod-fee';
+import { dueOnDeliveryCents, isFeeUnverified } from '@/server/checkout/cod-fee';
 import { OrderStatusBadge } from '@/modules/orders/components/order-status-badge';
 import { CodFeePanel, hasCodFee } from '@/modules/admin/payments/components/cod-fee-panel';
 
@@ -63,10 +63,7 @@ export default function AdminOrderDetailPage() {
   const feePayment = hasCodFee(o.payments[0]) ? o.payments[0] : null;
   // Confirming by hand while the fee is unverified (or rejected) waives it server-side.
   const confirmWaivesFee =
-    o.status === OrderStatus.PENDING &&
-    !!feePayment &&
-    (feePayment.feeStatus === CodFeeStatus.PENDING ||
-      feePayment.feeStatus === CodFeeStatus.REJECTED);
+    o.status === OrderStatus.PENDING && !!feePayment && isFeeUnverified(feePayment.feeStatus);
 
   function runTransition(status: OrderStatus) {
     transition.mutate({ status, note: note || undefined }, { onSuccess: () => setNote('') });

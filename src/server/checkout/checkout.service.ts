@@ -104,6 +104,12 @@ function assertLineAvailable(item: {
   }
 }
 
+/** Value of a settled promise, or rethrows its rejection. */
+function unwrapSettled<T>(result: PromiseSettledResult<T>): T {
+  if (result.status === 'rejected') throw result.reason;
+  return result.value;
+}
+
 async function loadAddressOrThrow(userId: string, addressId: string) {
   const address = await prisma.address.findFirst({ where: { id: addressId, userId } });
   if (!address) throw new NotFoundError('Address');
@@ -152,8 +158,15 @@ async function loadCartLines(userId: string): Promise<ResolvedCartLine[]> {
 
 export const checkoutService = {
   async quote(input: QuoteInput): Promise<CheckoutQuote> {
-    const address = await loadAddressOrThrow(input.userId, input.addressId);
-    const lines = await loadCartLines(input.userId);
+    // Independent reads run concurrently; results are unwrapped in the original
+    // order (address, cart, settings) so the first error thrown is unchanged.
+    const [addressResult, linesResult, settingsResult] = await Promise.allSettled([
+      loadAddressOrThrow(input.userId, input.addressId),
+      loadCartLines(input.userId),
+      input.paymentMethod ? paymentSettingsService.get() : Promise.resolve(null),
+    ]);
+    const address = unwrapSettled(addressResult);
+    const lines = unwrapSettled(linesResult);
     const subtotalCents = lines.reduce((sum, l) => sum + l.unitPriceCents * l.quantity, 0);
 
     let discountCents = 0;
@@ -180,7 +193,7 @@ export const checkoutService = {
     // A fee only ever applies to an explicitly requested COD quote.
     let codFee: ResolvedCodFee | null = null;
     if (input.paymentMethod) {
-      const settings = await paymentSettingsService.get();
+      const settings = unwrapSettled(settingsResult)!; // loaded above whenever paymentMethod is set
       if (!effectiveMethods(settings).includes(input.paymentMethod)) {
         throw paymentMethodUnavailable(input.paymentMethod);
       }

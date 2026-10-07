@@ -40,8 +40,10 @@ export function useUpdatePaymentSettings() {
       // The customer-facing config (Phase 4) must never serve stale settings.
       qc.invalidateQueries({ queryKey: queryKeys.paymentConfig });
     },
-    onError: (err) =>
-      toast.error(err instanceof Error ? err.message : 'Could not save payment settings'),
-    onSettled: () => qc.invalidateQueries({ queryKey: KEY }),
+    onError: (err) => {
+      toast.error(err instanceof Error ? err.message : 'Could not save payment settings');
+      // Only on failure: success already wrote the fresh response into the cache.
+      qc.invalidateQueries({ queryKey: KEY });
+    },
   });
 }

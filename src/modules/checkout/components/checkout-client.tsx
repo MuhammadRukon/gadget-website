@@ -6,7 +6,6 @@ import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -31,6 +30,7 @@ import {
 } from '@/modules/checkout/payment-methods';
 import { parseTxnIdInput } from '@/modules/checkout/txn-id';
 import { CodFeeNotice } from '@/modules/checkout/components/cod-fee-notice';
+import { PaymentConfigError } from '@/modules/checkout/components/payment-config-error';
 import { TxnIdField } from '@/modules/checkout/components/txn-id-field';
 import { useServerCart } from '@/modules/cart/hooks';
 import { useAddresses } from '@/modules/account/hooks';
@@ -295,20 +295,7 @@ export function CheckoutClient() {
             {config.isLoading ? (
               <p className="text-sm text-muted-foreground">Loading payment methods...</p>
             ) : config.isError || !config.data ? (
-              <Alert variant="destructive">
-                <AlertDescription className="items-start gap-2 text-destructive">
-                  <p>We could not load the payment methods.</p>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => void config.refetch()}
-                    disabled={config.isFetching}
-                  >
-                    {config.isFetching ? 'Retrying...' : 'Retry'}
-                  </Button>
-                </AlertDescription>
-              </Alert>
+              <PaymentConfigError message="We could not load the payment methods." query={config} />
             ) : config.data.methods.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 No payment methods are available right now. Please try again later.
@@ -329,12 +316,7 @@ export function CheckoutClient() {
                       checked={paymentMethod === method}
                       onChange={() => setSelectedMethod(method)}
                     />
-                    <span className="flex-1 text-sm">
-                      {info.label}
-                      {info.hint ? (
-                        <span className="text-muted-foreground ml-2 text-xs">({info.hint})</span>
-                      ) : null}
-                    </span>
+                    <span className="flex-1 text-sm">{info.label}</span>
                   </label>
                 );
               })
