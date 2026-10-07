@@ -12,6 +12,7 @@ export type ErrorCode =
   | 'FORBIDDEN'
   | 'NOT_FOUND'
   | 'CONFLICT'
+  | 'TXN_ID_DUPLICATE'
   | 'VALIDATION_ERROR'
   | 'INTERNAL_ERROR';
 
@@ -52,8 +53,24 @@ export class NotFoundError extends AppError {
 }
 
 export class ConflictError extends AppError {
-  constructor(message: string, meta?: Record<string, unknown>) {
-    super('CONFLICT', message, meta);
+  constructor(
+    message: string,
+    meta?: Record<string, unknown>,
+    code: 'CONFLICT' | 'TXN_ID_DUPLICATE' = 'CONFLICT',
+  ) {
+    super(code, message, meta);
+  }
+}
+
+/**
+ * A customer transaction id is already attached to another payment. Still a
+ * ConflictError (409); the distinct code lets clients show specific copy.
+ * Customer-facing throws carry no `meta`; admin throws carry
+ * `{ existingOrderId, existingOrderNumber }`.
+ */
+export class TxnIdDuplicateError extends ConflictError {
+  constructor(message = 'Transaction ID already exists', meta?: Record<string, unknown>) {
+    super(message, meta, 'TXN_ID_DUPLICATE');
   }
 }
 
@@ -69,6 +86,7 @@ const codeToStatus: Record<ErrorCode, number> = {
   FORBIDDEN: 403,
   NOT_FOUND: 404,
   CONFLICT: 409,
+  TXN_ID_DUPLICATE: 409,
   VALIDATION_ERROR: 422,
   INTERNAL_ERROR: 500,
 };

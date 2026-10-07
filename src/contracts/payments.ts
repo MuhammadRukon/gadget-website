@@ -17,12 +17,54 @@ export const verifyPaymentSchema = z.object({
 });
 export type VerifyPaymentInput = z.infer<typeof verifyPaymentSchema>;
 
+/**
+ * Manual-payment transaction id (e.g. a bKash/Nagad TrxID). Trimmed,
+ * alphanumeric, 6-30 chars, uppercased so comparisons are case-insensitive.
+ */
+export const TXN_ID_MIN = 6;
+export const TXN_ID_MAX = 30;
+
+export const txnIdSchema = z
+  .string()
+  .trim()
+  .min(TXN_ID_MIN)
+  .max(TXN_ID_MAX)
+  .regex(/^[A-Za-z0-9]+$/, 'Transaction ID must be letters and numbers only')
+  .transform((v) => v.toUpperCase());
+
+/** Canonical stored/compared form of a transaction id (trim + uppercase). */
+export function normalizeTxnId(raw: string): string {
+  return raw.trim().toUpperCase();
+}
+
+export const txnCheckSchema = z.object({ txnId: txnIdSchema });
+export type TxnCheckInput = z.infer<typeof txnCheckSchema>;
+/** Response body of `POST /api/payments/txn-check`: exactly this, nothing else. */
+export interface TxnCheckResult {
+  exists: boolean;
+}
+
+export const submitCustomerTxnIdSchema = z.object({
+  paymentId: z.string().min(1),
+  txnId: txnIdSchema,
+});
+export type SubmitCustomerTxnIdInput = z.infer<typeof submitCustomerTxnIdSchema>;
+
+export const adminSetTxnIdSchema = z.object({ txnId: txnIdSchema });
+export type AdminSetTxnIdInput = z.infer<typeof adminSetTxnIdSchema>;
+
+export const verifyCodFeeSchema = z.object({
+  outcome: z.enum(['VERIFIED', 'REJECTED']),
+  note: z.string().max(300).optional(),
+});
+export type VerifyCodFeeInput = z.infer<typeof verifyCodFeeSchema>;
+
 export interface InitiatedPayment {
   paymentId: string;
   /**
    * Where the client should redirect the user. `null` means the
-   * payment is already terminal (e.g. COD auto-confirmed) and the
-   * client should go to the order detail page instead.
+   * payment needs no gateway hop (COD, whether auto-confirmed or awaiting
+   * its confirmation fee) and the client should go to the order page.
    */
   redirectUrl: string | null;
 }

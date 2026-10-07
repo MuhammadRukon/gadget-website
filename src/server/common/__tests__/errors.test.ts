@@ -4,6 +4,7 @@ import {
   AppError,
   BadRequestError,
   ConflictError,
+  TxnIdDuplicateError,
   ForbiddenError,
   NotFoundError,
   UnauthorizedError,
@@ -20,6 +21,7 @@ describe('errors: statusFromError', () => {
     expect(statusFromError(new NotFoundError())).toBe(404);
     expect(statusFromError(new ConflictError('dup'))).toBe(409);
     expect(statusFromError(new ValidationError())).toBe(422);
+    expect(statusFromError(new TxnIdDuplicateError())).toBe(409);
   });
 
   it('falls back to 500 for unknown errors', () => {
@@ -46,5 +48,22 @@ describe('errors: toJsonError', () => {
 
   it('preserves the AppError class hierarchy', () => {
     expect(new NotFoundError() instanceof AppError).toBe(true);
+  });
+});
+
+describe('errors: TxnIdDuplicateError', () => {
+  it('is a ConflictError with its own code and optional meta', () => {
+    const err = new TxnIdDuplicateError('dup', { existingOrderId: 'o1', existingOrderNumber: 'T-1' });
+    expect(err).toBeInstanceOf(ConflictError);
+    expect(err.code).toBe('TXN_ID_DUPLICATE');
+    expect(toJsonError(err)).toEqual({
+      code: 'TXN_ID_DUPLICATE',
+      message: 'dup',
+      meta: { existingOrderId: 'o1', existingOrderNumber: 'T-1' },
+    });
+  });
+
+  it('plain ConflictError keeps the CONFLICT code', () => {
+    expect(new ConflictError('x').code).toBe('CONFLICT');
   });
 });
