@@ -15,6 +15,8 @@ export const queryKeys = {
   cartGuest: (lines: GuestCartLine[]) => ['cart', 'guest', lines] as const,
   orders: ['orders'] as const,
   orderById: (id: string) => ['orders', id] as const,
+  /** Customer-facing payment config (enabled methods, fee rule, QR, contact). */
+  paymentConfig: ['payment-config'] as const,
   user: ['user'] as const,
   userById: (id: string) => ['user', id] as const,
 };

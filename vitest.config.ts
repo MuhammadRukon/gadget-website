@@ -16,6 +16,7 @@ const SETTINGS_SERIAL_FILES = [
   'src/server/checkout/__tests__/checkout.fee.test.ts',
   'src/server/settings/__tests__/payment-settings.service.test.ts',
   'src/server/payments/__tests__/payment-routes.test.ts',
+  'src/server/settings/__tests__/settings-routes.test.ts',
 ];
 
 export default defineConfig({
