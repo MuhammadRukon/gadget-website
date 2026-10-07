@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useState } from 'react';
 import { CodFeeStatus, PaymentMethod } from '@prisma/client';
 
@@ -45,7 +44,7 @@ function describeAction(a: PendingAction): {
         }
       : {
           title: 'Reject the confirmation fee?',
-          description: `The fee for order ${a.orderNumber} will be rejected. The order stays pending and the customer is told the fee could not be verified. This cannot be undone.`,
+          description: `The fee for order ${a.orderNumber} will be rejected. The order stays pending and the customer is told the fee could not be verified. You can still verify it later if it arrives.`,
           confirmLabel: 'Reject fee',
           destructive: true,
         };
@@ -150,7 +149,7 @@ export default function AdminPaymentsPage() {
                         {new Date(p.createdAt).toLocaleString()}
                       </TableCell>
                       <TableCell className="text-right space-x-2">
-                        {feePending ? (
+                        {feePending || feeRejected ? (
                           <>
                             <Button
                               size="sm"
@@ -167,27 +166,25 @@ export default function AdminPaymentsPage() {
                             >
                               Verify fee
                             </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              disabled={busy}
-                              onClick={() =>
-                                setAction({
-                                  kind: 'fee',
-                                  id: p.id,
-                                  orderNumber: p.order.orderNumber,
-                                  outcome: 'REJECTED',
-                                })
-                              }
-                            >
-                              Reject fee
-                            </Button>
+                            {/* A rejected fee can still be verified but not rejected again. */}
+                            {feePending ? (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                disabled={busy}
+                                onClick={() =>
+                                  setAction({
+                                    kind: 'fee',
+                                    id: p.id,
+                                    orderNumber: p.order.orderNumber,
+                                    outcome: 'REJECTED',
+                                  })
+                                }
+                              >
+                                Reject fee
+                              </Button>
+                            ) : null}
                           </>
-                        ) : feeRejected ? (
-                          // A rejected fee cannot be re-decided; waive or cancel from the order.
-                          <Button asChild size="sm" variant="outline">
-                            <Link href={`/dashboard/orders/${p.order.id}`}>Open order</Link>
-                          </Button>
                         ) : (
                           <>
                             <Button

@@ -42,9 +42,9 @@ export function hasCodFee(payment: Payment | undefined): payment is Payment {
 /**
  * Admin order-detail panel for the COD confirmation fee: rule, amounts,
  * status, the customer's transaction id, and the verify / reject / edit-id
- * actions. Verify and reject exist only while the order and the fee are both
- * PENDING; a REJECTED fee cannot be re-decided (the server requires PENDING),
- * but the id can still be edited and the order waived or cancelled.
+ * actions. While the order is PENDING the fee can be verified from PENDING or
+ * REJECTED (a customer may pay after being rejected), but rejected only from
+ * PENDING; the id can also be edited and the order waived or cancelled.
  */
 export function CodFeePanel({ order, payment }: CodFeePanelProps) {
   const verifyFee = useVerifyCodFee();
@@ -59,7 +59,10 @@ export function CodFeePanel({ order, payment }: CodFeePanelProps) {
   const [duplicate, setDuplicate] = useState<DuplicateTxnInfo | null>(null);
 
   const orderPending = order.status === OrderStatus.PENDING;
-  const canDecide = orderPending && payment.feeStatus === CodFeeStatus.PENDING;
+  const canVerify =
+    orderPending &&
+    (payment.feeStatus === CodFeeStatus.PENDING || payment.feeStatus === CodFeeStatus.REJECTED);
+  const canReject = orderPending && payment.feeStatus === CodFeeStatus.PENDING;
   const canEditTxn =
     orderPending &&
     (payment.feeStatus === CodFeeStatus.PENDING || payment.feeStatus === CodFeeStatus.REJECTED);
@@ -147,35 +150,35 @@ export function CodFeePanel({ order, payment }: CodFeePanelProps) {
               {payment.customerTxnId ? 'Edit transaction ID' : 'Add transaction ID'}
             </Button>
           ) : null}
-          {canDecide ? (
-            <>
-              <Button
-                type="button"
-                size="sm"
-                disabled={verifyFee.isPending}
-                onClick={() => setConfirmOpen(true)}
-              >
-                Fee received — confirm order
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="destructive"
-                disabled={verifyFee.isPending}
-                onClick={() => {
-                  setRejectNote('');
-                  setRejectOpen(true);
-                }}
-              >
-                Reject fee
-              </Button>
-            </>
+          {canVerify ? (
+            <Button
+              type="button"
+              size="sm"
+              disabled={verifyFee.isPending}
+              onClick={() => setConfirmOpen(true)}
+            >
+              Fee received — confirm order
+            </Button>
+          ) : null}
+          {canReject ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="destructive"
+              disabled={verifyFee.isPending}
+              onClick={() => {
+                setRejectNote('');
+                setRejectOpen(true);
+              }}
+            >
+              Reject fee
+            </Button>
           ) : null}
         </div>
         {payment.feeStatus === CodFeeStatus.REJECTED && orderPending ? (
           <p className="text-xs text-muted-foreground">
-            The fee was rejected. You can still correct the transaction ID, confirm the order
-            (waives the fee), or cancel it.
+            The fee was rejected. You can still correct the transaction ID, confirm that the fee
+            was received, confirm the order without it (waives the fee), or cancel it.
           </p>
         ) : null}
       </CardContent>
@@ -204,8 +207,8 @@ export function CodFeePanel({ order, payment }: CodFeePanelProps) {
             <DialogHeader>
               <DialogTitle>Reject the confirmation fee?</DialogTitle>
               <DialogDescription>
-                The order stays pending and the customer is told the fee could not be verified.
-                This cannot be undone.
+                The order stays pending and the customer is told the fee could not be verified. You
+                can still verify the fee later if it arrives.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-2">
