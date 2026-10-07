@@ -1,6 +1,6 @@
 # Post-review structural cleanup: payment settings + COD fee
 
-Status: proposed, not started. Written 2026-10-08 at the end of the `execute-with-me` run for `docs/plans/admin-payment-methods-cod-fee-plan.md` (that plan is COMPLETE, ready for PR). Source: a strict structural review (`/thermo-nuclear-code-review`) by three read-only reviewers over `main...HEAD` plus the uncommitted working tree. Verdict: no blockers, no file near 1000 lines, correctness and tests are fine. The items below are structure debt.
+Status: in progress (execute-with-me run started 2026-10-08). Written 2026-10-08 at the end of the `execute-with-me` run for `docs/plans/admin-payment-methods-cod-fee-plan.md` (that plan is COMPLETE, ready for PR). Source: a strict structural review (`/thermo-nuclear-code-review`) by three read-only reviewers over `main...HEAD` plus the uncommitted working tree. Verdict: no blockers, no file near 1000 lines, correctness and tests are fine. The items below are structure debt.
 
 This file is a handoff. Read it, then ask the user which items to run before starting. Nothing here has been applied.
 
@@ -137,3 +137,21 @@ Body:
 2. Run the state check (read-only): `git branch --show-current` (expect `feature/admin-payment-methods-cod-fee`), `git status --short`, `git rev-list --count main..HEAD` (expect 39, or more if work was committed since), `git log main..HEAD --format=%B | grep -ciE 'co-authored|generated with'` (expect 0).
 3. Load `.env.dev`, run `npm run typecheck` and `npm run test` to confirm green before touching anything.
 4. Ask the user the three questions in "Ask the user before starting", then run the chosen items one at a time (implementation agent per item, orchestrator verifies with typecheck + full tests, one commit per item, browser E2E re-run after UI-touching items). Delete this file when the work is done (ask the user first; do not commit it unless they say so).
+
+## Execution Progress
+
+**Status: in progress**
+
+_Last updated: 2026-10-08 — Branch: feature/admin-payment-methods-cod-fee — Workspace: main working directory (plain branch)_
+
+User choices at setup: run A, B, C and D-G in order; commit pending work first on the same branch; WAIVED fee rows are hidden on both customer and admin pages; subagent-driven (Agent tool). Pending work was committed first as `d5431c8` (refactor(checkout): simplify cod fee code), `8b23539` (docs: sync payment settings and cod fee), `93de1a3` (docs(plans): add cod fee and cleanup plans); branch was 42 commits ahead of main at start, nothing pushed.
+
+Final commit list: `9f1f7f3` (move cod fee helpers to lib), `154a72f` (policy table), `1ba83ee` (fee view + summary rows)
+
+| Phase | Status | Commit | Review | Notes |
+| --- | --- | --- | --- | --- |
+| 1. A: fee lifecycle home (move to src/lib/cod-fee, policy table, feeView + FeeSummaryRows) | done (UI rendering browser-checked in Cross-Validation) | `9f1f7f3`, `154a72f`, `1ba83ee` | deferred | general-purpose agents (first died on a session limit after step 1; step 1 verified and committed by orchestrator, fresh agent did steps 2-3). Verified: typecheck 0, 3 full runs 30 files / 335 tests pass. `isFeeUnverified` / `FEE_UNVERIFIED_STATUSES` and `modules/checkout/fee-state.ts` deleted (folded into policy.ts / view.ts). WAIVED summary rows hidden on both pages (user decision). `feeActive` in checkout-client left as-is (not provably equivalent). Payments page passes order status PENDING to feeView (list DTO has no order status; list excludes cancelled). Only typecheck-verified: fee-summary-rows, both order pages, payments page, cod-fee-panel, checkout-client. One flaky failure seen once in payments.pending-list.test.ts ("Field order is required"), not reproduced in 4 later runs. |
+| 2. B: split payments.service (cod-fee.service + shared mutator helpers) | pending | — | deferred | — |
+| 3. C: checkout pricing (priceOrder, loadCart, planPlacement) | pending | — | deferred | — |
+| 4. D-G: error plumbing, settings flag map, typed gateway creds, serial test rename | pending | — | deferred | — |
+| Cross-Validation | pending | — | pending | full typecheck/test/build, browser E2E re-run, one combined gap + code review of the new commits |
