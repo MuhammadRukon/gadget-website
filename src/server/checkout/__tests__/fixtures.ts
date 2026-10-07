@@ -90,7 +90,11 @@ async function restoreSettings() {
 
 export async function createAdminUser() {
   const admin = await prisma.user.create({
-    data: { email: `checkout-admin-${rand()}@example.com`, name: 'Admin Test', role: UserRole.ADMIN },
+    data: {
+      email: `checkout-admin-${rand()}@example.com`,
+      name: 'Admin Test',
+      role: UserRole.ADMIN,
+    },
   });
   createdUserIds.push(admin.id);
   return admin;
@@ -253,8 +257,7 @@ export async function createCheckoutFixture(opts: CheckoutFixtureOptions) {
     cart: first.cart,
     address: first.address,
     /** Another user with their own cart against the SAME variant. */
-    addShopper: (cartQty: number) =>
-      createShopper([{ variantId: variant.id, quantity: cartQty }]),
+    addShopper: (cartQty: number) => createShopper([{ variantId: variant.id, quantity: cartQty }]),
     /** Another variant (same product) with the given stock. */
     addVariant: (stock: number) =>
       prisma.productVariant.create({
@@ -268,8 +271,7 @@ export async function createCheckoutFixture(opts: CheckoutFixtureOptions) {
         },
       }),
     /** Another user whose cart lists the given variants in the given order. */
-    addShopperWithItems: (items: { variantId: string; quantity: number }[]) =>
-      createShopper(items),
+    addShopperWithItems: (items: { variantId: string; quantity: number }[]) => createShopper(items),
   };
 }
 

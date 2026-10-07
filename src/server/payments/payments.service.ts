@@ -109,7 +109,12 @@ export const paymentsService = {
   async applyCallback(method: PaymentMethod, outcome: CallbackOutcome) {
     // The customer notification is collected inside the transaction but
     // sent only after it commits (never email about a rolled-back state).
-    let notify: { email: string | null; orderNumber: string; totalCents: number; succeeded: boolean } | null = null;
+    let notify: {
+      email: string | null;
+      orderNumber: string;
+      totalCents: number;
+      succeeded: boolean;
+    } | null = null;
 
     const result = await prisma.$transaction(async (tx) => {
       const payment = await tx.payment.findUnique({

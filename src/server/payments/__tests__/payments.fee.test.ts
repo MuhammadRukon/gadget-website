@@ -158,9 +158,7 @@ describe('paymentsService.submitCustomerTxnId', () => {
       const rejected = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected');
       expect(rejected).toHaveLength(1);
       expect(rejected[0].reason).toBeInstanceOf(TxnIdDuplicateError);
-      expect(
-        await prisma.payment.count({ where: { customerTxnId: 'RACE123456' } }),
-      ).toBe(1);
+      expect(await prisma.payment.count({ where: { customerTxnId: 'RACE123456' } })).toBe(1);
     },
     TEST_TIMEOUT,
   );
@@ -328,7 +326,12 @@ describe('paymentsService.verifyCodFee', () => {
       const admin = await createAdminUser();
       const { order, payment } = await feePending();
 
-      const updated = await paymentsService.verifyCodFee(admin.id, payment.id, 'REJECTED', 'no txn');
+      const updated = await paymentsService.verifyCodFee(
+        admin.id,
+        payment.id,
+        'REJECTED',
+        'no txn',
+      );
 
       expect(updated.feeStatus).toBe(CodFeeStatus.REJECTED);
       const row = await prisma.order.findUniqueOrThrow({ where: { id: order.id } });

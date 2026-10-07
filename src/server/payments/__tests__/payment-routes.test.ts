@@ -119,7 +119,13 @@ describe('GET /api/checkout/config', () => {
   it(
     'returns the stored qr/contact/note when the fee is off, and drops a gateway without credentials',
     async () => {
-      for (const key of ['BKASH_BASE_URL', 'BKASH_APP_KEY', 'BKASH_APP_SECRET', 'BKASH_USERNAME', 'BKASH_PASSWORD']) {
+      for (const key of [
+        'BKASH_BASE_URL',
+        'BKASH_APP_KEY',
+        'BKASH_APP_SECRET',
+        'BKASH_USERNAME',
+        'BKASH_PASSWORD',
+      ]) {
         vi.stubEnv(key, '');
       }
       signInAs('config-user');
@@ -172,7 +178,9 @@ describe('POST /api/payments/txn-check', () => {
       expect(hit.status).toBe(200);
       expect(await hit.json()).toEqual({ exists: true });
       expect(await miss.json()).toEqual({ exists: false });
-      const keys = Object.keys(await (await txnCheckPOST(post('/api/payments/txn-check', { txnId: 'abc12345' }))).json());
+      const keys = Object.keys(
+        await (await txnCheckPOST(post('/api/payments/txn-check', { txnId: 'abc12345' }))).json(),
+      );
       expect(keys).toEqual(['exists']);
     },
     TEST_TIMEOUT,
@@ -222,7 +230,9 @@ describe('POST /api/payments/txn-id', () => {
   it(
     'unauthenticated -> 401',
     async () => {
-      const res = await txnIdPOST(post('/api/payments/txn-id', { paymentId: 'x', txnId: 'ABC12345' }));
+      const res = await txnIdPOST(
+        post('/api/payments/txn-id', { paymentId: 'x', txnId: 'ABC12345' }),
+      );
       expect(res.status).toBe(401);
     },
     TEST_TIMEOUT,
@@ -244,14 +254,18 @@ describe('POST /api/payments/txn-id', () => {
       });
       signInAs(mine.userId);
 
-      const dup = await txnIdPOST(post('/api/payments/txn-id', { paymentId: mine.payment.id, txnId: 'taken12345' }));
+      const dup = await txnIdPOST(
+        post('/api/payments/txn-id', { paymentId: mine.payment.id, txnId: 'taken12345' }),
+      );
       const dupBody = await dup.json();
       expect(dup.status).toBe(409);
       expect(dupBody.code).toBe('TXN_ID_DUPLICATE');
       expect(dupBody.meta).toBeUndefined();
       expect(JSON.stringify(dupBody)).not.toContain(taken.order.orderNumber);
 
-      const ok = await txnIdPOST(post('/api/payments/txn-id', { paymentId: mine.payment.id, txnId: 'mine123456' }));
+      const ok = await txnIdPOST(
+        post('/api/payments/txn-id', { paymentId: mine.payment.id, txnId: 'mine123456' }),
+      );
       expect(ok.status).toBe(200);
       expect((await ok.json()).payment.customerTxnId).toBe('MINE123456');
     },
@@ -333,13 +347,19 @@ describe('POST /api/admin/payments/[id]/fee', () => {
       });
       const url = `/api/admin/payments/${payment.id}/fee`;
 
-      expect((await adminFeePOST(post(url, { outcome: 'VERIFIED' }), ctx(payment.id))).status).toBe(401);
+      expect((await adminFeePOST(post(url, { outcome: 'VERIFIED' }), ctx(payment.id))).status).toBe(
+        401,
+      );
       signInAs(userId, 'CUSTOMER');
-      expect((await adminFeePOST(post(url, { outcome: 'VERIFIED' }), ctx(payment.id))).status).toBe(403);
+      expect((await adminFeePOST(post(url, { outcome: 'VERIFIED' }), ctx(payment.id))).status).toBe(
+        403,
+      );
 
       const admin = await createAdminUser();
       signInAs(admin.id, 'ADMIN');
-      expect((await adminFeePOST(post(url, { outcome: 'SUCCEEDED' }), ctx(payment.id))).status).toBe(422);
+      expect(
+        (await adminFeePOST(post(url, { outcome: 'SUCCEEDED' }), ctx(payment.id))).status,
+      ).toBe(422);
     },
     TEST_TIMEOUT,
   );
