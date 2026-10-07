@@ -10,15 +10,10 @@ import type {
 } from '@/contracts/checkout';
 import { normalizeTxnId } from '@/contracts/payments';
 import { applyDiscount } from '@/server/common/money';
-import {
-  BadRequestError,
-  ConflictError,
-  NotFoundError,
-  TxnIdDuplicateError,
-} from '@/server/common/errors';
+import { BadRequestError, ConflictError, NotFoundError } from '@/server/common/errors';
 import { couponsService } from '@/server/coupons/coupons.service';
 import { cancelOrderInTx } from '@/server/orders/orders.service';
-import { findPaymentByTxnId, isTxnIdUniqueViolation } from '@/server/payments/txn-id';
+import { assertTxnIdFree, mapTxnIdViolation } from '@/server/payments/txn-id';
 import {
   effectiveMethods,
   paymentSettingsService,
@@ -325,9 +320,7 @@ export const checkoutService = {
       // The txn id only means something when a fee is being paid; ignore it otherwise.
       const customerTxnId =
         codFee && input.customerTxnId ? normalizeTxnId(input.customerTxnId) : null;
-      if (customerTxnId && (await findPaymentByTxnId(tx, customerTxnId))) {
-        throw new TxnIdDuplicateError();
-      }
+      if (customerTxnId) await assertTxnIdFree(tx, customerTxnId);
 
       // 4. Create order with snapshotted address + items.
       const order = await tx.order.create({
@@ -427,8 +420,7 @@ export const checkoutService = {
         });
       } catch (err) {
         // Lost a race on the unique index despite the pre-check above.
-        if (customerTxnId && isTxnIdUniqueViolation(err)) throw new TxnIdDuplicateError();
-        throw err;
+        throw customerTxnId ? await mapTxnIdViolation(err, customerTxnId) : err;
       }
 
       // 8. Audit (cart was consumed at the top of the transaction).
