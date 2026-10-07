@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -14,22 +15,27 @@ import { Textarea } from '@/components/ui/textarea';
 import { Loader } from '@/app/common/loader/loader';
 import { ApiClientError, apiFetch } from '@/lib/fetcher';
 import { formatBDT } from '@/server/common/money';
+import { buildCodFeeWarning } from '@/server/checkout/cod-fee';
 import type { CheckoutInput, CheckoutQuote } from '@/contracts/checkout';
 import { queryKeys } from '@/constants/queryKeys';
-import { checkoutErrorMessage } from '@/modules/checkout/checkout-error';
-import { usePlaceOrder } from '@/modules/checkout/hooks';
+import {
+  checkoutErrorMessage,
+  isPaymentMethodUnavailable,
+  isTxnIdDuplicate,
+} from '@/modules/checkout/checkout-error';
+import { usePaymentConfig, usePlaceOrder } from '@/modules/checkout/hooks';
+import {
+  PAYMENT_METHOD_INFO,
+  defaultPaymentMethod,
+  effectiveSelection,
+} from '@/modules/checkout/payment-methods';
+import { parseTxnIdInput } from '@/modules/checkout/txn-id';
+import { CodFeeNotice } from '@/modules/checkout/components/cod-fee-notice';
+import { TxnIdField } from '@/modules/checkout/components/txn-id-field';
 import { useServerCart } from '@/modules/cart/hooks';
 import { useAddresses } from '@/modules/account/hooks';
 import { AddressForm } from '@/modules/account/components/address-form';
 import { cn } from '@/lib/utils';
-
-const PAYMENT_METHODS: Array<{ id: CheckoutInput['paymentMethod']; label: string; hint?: string }> =
-  [
-    { id: 'COD', label: 'Cash on delivery (COD)' },
-    { id: 'BKASH', label: 'bKash' },
-    { id: 'SSLCOMMERZ', label: 'Card / mobile banking (SSLCommerz)' },
-    { id: 'BANK_TRANSFER', label: 'Bank transfer (manual verification)' },
-  ];
 
 export function CheckoutClient() {
   const router = useRouter();
@@ -38,7 +44,13 @@ export function CheckoutClient() {
 
   const [addressId, setAddressId] = useState<string | null>(null);
   const [showAddAddress, setShowAddAddress] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<CheckoutInput['paymentMethod']>('COD');
+  // undefined = no pick yet; pinned to the default once the config loads, and
+  // resolved to null if the picked method later disappears from the config.
+  const [selectedMethod, setSelectedMethod] = useState<
+    CheckoutInput['paymentMethod'] | null | undefined
+  >(undefined);
+  const [txnId, setTxnId] = useState('');
+  const [txnDuplicate, setTxnDuplicate] = useState(false);
   const [couponCode, setCouponCode] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState<string | null>(null);
   const [notes, setNotes] = useState('');
@@ -50,6 +62,17 @@ export function CheckoutClient() {
   const submitGuard = useRef(false);
   const placeOrderMutation = usePlaceOrder();
   const queryClient = useQueryClient();
+  const config = usePaymentConfig();
+
+  const configLoading = config.isLoading;
+  const methods = config.data?.methods;
+  const paymentMethod = effectiveSelection(selectedMethod, methods ?? []);
+
+  useEffect(() => {
+    if (methods && selectedMethod === undefined) {
+      setSelectedMethod(defaultPaymentMethod(methods));
+    }
+  }, [methods, selectedMethod]);
 
   useEffect(() => {
     if (!addressId && addresses.data && addresses.data.length > 0) {
@@ -62,11 +85,17 @@ export function CheckoutClient() {
       setQuote(null);
       return;
     }
+    // Wait for the config so the first quote already carries the payment method.
+    if (configLoading) return;
     let cancelled = false;
     setQuoting(true);
     apiFetch<CheckoutQuote>('/api/checkout/quote', {
       method: 'POST',
-      body: { addressId, couponCode: appliedCoupon ?? undefined },
+      body: {
+        addressId,
+        couponCode: appliedCoupon ?? undefined,
+        paymentMethod: paymentMethod ?? undefined,
+      },
     })
       .then((q) => {
         if (!cancelled) setQuote(q);
@@ -75,11 +104,17 @@ export function CheckoutClient() {
         if (cancelled) return;
         const isApiError = err instanceof ApiClientError;
         toast.error(isApiError ? checkoutErrorMessage(err) : 'Could not calculate totals');
+        setQuote(null);
+        // The admin turned the method off after the config loaded: refetch the
+        // list. The coupon is unrelated, so keep it.
+        if (isPaymentMethodUnavailable(err)) {
+          queryClient.invalidateQueries({ queryKey: queryKeys.paymentConfig });
+          return;
+        }
         // Quote returns the same stock-conflict 409 as checkout; the cart snapshot is stale.
         if (isApiError && err.status === 409) {
           queryClient.invalidateQueries({ queryKey: queryKeys.cart });
         }
-        setQuote(null);
         if (appliedCoupon) setAppliedCoupon(null);
       })
       .finally(() => {
@@ -88,10 +123,32 @@ export function CheckoutClient() {
     return () => {
       cancelled = true;
     };
-  }, [addressId, appliedCoupon, queryClient]);
+  }, [addressId, appliedCoupon, paymentMethod, configLoading, queryClient]);
 
   const itemCount = cart.data?.itemCount ?? 0;
-  const ready = !!addressId && itemCount > 0 && !quoting && !!quote;
+
+  // Fee UI only reflects a settled quote for COD; while re-quoting, the old
+  // quote may belong to a different method.
+  const feeRule = quote?.codFeeRule ?? null;
+  const feeActive =
+    paymentMethod === 'COD' &&
+    !!config.data?.cod.feeEnabled &&
+    !quoting &&
+    !!quote &&
+    quote.codFeeCents > 0 &&
+    !!feeRule;
+  const txnInput = parseTxnIdInput(txnId);
+  // A non-empty id the server would reject (422) blocks the order until fixed or cleared.
+  const txnBlocksOrder = feeActive && txnInput.status === 'invalid';
+
+  const ready =
+    !!addressId &&
+    itemCount > 0 &&
+    !quoting &&
+    !!quote &&
+    !!config.data &&
+    !!paymentMethod &&
+    !txnBlocksOrder;
   const cartHasIssues = !!cart.data?.hasIssues;
 
   async function applyCoupon() {
@@ -99,15 +156,19 @@ export function CheckoutClient() {
   }
 
   function placeOrder() {
-    if (!addressId) return;
+    if (!addressId || !paymentMethod) return;
     if (submitGuard.current) return;
     submitGuard.current = true;
+    // Only a valid id that the blur check did not flag as existing is sent.
+    const customerTxnId =
+      feeActive && !txnDuplicate && txnInput.status === 'valid' ? txnInput.value : undefined;
     placeOrderMutation.mutate(
       {
         addressId,
         paymentMethod,
         couponCode: appliedCoupon ?? undefined,
         notes: notes || undefined,
+        ...(customerTxnId ? { customerTxnId } : {}),
       } satisfies CheckoutInput,
       {
         onSuccess: (res) => {
@@ -119,8 +180,13 @@ export function CheckoutClient() {
           }
           router.push(`/orders/${res.id}`);
         },
-        onError: () => {
+        onError: (err) => {
           submitGuard.current = false;
+          if (isTxnIdDuplicate(err)) {
+            // Cart is untouched; show the inline message and let them retry without the id.
+            setTxnId('');
+            setTxnDuplicate(true);
+          }
         },
       },
     );
@@ -226,27 +292,77 @@ export function CheckoutClient() {
             <CardTitle>Payment method</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            {PAYMENT_METHODS.map((method) => (
-              <label
-                key={method.id}
-                className={`flex cursor-pointer items-center gap-3 rounded border p-3 ${
-                  paymentMethod === method.id ? 'border-primary' : ''
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="payment"
-                  checked={paymentMethod === method.id}
-                  onChange={() => setPaymentMethod(method.id)}
+            {config.isLoading ? (
+              <p className="text-sm text-muted-foreground">Loading payment methods...</p>
+            ) : config.isError || !config.data ? (
+              <Alert variant="destructive">
+                <AlertDescription className="items-start gap-2 text-destructive">
+                  <p>We could not load the payment methods.</p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void config.refetch()}
+                    disabled={config.isFetching}
+                  >
+                    {config.isFetching ? 'Retrying...' : 'Retry'}
+                  </Button>
+                </AlertDescription>
+              </Alert>
+            ) : config.data.methods.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No payment methods are available right now. Please try again later.
+              </p>
+            ) : (
+              config.data.methods.map((method) => {
+                const info = PAYMENT_METHOD_INFO[method];
+                return (
+                  <label
+                    key={method}
+                    className={`flex cursor-pointer items-center gap-3 rounded border p-3 ${
+                      paymentMethod === method ? 'border-primary' : ''
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="payment"
+                      checked={paymentMethod === method}
+                      onChange={() => setSelectedMethod(method)}
+                    />
+                    <span className="flex-1 text-sm">
+                      {info.label}
+                      {info.hint ? (
+                        <span className="text-muted-foreground ml-2 text-xs">({info.hint})</span>
+                      ) : null}
+                    </span>
+                  </label>
+                );
+              })
+            )}
+            {config.data && config.data.methods.length > 0 && !paymentMethod ? (
+              <p className="text-sm text-destructive">Choose a payment method to continue.</p>
+            ) : null}
+            {feeActive && config.data && feeRule && quote ? (
+              <div className="space-y-4 pt-2">
+                <CodFeeNotice
+                  warning={buildCodFeeWarning({
+                    type: feeRule.type,
+                    value: feeRule.value,
+                    feeCents: quote.codFeeCents,
+                    contactNumber: config.data.contactNumber,
+                  })}
+                  qrImageUrl={config.data.qrImageUrl}
+                  contactNumber={config.data.contactNumber}
+                  paymentNote={config.data.paymentNote}
                 />
-                <span className="flex-1 text-sm">
-                  {method.label}
-                  {method.hint ? (
-                    <span className="text-muted-foreground ml-2 text-xs">({method.hint})</span>
-                  ) : null}
-                </span>
-              </label>
-            ))}
+                <TxnIdField
+                  value={txnId}
+                  onChange={setTxnId}
+                  duplicate={txnDuplicate}
+                  onDuplicateChange={setTxnDuplicate}
+                />
+              </div>
+            ) : null}
           </CardContent>
         </Card>
         <Card>
@@ -311,6 +427,18 @@ export function CheckoutClient() {
                 <span>Total</span>
                 <span>{quote ? formatBDT(quote.totalCents) : '...'}</span>
               </div>
+              {feeActive && quote ? (
+                <>
+                  <div className="flex justify-between">
+                    <span>Confirmation fee (advance)</span>
+                    <span>{formatBDT(quote.codFeeCents)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Due on delivery</span>
+                    <span>{formatBDT(quote.dueOnDeliveryCents)}</span>
+                  </div>
+                </>
+              ) : null}
             </div>
             <Button
               className="w-full"
