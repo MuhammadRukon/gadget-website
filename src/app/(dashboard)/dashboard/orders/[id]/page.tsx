@@ -4,14 +4,16 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
-import { OrderStatus } from '@prisma/client';
+import { CodFeeStatus, OrderStatus } from '@prisma/client';
 
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader } from '@/app/common/loader/loader';
 import { Textarea } from '@/components/ui/textarea';
 import { formatBDT } from '@/server/common/money';
 import { OrderStatusBadge } from '@/modules/orders/components/order-status-badge';
+import { CodFeePanel, hasCodFee } from '@/modules/admin/payments/components/cod-fee-panel';
 
 import { useAdminOrderDetail, useTransitionOrder } from '@/modules/admin/orders/hooks';
 
@@ -35,6 +37,7 @@ export default function AdminOrderDetailPage() {
   const order = useAdminOrderDetail(id);
   const transition = useTransitionOrder(id ?? '');
   const [note, setNote] = useState('');
+  const [waiveOpen, setWaiveOpen] = useState(false);
 
   if (order.isLoading) {
     return (
@@ -56,6 +59,17 @@ export default function AdminOrderDetailPage() {
 
   const o = order.data;
   const nextStatus = getNextStatus(o.status);
+  const feePayment = hasCodFee(o.payments[0]) ? o.payments[0] : null;
+  // Confirming by hand while the fee is unverified (or rejected) waives it server-side.
+  const confirmWaivesFee =
+    o.status === OrderStatus.PENDING &&
+    !!feePayment &&
+    (feePayment.feeStatus === CodFeeStatus.PENDING ||
+      feePayment.feeStatus === CodFeeStatus.REJECTED);
+
+  function runTransition(status: OrderStatus) {
+    transition.mutate({ status, note: note || undefined }, { onSuccess: () => setNote('') });
+  }
   return (
     <div className="space-y-6 p-6">
       <div className="flex items-start justify-between gap-4">
@@ -124,6 +138,8 @@ export default function AdminOrderDetailPage() {
         </CardContent>
       </Card>
 
+      {feePayment ? <CodFeePanel order={o} payment={feePayment} /> : null}
+
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader>
@@ -146,6 +162,18 @@ export default function AdminOrderDetailPage() {
               <span>Total</span>
               <span>{formatBDT(o.totalCents)}</span>
             </div>
+            {feePayment && feePayment.feeCents > 0 ? (
+              <>
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Confirmation fee (advance)</span>
+                  <span>{formatBDT(feePayment.feeCents)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Due on delivery</span>
+                  <span>{formatBDT(o.totalCents - feePayment.feeCents)}</span>
+                </div>
+              </>
+            ) : null}
             <p className="pt-2 text-xs text-muted-foreground">
               Payment: {o.payments.map((p) => `${p.method} (${p.status})`).join(', ') || 'Pending'}
             </p>
@@ -174,12 +202,12 @@ export default function AdminOrderDetailPage() {
                     size="sm"
                     variant={o.status === s ? 'default' : 'outline'}
                     disabled={o.status === s || transition.isPending || (!isNext && !isCancelled)}
-                    onClick={async () => {
-                      await transition.mutateAsync({
-                        status: s,
-                        note: note || undefined,
-                      });
-                      setNote('');
+                    onClick={() => {
+                      if (s === OrderStatus.CONFIRMED && confirmWaivesFee) {
+                        setWaiveOpen(true);
+                        return;
+                      }
+                      runTransition(s);
                     }}
                   >
                     {s}
@@ -190,6 +218,15 @@ export default function AdminOrderDetailPage() {
           </CardContent>
         </Card>
       </div>
+
+      <ConfirmDialog
+        open={waiveOpen}
+        onOpenChange={setWaiveOpen}
+        title="Confirmation fee not verified"
+        description="Confirmation fee not verified. Confirming will waive it. The order will be confirmed and the fee marked as waived."
+        confirmLabel="Confirm and waive fee"
+        onConfirm={() => runTransition(OrderStatus.CONFIRMED)}
+      />
 
       <Card>
         <CardHeader>
