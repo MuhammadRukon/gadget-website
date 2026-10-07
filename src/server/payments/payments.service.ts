@@ -1,4 +1,4 @@
-import { OrderStatus, PaymentMethod, PaymentStatus, Prisma } from '@prisma/client';
+import { CodFeeStatus, OrderStatus, PaymentMethod, PaymentStatus, Prisma } from '@prisma/client';
 
 import { prisma } from '@/lib/prisma';
 import {
@@ -6,14 +6,16 @@ import {
   ConflictError,
   ForbiddenError,
   NotFoundError,
+  TxnIdDuplicateError,
 } from '@/server/common/errors';
 import { log } from '@/server/common/logger';
-import { paymentResultEmail, sendMail } from '@/server/common/mailer';
-import { restockOrderItems } from '@/server/orders/orders.service';
-import type { InitiatedPayment } from '@/contracts/payments';
+import { orderStatusEmail, paymentResultEmail, sendMail } from '@/server/common/mailer';
+import { claimOrderStatus, restockOrderItems } from '@/server/orders/orders.service';
+import { normalizeTxnId, type InitiatedPayment } from '@/contracts/payments';
 
 import type { CallbackOutcome, PaymentInitInput } from './gateway.interface';
 import { getGateway } from './registry';
+import { findPaymentByTxnId, isTxnIdUniqueViolation } from './txn-id';
 
 /**
  * `payments.service` is the *only* module in the system that:
@@ -258,6 +260,11 @@ export const paymentsService = {
       if (payment.status !== PaymentStatus.PENDING) {
         throw new ConflictError('Payment already processed');
       }
+      // A COD order with an unverified confirmation fee must go through
+      // verifyCodFee first (or be confirmed/waived via ordersService.transition).
+      if (payment.method === PaymentMethod.COD && payment.feeStatus === CodFeeStatus.PENDING) {
+        throw new ConflictError('Verify the confirmation fee first');
+      }
 
       const updated = await tx.payment.update({
         where: { id: paymentId },
@@ -290,6 +297,196 @@ export const paymentsService = {
 
       return updated;
     });
+  },
+
+  /**
+   * Customer attaches the transaction id of their manually-paid COD
+   * confirmation fee. Add-only: once set it can't be changed by the customer.
+   * Ownership failures are reported as NotFound (no existence leak), and a
+   * duplicate id reveals nothing about the other order.
+   */
+  async submitCustomerTxnId(userId: string, paymentId: string, rawTxnId: string) {
+    const txnId = normalizeTxnId(rawTxnId);
+    try {
+      return await prisma.$transaction(async (tx) => {
+        const payment = await tx.payment.findUnique({
+          where: { id: paymentId },
+          include: { order: true },
+        });
+        if (!payment || payment.order.userId !== userId) throw new NotFoundError('Payment');
+        if (payment.method !== PaymentMethod.COD || payment.feeStatus !== CodFeeStatus.PENDING) {
+          throw new ConflictError('No confirmation fee is awaiting a transaction ID');
+        }
+        if (payment.order.status !== OrderStatus.PENDING) {
+          throw new ConflictError('Order is no longer pending');
+        }
+        if (payment.customerTxnId) throw new ConflictError('Transaction ID already submitted');
+        if (await findPaymentByTxnId(tx, txnId)) throw new TxnIdDuplicateError();
+
+        // Atomic add-only write: loses cleanly to a concurrent submit.
+        const res = await tx.payment.updateMany({
+          where: { id: paymentId, customerTxnId: null, feeStatus: CodFeeStatus.PENDING },
+          data: { customerTxnId: txnId, txnSubmittedAt: new Date() },
+        });
+        if (res.count !== 1) throw new ConflictError('Transaction ID already submitted');
+
+        await tx.orderEvent.create({
+          data: {
+            orderId: payment.orderId,
+            status: payment.order.status,
+            note: 'Customer submitted transaction ID',
+            actorId: userId,
+          },
+        });
+        return tx.payment.findUniqueOrThrow({ where: { id: paymentId } });
+      });
+    } catch (err) {
+      // Lost a race on the unique index despite the pre-check.
+      if (isTxnIdUniqueViolation(err)) throw new TxnIdDuplicateError();
+      throw err;
+    }
+  },
+
+  /**
+   * Admin sets or replaces the transaction id on a fee-unverified COD
+   * payment. A duplicate throws TXN_ID_DUPLICATE with the conflicting order's
+   * id/number in `meta` (admin-only; `jsonError` serializes it).
+   */
+  async adminSetTxnId(adminId: string, paymentId: string, rawTxnId: string) {
+    const txnId = normalizeTxnId(rawTxnId);
+    const duplicate = (order: { id: string; orderNumber: string }) =>
+      new TxnIdDuplicateError(`Transaction ID is already used on order ${order.orderNumber}`, {
+        existingOrderId: order.id,
+        existingOrderNumber: order.orderNumber,
+      });
+
+    try {
+      return await prisma.$transaction(async (tx) => {
+        const payment = await tx.payment.findUnique({
+          where: { id: paymentId },
+          include: { order: true },
+        });
+        if (!payment) throw new NotFoundError('Payment');
+        if (
+          payment.method !== PaymentMethod.COD ||
+          (payment.feeStatus !== CodFeeStatus.PENDING &&
+            payment.feeStatus !== CodFeeStatus.REJECTED)
+        ) {
+          throw new ConflictError('Transaction ID can only be set while the fee is unverified');
+        }
+        if (payment.order.status !== OrderStatus.PENDING) {
+          throw new ConflictError('Order is no longer pending');
+        }
+
+        const existing = await findPaymentByTxnId(tx, txnId, paymentId);
+        if (existing) throw duplicate(existing.order);
+
+        const res = await tx.payment.updateMany({
+          where: {
+            id: paymentId,
+            feeStatus: { in: [CodFeeStatus.PENDING, CodFeeStatus.REJECTED] },
+          },
+          data: { customerTxnId: txnId, txnSubmittedAt: new Date() },
+        });
+        if (res.count !== 1) throw new ConflictError('Confirmation fee already processed');
+
+        await tx.orderEvent.create({
+          data: {
+            orderId: payment.orderId,
+            status: payment.order.status,
+            note: payment.customerTxnId
+              ? `Admin replaced transaction ID (was ${payment.customerTxnId})`
+              : 'Admin set transaction ID',
+            actorId: adminId,
+          },
+        });
+        return tx.payment.findUniqueOrThrow({ where: { id: paymentId } });
+      });
+    } catch (err) {
+      if (isTxnIdUniqueViolation(err)) {
+        const existing = await findPaymentByTxnId(prisma, txnId, paymentId);
+        throw existing ? duplicate(existing.order) : new TxnIdDuplicateError();
+      }
+      throw err;
+    }
+  },
+
+  /**
+   * Admin decision on a COD confirmation fee (paid manually, outside the
+   * system). VERIFIED confirms the order; REJECTED leaves it PENDING.
+   * Lock order matches `ordersService.transition` (order row, then payment
+   * row) so the two can't deadlock, and both decisions are compare-and-set so
+   * exactly one concurrent caller wins.
+   */
+  async verifyCodFee(
+    adminId: string,
+    paymentId: string,
+    outcome: 'VERIFIED' | 'REJECTED',
+    note?: string,
+  ) {
+    let notify: { email: string | null; orderNumber: string } | null = null;
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const payment = await tx.payment.findUnique({
+        where: { id: paymentId },
+        include: { order: { include: { user: { select: { email: true } } } } },
+      });
+      if (!payment) throw new NotFoundError('Payment');
+      if (payment.method !== PaymentMethod.COD) {
+        throw new BadRequestError('Confirmation fee only applies to COD payments');
+      }
+      if (payment.feeStatus !== CodFeeStatus.PENDING) {
+        throw new ConflictError('Confirmation fee already processed');
+      }
+      if (payment.order.status !== OrderStatus.PENDING) {
+        throw new ConflictError('Order is no longer pending');
+      }
+
+      if (outcome === 'VERIFIED') {
+        const claimed = await claimOrderStatus(tx, payment.order, {
+          status: OrderStatus.CONFIRMED,
+        });
+        if (!claimed) throw new ConflictError('Order status changed, refresh and retry');
+      }
+
+      const res = await tx.payment.updateMany({
+        where: { id: paymentId, feeStatus: CodFeeStatus.PENDING },
+        data:
+          outcome === 'VERIFIED'
+            ? {
+                feeStatus: CodFeeStatus.VERIFIED,
+                feeVerifiedById: adminId,
+                feeVerifiedAt: new Date(),
+              }
+            : { feeStatus: CodFeeStatus.REJECTED },
+      });
+      if (res.count !== 1) throw new ConflictError('Confirmation fee already processed');
+
+      const base =
+        outcome === 'VERIFIED'
+          ? 'COD confirmation fee verified by admin'
+          : 'COD confirmation fee rejected by admin';
+      await tx.orderEvent.create({
+        data: {
+          orderId: payment.orderId,
+          status: outcome === 'VERIFIED' ? OrderStatus.CONFIRMED : OrderStatus.PENDING,
+          note: note ? `${base}: ${note}` : base,
+          actorId: adminId,
+        },
+      });
+
+      if (outcome === 'VERIFIED') {
+        notify = { email: payment.order.user.email, orderNumber: payment.order.orderNumber };
+      }
+      return tx.payment.findUniqueOrThrow({ where: { id: paymentId } });
+    });
+
+    // Fire-and-forget, after commit: a failed email never fails the verify.
+    if (notify) {
+      const { email, orderNumber } = notify;
+      void sendMail(email, orderStatusEmail({ orderNumber }, OrderStatus.CONFIRMED));
+    }
+    return updated;
   },
 
   /**
