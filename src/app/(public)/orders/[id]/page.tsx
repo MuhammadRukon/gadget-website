@@ -93,6 +93,25 @@ function FeeSection({
     return <p className="text-sm text-muted-foreground">Loading payment details...</p>;
   }
 
+  if (config.isError || !config.data) {
+    return (
+      <Alert variant="destructive">
+        <AlertDescription className="items-start gap-2 text-destructive">
+          <p>We could not load the payment details for your confirmation fee.</p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => void config.refetch()}
+            disabled={config.isFetching}
+          >
+            {config.isFetching ? 'Retrying...' : 'Retry'}
+          </Button>
+        </AlertDescription>
+      </Alert>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <CodFeeNotice
@@ -102,9 +121,9 @@ function FeeSection({
           feeCents: payment.feeCents,
           contactNumber: contact,
         })}
-        qrImageUrl={config.data?.qrImageUrl ?? null}
+        qrImageUrl={config.data.qrImageUrl ?? null}
         contactNumber={contact}
-        paymentNote={config.data?.paymentNote ?? null}
+        paymentNote={config.data.paymentNote ?? null}
       />
       {payment.customerTxnId ? (
         <SubmittedTxnId payment={payment} />
