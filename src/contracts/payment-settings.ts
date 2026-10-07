@@ -65,6 +65,14 @@ export const paymentSettingsInputSchema = z
       });
     }
 
+    if (v.codFeeEnabled && !v.codEnabled) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['codFeeEnabled'],
+        message: 'The confirmation fee requires Cash on Delivery to be enabled',
+      });
+    }
+
     if (v.codFeeEnabled && !v.contactNumber) {
       ctx.addIssue({
         code: 'custom',

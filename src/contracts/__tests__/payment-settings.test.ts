@@ -125,4 +125,20 @@ describe('paymentSettingsInputSchema', () => {
     delete rest.codEnabled;
     expect(paymentSettingsInputSchema.safeParse(rest).success).toBe(false);
   });
+
+  it('rejects codFeeEnabled=true when codEnabled=false', () => {
+    const input = { ...valid, codEnabled: false, bankTransferEnabled: true };
+    expect(paymentSettingsInputSchema.safeParse(input).success).toBe(false);
+    expect(issuePaths(input)).toContain('codFeeEnabled');
+  });
+
+  it('allows codFeeEnabled=false when codEnabled=false', () => {
+    const res = paymentSettingsInputSchema.safeParse({
+      ...valid,
+      codEnabled: false,
+      bankTransferEnabled: true,
+      codFeeEnabled: false,
+    });
+    expect(res.success).toBe(true);
+  });
 });
