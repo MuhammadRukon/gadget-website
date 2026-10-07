@@ -1,4 +1,4 @@
-import { Prisma, OrderStatus } from '@prisma/client';
+import { CodFeeStatus, OrderStatus, PaymentMethod, Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { ConflictError, ForbiddenError, NotFoundError } from '@/server/common/errors';
 import { orderStatusEmail, sendMail } from '@/server/common/mailer';
@@ -158,6 +158,10 @@ export const ordersService = {
    * ALLOWED_TRANSITIONS (e.g. DELIVERED -> PENDING, re-cancelling an
    * already-cancelled order). Cancelling restocks the order's items,
    * matching customer self-cancel behavior.
+   *
+   * Confirming a PENDING order whose COD confirmation fee is unverified
+   * (PENDING/REJECTED) is allowed but waives the fee (feeStatus -> WAIVED)
+   * in the same transaction, and the event note records that.
    */
   async transition(adminId: string, orderId: string, status: OrderStatus, note?: string) {
     const { updated, customerEmail } = await prisma.$transaction(async (tx) => {
@@ -184,8 +188,26 @@ export const ordersService = {
         await restockOrderItems(tx, order.items);
       }
 
+      // Lock order is order row (claimed above) then payment row, matching
+      // paymentsService.verifyCodFee.
+      let eventNote = note ?? null;
+      if (order.status === OrderStatus.PENDING && status === OrderStatus.CONFIRMED) {
+        const waived = await tx.payment.updateMany({
+          where: {
+            orderId,
+            method: PaymentMethod.COD,
+            feeStatus: { in: [CodFeeStatus.PENDING, CodFeeStatus.REJECTED] },
+          },
+          data: { feeStatus: CodFeeStatus.WAIVED },
+        });
+        if (waived.count > 0) {
+          const waiver = 'Confirmed without confirmation fee (waived by admin)';
+          eventNote = note ? `${waiver}: ${note}` : waiver;
+        }
+      }
+
       await tx.orderEvent.create({
-        data: { orderId, status, note: note ?? null, actorId: adminId },
+        data: { orderId, status, note: eventNote, actorId: adminId },
       });
       return { updated, customerEmail: order.user.email };
     });

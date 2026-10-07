@@ -3,7 +3,7 @@
  * convention exists in this repo, so these run against the DATABASE_URL
  * database). Fixtures are randomised per test and cleaned up after.
  */
-import { OrderStatus } from '@prisma/client';
+import { CodFeeStatus, OrderStatus, PaymentMethod, PaymentStatus } from '@prisma/client';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { prisma } from '@/lib/prisma';
@@ -18,7 +18,12 @@ const createdOrderIds: string[] = [];
 const createdProductIds: string[] = [];
 const createdBrandIds: string[] = [];
 
-async function createOrderFixture(opts: { orderStatus: OrderStatus; stock?: number }) {
+async function createOrderFixture(opts: {
+  orderStatus: OrderStatus;
+  stock?: number;
+  /** Optional COD/other payment row; `feeStatus` defaults to NONE. */
+  payment?: { method: PaymentMethod; feeStatus?: CodFeeStatus };
+}) {
   const suffix = Math.random().toString(36).slice(2, 10);
   const stock = opts.stock ?? 5;
   const quantity = 2;
@@ -93,7 +98,19 @@ async function createOrderFixture(opts: { orderStatus: OrderStatus; stock?: numb
   });
   createdOrderIds.push(order.id);
 
-  return { user, order, variant, quantity, stock };
+  const payment = opts.payment
+    ? await prisma.payment.create({
+        data: {
+          orderId: order.id,
+          method: opts.payment.method,
+          status: PaymentStatus.PENDING,
+          amountCents: 200_000,
+          feeStatus: opts.payment.feeStatus ?? CodFeeStatus.NONE,
+        },
+      })
+    : null;
+
+  return { user, order, variant, quantity, stock, payment };
 }
 
 afterEach(async () => {
@@ -104,6 +121,80 @@ afterEach(async () => {
   await prisma.brand.deleteMany({ where: { id: { in: createdBrandIds.splice(0) } } });
   await prisma.user.deleteMany({ where: { id: { in: createdUserIds.splice(0) } } });
 }, TEST_TIMEOUT);
+
+describe('ordersService.transition: COD confirmation fee guard', () => {
+  it.each([CodFeeStatus.PENDING, CodFeeStatus.REJECTED])(
+    'PENDING -> CONFIRMED with an unverified (%s) fee waives it and says so in the event',
+    async (feeStatus) => {
+      const { user, order, payment } = await createOrderFixture({
+        orderStatus: OrderStatus.PENDING,
+        payment: { method: PaymentMethod.COD, feeStatus },
+      });
+
+      const updated = await ordersService.transition(user.id, order.id, OrderStatus.CONFIRMED);
+
+      expect(updated.status).toBe(OrderStatus.CONFIRMED);
+      const pay = await prisma.payment.findUniqueOrThrow({ where: { id: payment!.id } });
+      expect(pay.feeStatus).toBe(CodFeeStatus.WAIVED);
+      const events = await prisma.orderEvent.findMany({ where: { orderId: order.id } });
+      expect(events).toHaveLength(1);
+      expect(events[0].status).toBe(OrderStatus.CONFIRMED);
+      expect(events[0].note).toContain('waived');
+    },
+    TEST_TIMEOUT,
+  );
+
+  it(
+    'keeps an admin-supplied note alongside the waiver text',
+    async () => {
+      const { user, order } = await createOrderFixture({
+        orderStatus: OrderStatus.PENDING,
+        payment: { method: PaymentMethod.COD, feeStatus: CodFeeStatus.PENDING },
+      });
+
+      await ordersService.transition(user.id, order.id, OrderStatus.CONFIRMED, 'phoned customer');
+
+      const events = await prisma.orderEvent.findMany({ where: { orderId: order.id } });
+      expect(events[0].note).toContain('waived');
+      expect(events[0].note).toContain('phoned customer');
+    },
+    TEST_TIMEOUT,
+  );
+
+  it.each([CodFeeStatus.NONE, CodFeeStatus.VERIFIED])(
+    'a %s fee is left untouched and the event note is just the admin note',
+    async (feeStatus) => {
+      const { user, order, payment } = await createOrderFixture({
+        orderStatus: OrderStatus.PENDING,
+        payment: { method: PaymentMethod.COD, feeStatus },
+      });
+
+      await ordersService.transition(user.id, order.id, OrderStatus.CONFIRMED);
+
+      const pay = await prisma.payment.findUniqueOrThrow({ where: { id: payment!.id } });
+      expect(pay.feeStatus).toBe(feeStatus);
+      const events = await prisma.orderEvent.findMany({ where: { orderId: order.id } });
+      expect(events[0].note).toBeNull();
+    },
+    TEST_TIMEOUT,
+  );
+
+  it(
+    'cancelling a fee-pending order does not waive the fee',
+    async () => {
+      const { user, order, payment } = await createOrderFixture({
+        orderStatus: OrderStatus.PENDING,
+        payment: { method: PaymentMethod.COD, feeStatus: CodFeeStatus.PENDING },
+      });
+
+      await ordersService.transition(user.id, order.id, OrderStatus.CANCELLED, 'no show');
+
+      const pay = await prisma.payment.findUniqueOrThrow({ where: { id: payment!.id } });
+      expect(pay.feeStatus).toBe(CodFeeStatus.PENDING);
+    },
+    TEST_TIMEOUT,
+  );
+});
 
 describe('ordersService.transition', () => {
   it(
