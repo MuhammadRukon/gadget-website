@@ -1,9 +1,9 @@
-import { CodFeeStatus, OrderStatus, PaymentMethod, Prisma } from '@prisma/client';
+import { OrderStatus, PaymentMethod, Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { ConflictError, ForbiddenError, NotFoundError } from '@/server/common/errors';
 import { orderStatusEmail, sendMail } from '@/server/common/mailer';
 import { CUSTOMER_PAYMENT_FIELDS, type CustomerPaymentField } from '@/contracts/payments';
-import { FEE_UNVERIFIED_STATUSES } from '@/lib/cod-fee/compute';
+import { FEE_ACTIONS, feeFrom } from '@/lib/cod-fee/policy';
 
 /** Payment columns safe to return to the customer (see CUSTOMER_PAYMENT_FIELDS). */
 export const customerPaymentSelect = Object.fromEntries(
@@ -214,9 +214,9 @@ export const ordersService = {
           where: {
             orderId,
             method: PaymentMethod.COD,
-            feeStatus: { in: [...FEE_UNVERIFIED_STATUSES] },
+            feeStatus: { in: feeFrom('waive') },
           },
-          data: { feeStatus: CodFeeStatus.WAIVED },
+          data: { feeStatus: FEE_ACTIONS.waive.to },
         });
         if (waived.count > 0) {
           const waiver = 'Confirmed without confirmation fee (waived by admin)';

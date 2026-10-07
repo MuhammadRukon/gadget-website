@@ -1,5 +1,7 @@
 import type { OrderStatus, Payment } from '@prisma/client';
 
+import { canFee } from '@/lib/cod-fee/policy';
+
 export type FeeNoticeState = 'none' | 'pending' | 'rejected' | 'verified';
 
 /**
@@ -14,14 +16,9 @@ export function getFeeNoticeState(
 ): FeeNoticeState {
   if (!payment || payment.method !== 'COD' || orderStatus === 'CANCELLED') return 'none';
 
-  switch (payment.feeStatus) {
-    case 'VERIFIED':
-      return 'verified';
-    case 'PENDING':
-      return orderStatus === 'PENDING' ? 'pending' : 'none';
-    case 'REJECTED':
-      return orderStatus === 'PENDING' ? 'rejected' : 'none';
-    default:
-      return 'none';
-  }
+  // Actionable states (the fee can still be decided) only apply while the order
+  // is PENDING; VERIFIED has no remaining action and shows for any live order.
+  if (payment.feeStatus === 'VERIFIED') return 'verified';
+  if (orderStatus !== 'PENDING' || !canFee('verify', payment.feeStatus)) return 'none';
+  return payment.feeStatus === 'REJECTED' ? 'rejected' : 'pending';
 }

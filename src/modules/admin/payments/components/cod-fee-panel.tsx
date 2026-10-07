@@ -18,8 +18,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { TXN_ID_MAX, TXN_ID_MIN, txnIdSchema } from '@/contracts/payments';
-import { dueOnDeliveryCents, isFeeUnverified } from '@/lib/cod-fee/compute';
+import { dueOnDeliveryCents } from '@/lib/cod-fee/compute';
 import { describeCodFeeRule } from '@/lib/cod-fee/copy';
+import { canFee } from '@/lib/cod-fee/policy';
 import { formatBDT } from '@/server/common/money';
 import { DuplicateTxnDialog } from '@/modules/admin/payments/components/duplicate-txn-dialog';
 import { FeeStatusBadge } from '@/modules/admin/payments/components/fee-status-badge';
@@ -61,9 +62,9 @@ export function CodFeePanel({ order, payment }: CodFeePanelProps) {
 
   const orderPending = order.status === OrderStatus.PENDING;
   // Verifying and editing the txn id are allowed in exactly the same states.
-  const canVerify = orderPending && isFeeUnverified(payment.feeStatus);
+  const canVerify = orderPending && canFee('verify', payment.feeStatus);
   const canEditTxn = canVerify;
-  const canReject = orderPending && payment.feeStatus === CodFeeStatus.PENDING;
+  const canReject = orderPending && canFee('reject', payment.feeStatus);
 
   const rule =
     payment.feeType && payment.feeValue !== null

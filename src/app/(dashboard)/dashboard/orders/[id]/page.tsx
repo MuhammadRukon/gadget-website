@@ -12,7 +12,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader } from '@/app/common/loader/loader';
 import { Textarea } from '@/components/ui/textarea';
 import { formatBDT } from '@/server/common/money';
-import { dueOnDeliveryCents, isFeeUnverified } from '@/lib/cod-fee/compute';
+import { dueOnDeliveryCents } from '@/lib/cod-fee/compute';
+import { canFee } from '@/lib/cod-fee/policy';
 import { OrderStatusBadge } from '@/modules/orders/components/order-status-badge';
 import { CodFeePanel, hasCodFee } from '@/modules/admin/payments/components/cod-fee-panel';
 
@@ -63,7 +64,7 @@ export default function AdminOrderDetailPage() {
   const feePayment = hasCodFee(o.payments[0]) ? o.payments[0] : null;
   // Confirming by hand while the fee is unverified (or rejected) waives it server-side.
   const confirmWaivesFee =
-    o.status === OrderStatus.PENDING && !!feePayment && isFeeUnverified(feePayment.feeStatus);
+    o.status === OrderStatus.PENDING && !!feePayment && canFee('waive', feePayment.feeStatus);
 
   function runTransition(status: OrderStatus) {
     transition.mutate({ status, note: note || undefined }, { onSuccess: () => setNote('') });

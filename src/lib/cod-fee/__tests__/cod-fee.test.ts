@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import { formatBDT } from '@/server/common/money';
 
-import { computeCodConfirmationFee, dueOnDeliveryCents, isFeeUnverified } from '../compute';
+import { computeCodConfirmationFee, dueOnDeliveryCents } from '../compute';
 import { buildCodFeeWarning, buildFeeRejectedMessage, describeCodFeeRule } from '../copy';
 
 const FLAT = CodFeeType.FLAT;
@@ -137,16 +137,6 @@ describe('dueOnDeliveryCents', () => {
     expect(dueOnDeliveryCents({ ...base, feeStatus: CodFeeStatus.WAIVED })).toBe(500_000);
     expect(dueOnDeliveryCents({ ...base, feeStatus: CodFeeStatus.REJECTED })).toBe(500_000);
     expect(dueOnDeliveryCents({ ...base, feeStatus: CodFeeStatus.NONE })).toBe(500_000);
-  });
-});
-
-describe('isFeeUnverified', () => {
-  it('is true only for PENDING and REJECTED', () => {
-    expect(isFeeUnverified(CodFeeStatus.PENDING)).toBe(true);
-    expect(isFeeUnverified(CodFeeStatus.REJECTED)).toBe(true);
-    expect(isFeeUnverified(CodFeeStatus.VERIFIED)).toBe(false);
-    expect(isFeeUnverified(CodFeeStatus.WAIVED)).toBe(false);
-    expect(isFeeUnverified(CodFeeStatus.NONE)).toBe(false);
   });
 });
 

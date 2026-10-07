@@ -8,7 +8,7 @@ import {
   NotFoundError,
   TxnIdDuplicateError,
 } from '@/server/common/errors';
-import { FEE_UNVERIFIED_STATUSES, isFeeUnverified } from '@/lib/cod-fee/compute';
+import { FEE_ACTIONS, canFee, feeFrom } from '@/lib/cod-fee/policy';
 import { log } from '@/server/common/logger';
 import { orderStatusEmail, paymentResultEmail, sendMail } from '@/server/common/mailer';
 import {
@@ -274,16 +274,15 @@ export const paymentsService = {
       if (payment.status !== PaymentStatus.PENDING) {
         throw new ConflictError('Payment already processed');
       }
-      // A COD order with an undecided confirmation fee must go through
+      // A COD order whose confirmation fee is still unverified must go through
       // verifyCodFee first (or be confirmed/waived via ordersService.transition).
-      if (payment.method === PaymentMethod.COD && payment.feeStatus === CodFeeStatus.PENDING) {
-        throw new ConflictError('Verify the confirmation fee first');
-      }
       // A rejected fee is a decision already made: the admin either waives it
-      // by confirming the order (ordersService.transition) or reopens it.
-      if (payment.method === PaymentMethod.COD && payment.feeStatus === CodFeeStatus.REJECTED) {
+      // by confirming the order or reopens it by verifying the fee.
+      if (payment.method === PaymentMethod.COD && canFee('verify', payment.feeStatus)) {
         throw new ConflictError(
-          'The confirmation fee was rejected. Verify the fee, or waive it by changing the order status to Confirmed.',
+          payment.feeStatus === CodFeeStatus.REJECTED
+            ? 'The confirmation fee was rejected. Verify the fee, or waive it by changing the order status to Confirmed.'
+            : 'Verify the confirmation fee first',
         );
       }
 
@@ -340,7 +339,8 @@ export const paymentsService = {
           include: { order: true },
         });
         if (!payment || payment.order.userId !== userId) throw new NotFoundError('Payment');
-        if (payment.method !== PaymentMethod.COD || payment.feeStatus !== CodFeeStatus.PENDING) {
+        if (payment.method !== PaymentMethod.COD || !canFee('reject', payment.feeStatus)) {
+          // Customers may add the id only while the fee awaits its first decision.
           throw new ConflictError('No confirmation fee is awaiting a transaction ID');
         }
         if (payment.order.status !== OrderStatus.PENDING) {
@@ -351,7 +351,7 @@ export const paymentsService = {
 
         // Atomic add-only write: loses cleanly to a concurrent submit.
         const res = await tx.payment.updateMany({
-          where: { id: paymentId, customerTxnId: null, feeStatus: CodFeeStatus.PENDING },
+          where: { id: paymentId, customerTxnId: null, feeStatus: { in: feeFrom('reject') } },
           data: { customerTxnId: txnId, txnSubmittedAt: new Date() },
         });
         if (res.count !== 1) throw new ConflictError('Transaction ID already submitted');
@@ -396,7 +396,7 @@ export const paymentsService = {
           include: { order: true },
         });
         if (!payment) throw new NotFoundError('Payment');
-        if (payment.method !== PaymentMethod.COD || !isFeeUnverified(payment.feeStatus)) {
+        if (payment.method !== PaymentMethod.COD || !canFee('verify', payment.feeStatus)) {
           throw new ConflictError('Transaction ID can only be set while the fee is unverified');
         }
         if (payment.order.status !== OrderStatus.PENDING) {
@@ -416,7 +416,7 @@ export const paymentsService = {
         const res = await tx.payment.updateMany({
           where: {
             id: paymentId,
-            feeStatus: { in: [...FEE_UNVERIFIED_STATUSES] },
+            feeStatus: { in: feeFrom('verify') },
           },
           data: { customerTxnId: txnId, txnSubmittedAt: new Date() },
         });
@@ -472,16 +472,14 @@ export const paymentsService = {
         throw new BadRequestError('Confirmation fee only applies to COD payments');
       }
       // VERIFIED may follow an earlier rejection (the customer paid after all);
-      // REJECTED is only a first decision.
-      const decidable: CodFeeStatus[] =
-        outcome === 'VERIFIED' ? [...FEE_UNVERIFIED_STATUSES] : [CodFeeStatus.PENDING];
-      if (!decidable.includes(payment.feeStatus)) {
+      // REJECTED is only a first decision (see FEE_ACTIONS).
+      const action = outcome === 'VERIFIED' ? 'verify' : 'reject';
+      if (!canFee(action, payment.feeStatus)) {
         throw new ConflictError('Confirmation fee already processed');
       }
       if (payment.order.status !== OrderStatus.PENDING) {
         throw new ConflictError('Order is no longer pending');
       }
-      const afterRejection = payment.feeStatus === CodFeeStatus.REJECTED;
 
       // Claim the order row before touching the payment: VERIFIED moves it to
       // CONFIRMED, REJECTED is a no-op CAS (same status) that still serializes
@@ -492,21 +490,21 @@ export const paymentsService = {
       if (!claimed) throw new ConflictError('Order status changed, refresh and retry');
 
       const res = await tx.payment.updateMany({
-        where: { id: paymentId, feeStatus: { in: decidable } },
+        where: { id: paymentId, feeStatus: { in: feeFrom(action) } },
         data:
           outcome === 'VERIFIED'
             ? {
-                feeStatus: CodFeeStatus.VERIFIED,
+                feeStatus: FEE_ACTIONS.verify.to,
                 feeVerifiedById: adminId,
                 feeVerifiedAt: new Date(),
               }
-            : { feeStatus: CodFeeStatus.REJECTED },
+            : { feeStatus: FEE_ACTIONS.reject.to },
       });
       if (res.count !== 1) throw new ConflictError('Confirmation fee already processed');
 
       const base =
         outcome === 'VERIFIED'
-          ? afterRejection
+          ? payment.feeStatus === CodFeeStatus.REJECTED
             ? 'COD confirmation fee verified by admin after an earlier rejection'
             : 'COD confirmation fee verified by admin'
           : 'COD confirmation fee rejected by admin';

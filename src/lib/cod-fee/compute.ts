@@ -6,6 +6,8 @@ import {
   isValidCodFeeValue,
 } from '@/contracts/payment-settings';
 
+import { FEE_CREDITED } from './policy';
+
 /**
  * COD confirmation fee calculation (pure, integer cents, client-safe).
  *
@@ -63,18 +65,7 @@ export function dueOnDeliveryCents(input: {
   feeCents: number;
   feeStatus: CodFeeStatus;
 }): number {
-  const credited =
-    input.feeStatus === CodFeeStatus.PENDING || input.feeStatus === CodFeeStatus.VERIFIED;
-  return credited ? input.totalCents - input.feeCents : input.totalCents;
-}
-
-/**
- * Fee states where the admin has not (yet) accepted the fee: it is still
- * expected, or was rejected and may yet be paid, so the txn id can be set,
- * the fee verified, or the fee waived by confirming the order.
- */
-export const FEE_UNVERIFIED_STATUSES = [CodFeeStatus.PENDING, CodFeeStatus.REJECTED] as const;
-
-export function isFeeUnverified(status: CodFeeStatus): boolean {
-  return (FEE_UNVERIFIED_STATUSES as readonly CodFeeStatus[]).includes(status);
+  return FEE_CREDITED.includes(input.feeStatus)
+    ? input.totalCents - input.feeCents
+    : input.totalCents;
 }
