@@ -14,7 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader } from '@/app/common/loader/loader';
 import { Textarea } from '@/components/ui/textarea';
 import { formatBDT } from '@/server/common/money';
-import { buildCodFeeWarning } from '@/server/checkout/cod-fee';
+import { buildCodFeeWarning, dueOnDeliveryCents } from '@/server/checkout/cod-fee';
 import { AddTxnIdCard } from '@/modules/checkout/components/add-txn-id-card';
 import { CodFeeNotice } from '@/modules/checkout/components/cod-fee-notice';
 import {
@@ -253,7 +253,13 @@ export default function OrderDetailPage() {
                 </div>
                 <div className="flex justify-between">
                   <span>Due on delivery</span>
-                  <span>{formatBDT(o.totalCents - feePayment.feeCents)}</span>
+                  <span>{formatBDT(
+                      dueOnDeliveryCents({
+                        totalCents: o.totalCents,
+                        feeCents: feePayment.feeCents,
+                        feeStatus: feePayment.feeStatus,
+                      }),
+                    )}</span>
                 </div>
               </>
             ) : null}

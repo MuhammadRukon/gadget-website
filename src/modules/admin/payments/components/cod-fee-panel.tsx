@@ -18,7 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { txnIdSchema } from '@/contracts/payments';
-import { describeCodFeeRule } from '@/server/checkout/cod-fee';
+import { describeCodFeeRule, dueOnDeliveryCents } from '@/server/checkout/cod-fee';
 import { formatBDT } from '@/server/common/money';
 import { DuplicateTxnDialog } from '@/modules/admin/payments/components/duplicate-txn-dialog';
 import { FeeStatusBadge } from '@/modules/admin/payments/components/fee-status-badge';
@@ -116,7 +116,13 @@ export function CodFeePanel({ order, payment }: CodFeePanelProps) {
           </div>
           <div>
             <dt className="text-xs text-muted-foreground">Due on delivery</dt>
-            <dd className="font-medium">{formatBDT(order.totalCents - payment.feeCents)}</dd>
+            <dd className="font-medium">{formatBDT(
+                dueOnDeliveryCents({
+                  totalCents: order.totalCents,
+                  feeCents: payment.feeCents,
+                  feeStatus: payment.feeStatus,
+                }),
+              )}</dd>
           </div>
           <div>
             <dt className="text-xs text-muted-foreground">Customer transaction ID</dt>

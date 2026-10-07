@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader } from '@/app/common/loader/loader';
 import { Textarea } from '@/components/ui/textarea';
 import { formatBDT } from '@/server/common/money';
+import { dueOnDeliveryCents } from '@/server/checkout/cod-fee';
 import { OrderStatusBadge } from '@/modules/orders/components/order-status-badge';
 import { CodFeePanel, hasCodFee } from '@/modules/admin/payments/components/cod-fee-panel';
 
@@ -170,7 +171,13 @@ export default function AdminOrderDetailPage() {
                 </div>
                 <div className="flex justify-between">
                   <span>Due on delivery</span>
-                  <span>{formatBDT(o.totalCents - feePayment.feeCents)}</span>
+                  <span>{formatBDT(
+                      dueOnDeliveryCents({
+                        totalCents: o.totalCents,
+                        feeCents: feePayment.feeCents,
+                        feeStatus: feePayment.feeStatus,
+                      }),
+                    )}</span>
                 </div>
               </>
             ) : null}

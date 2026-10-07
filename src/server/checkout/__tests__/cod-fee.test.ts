@@ -1,9 +1,14 @@
-import { CodFeeType } from '@prisma/client';
+import { CodFeeStatus, CodFeeType } from '@prisma/client';
 import { describe, expect, it } from 'vitest';
 
 import { formatBDT } from '@/server/common/money';
 
-import { buildCodFeeWarning, computeCodConfirmationFee, describeCodFeeRule } from '../cod-fee';
+import {
+  buildCodFeeWarning,
+  computeCodConfirmationFee,
+  describeCodFeeRule,
+  dueOnDeliveryCents,
+} from '../cod-fee';
 
 const FLAT = CodFeeType.FLAT;
 const PERCENT = CodFeeType.PERCENT;
@@ -121,5 +126,20 @@ describe('buildCodFeeWarning', () => {
     });
     expect(msg.endsWith('Pay or contact admin.')).toBe(true);
     expect(msg).not.toContain(' at ');
+  });
+});
+
+describe('dueOnDeliveryCents', () => {
+  const base = { totalCents: 500_000, feeCents: 10_000 };
+
+  it('subtracts the fee while it is PENDING or VERIFIED (advance credit)', () => {
+    expect(dueOnDeliveryCents({ ...base, feeStatus: CodFeeStatus.PENDING })).toBe(490_000);
+    expect(dueOnDeliveryCents({ ...base, feeStatus: CodFeeStatus.VERIFIED })).toBe(490_000);
+  });
+
+  it('is the full total when the fee was WAIVED, REJECTED or never applied', () => {
+    expect(dueOnDeliveryCents({ ...base, feeStatus: CodFeeStatus.WAIVED })).toBe(500_000);
+    expect(dueOnDeliveryCents({ ...base, feeStatus: CodFeeStatus.REJECTED })).toBe(500_000);
+    expect(dueOnDeliveryCents({ ...base, feeStatus: CodFeeStatus.NONE })).toBe(500_000);
   });
 });

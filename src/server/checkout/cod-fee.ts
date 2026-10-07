@@ -1,4 +1,4 @@
-import { CodFeeType } from '@prisma/client';
+import { CodFeeStatus, CodFeeType } from '@prisma/client';
 
 import type { CodFeeRule } from '@/contracts/payment-settings';
 import { formatBDT } from '@/server/common/money';
@@ -45,6 +45,22 @@ export function computeCodConfirmationFee(input: CodFeeInput): number {
     throw new Error('COD flat fee must not be negative');
   }
   return Math.min(value, totalCents);
+}
+
+/**
+ * Amount the customer still owes in cash on delivery. The fee is an advance
+ * credit only while it is PENDING (expected) or VERIFIED (received); when it
+ * was WAIVED or REJECTED, or never applied, nothing was collected up front,
+ * so the whole total is due. Pure and client-safe (used by order pages).
+ */
+export function dueOnDeliveryCents(input: {
+  totalCents: number;
+  feeCents: number;
+  feeStatus: CodFeeStatus;
+}): number {
+  const credited =
+    input.feeStatus === CodFeeStatus.PENDING || input.feeStatus === CodFeeStatus.VERIFIED;
+  return credited ? input.totalCents - input.feeCents : input.totalCents;
 }
 
 /** Human-readable rule text, e.g. `flat Tk 100` or `25% = Tk 130`. */
