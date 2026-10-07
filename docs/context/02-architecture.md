@@ -30,7 +30,7 @@ UI (src/app pages, src/modules components/hooks)
 - `registry.ts` maps `PaymentMethod` → gateway: `cod.ts` (auto-confirm), `bank-transfer.ts` (customer submits bankRef → admin manually verifies), `bkash.ts` (grant→create→execute token flow), `sslcommerz.ts` (hosted checkout + validator API).
 - Callback routes (`/api/payments/{provider}/{success,fail,cancel,ipn}`) are thin wrappers over `src/app/api/payments/_handlers.ts`.
 - **Sandbox fallback**: with no credentials, providers redirect to `/api/payments/sandbox/*` harness pages that POST back `sandbox_`-prefixed refs. `parseCallback` now checks server-side credential presence *before* trusting that prefix (fixed in `docs/issues/00-fix-scope.md`'s pass; previously the prefix alone was trusted, the project's most critical security flaw — see `docs/issues/01-security.md`).
-- `paymentsService.applyCallback` runs in a transaction, dedupes by terminal payment status, flips order PENDING → CONFIRMED on success, writes an `OrderEvent`. Failed/cancelled payments do **not** restock.
+- `paymentsService.applyCallback` runs in a transaction, dedupes by terminal payment status, flips order PENDING → CONFIRMED on success, writes an `OrderEvent`. Failed/cancelled payments **do restock** (atomically in the same transaction).
 
 ## Cart
 
@@ -40,9 +40,10 @@ UI (src/app pages, src/modules components/hooks)
 
 ## Checkout
 
-1. `POST /api/checkout/quote` — read-only: address + cart lines → subtotal, coupon validation, shipping (`shipping.ts`: Dhaka 60৳ / outside 120৳, free ≥ 5000৳) → totals.
-2. `POST /api/checkout` — `checkoutService.placeOrder` in one `prisma.$transaction`: re-validate stock + coupon, snapshot order items (name/sku/price copied), decrement stock, bump coupon `usedCount`, create `Payment` (PENDING; COD auto-CONFIRMED), clear cart, write `OrderEvent`.
-3. The **route** then calls `paymentsService.kickoff` (outside the transaction) to get the gateway redirect URL.
+1. `GET /api/checkout/config` — returns enabled payment methods (intersection of admin-flagged and gateway-configured), COD fee rule, QR/contact/note (always present, nullable, so orders can display them even if later disabled).
+2. `POST /api/checkout/quote` — optional `paymentMethod` param; returns subtotal + coupon validation + shipping (`shipping.ts`: Dhaka 60৳ / outside 120৳, free ≥ 5000৳), plus `codFeeCents`, `dueOnDeliveryCents` (= total − fee), `codFeeRule` (null if no fee or non-COD method).
+3. `POST /api/checkout` — `checkoutService.placeOrder` in one `prisma.$transaction`: read settings via `tx`, reject disabled methods (400 `BadRequestError`), re-validate stock + coupon, snapshot order items (name/sku/price copied), snapshot fee on Payment if applicable (feeCents/feeType/feeValue/feeStatus: PENDING), store `codFeeCents` on Order, decrement stock, bump coupon `usedCount`, create `Payment` (PENDING; COD auto-CONFIRMED only if no fee applies), optional `customerTxnId` stored and checked for uniqueness (add-only during fee-pending), clear cart, write `OrderEvent` (COD with fee gets "confirmation fee pending" note). Response includes `feeRequired` flag.
+4. The **route** then calls `paymentsService.kickoff` (outside the transaction) to get the gateway redirect URL.
 
 Known caveats: stock decrement and coupon increment are not concurrency-safe; kickoff failure orphans the order; coupon re-validation inside the tx uses the global prisma client, not `tx`. All tracked in `docs/issues/02-correctness.md`.
 
@@ -50,8 +51,8 @@ Known caveats: stock decrement and coupon increment are not concurrency-safe; ki
 
 `PENDING → CONFIRMED → PROCESSING → SHIPPED → DELIVERED`, plus `CANCELLED`.
 
-- COD confirms at checkout; gateway success confirms via callback; bank transfer confirms on admin verify.
-- Admin transitions via `ordersService.transition` — validated against an explicit `ALLOWED_TRANSITIONS` map (fixed in `docs/issues/00-fix-scope.md`'s pass; previously any → any). Admin cancel now restocks atomically, matching customer self-cancel.
+- COD auto-confirms at checkout only when no confirmation fee applies; with a fee, order stays PENDING until admin verifies via `paymentsService.verifyCodFee` (outcome: VERIFIED → CONFIRMED, REJECTED → stays PENDING). Gateway success confirms via callback; bank transfer confirms on admin verify.
+- Admin transitions via `ordersService.transition` — validated against an explicit `ALLOWED_TRANSITIONS` map. When transitioning PENDING→CONFIRMED with COD fee PENDING or REJECTED, auto-waives the fee (sets feeStatus: WAIVED). Admin cancel and customer self-cancel both restock atomically.
 - Customer self-cancel allowed while PENDING/CONFIRMED/PROCESSING — restocks atomically via the shared `restockOrderItems` helper.
 - Every transition writes an `OrderEvent` (status, note, actorId) — the audit trail shown on both customer and admin order pages.
 

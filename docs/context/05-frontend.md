@@ -21,7 +21,7 @@
 
 ## Admin pages (`/dashboard/*`)
 
-Dashboard (analytics cards), Orders (+detail), Payments, Warranty, Products (+new/edit), Categories, Brands, Coupons, Users, Settings (**placeholder stub**). All client components using React Query hooks from `src/modules/admin/**`; tables via shared `src/components/data-table.tsx` (client-side pagination/filtering only).
+Dashboard (analytics cards), Orders (+detail with COD fee panel), Payments (with fee verify), Warranty, Products (+new/edit), Categories, Brands, Coupons, Users, Settings (payment methods, COD fee rule, QR upload, contact, note). All client components using React Query hooks from `src/modules/admin/**`; tables via shared `src/components/data-table.tsx` (client-side pagination/filtering only).
 
 ## Module structure (`src/modules/<domain>`)
 
@@ -29,7 +29,7 @@ Each domain has `hooks.ts` (React Query wrappers over `src/lib/fetcher.ts`) and 
 
 - `storefront/` — product-card, product-grid, product-filters, product-detail (server component + JSON-LD), gallery, purchase panel, pagination, deferred reviews.
 - `cart/` — `guest-cart.ts` (Zustand + localStorage), `hooks.ts` (`useCart` branches guest/server; `useGuestCartMerge` on login), add-to-cart button (always qty 1).
-- `checkout/` — `checkout-client.tsx`: addresses, payment method, coupon, live quote, place order.
+- `checkout/` — `checkout-client.tsx` (addresses, payment method, coupon, live quote, place order), `cod-fee-notice.tsx`, `txn-id-field.tsx` (blur-validated), `add-txn-id-card.tsx` (order page), config/txn-check hooks.
 - `auth/` — server actions (`actions.ts`: signup/forgot/reset), auth-card, google-button.
 - `reviews/`, `orders/`, `account/`, `warranty/`, `admin/*` — hooks + forms.
 
