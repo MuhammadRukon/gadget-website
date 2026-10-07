@@ -6,13 +6,14 @@ import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { CheckCircle2Icon } from 'lucide-react';
-import { OrderStatus, type Payment } from '@prisma/client';
+import { OrderStatus } from '@prisma/client';
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader } from '@/app/common/loader/loader';
 import { Textarea } from '@/components/ui/textarea';
+import type { CustomerPayment } from '@/contracts/payments';
 import { formatBDT } from '@/server/common/money';
 import { buildCodFeeWarning, dueOnDeliveryCents } from '@/server/checkout/cod-fee';
 import { AddTxnIdCard } from '@/modules/checkout/components/add-txn-id-card';
@@ -32,7 +33,7 @@ const CANCELLABLE: OrderStatus[] = ['PENDING', 'CONFIRMED', 'PROCESSING'];
 type PaymentConfigQuery = ReturnType<typeof usePaymentConfig>;
 
 /** Read-only display of the submitted id. Never an input: it is add-only. */
-function SubmittedTxnId({ payment }: { payment: Payment }) {
+function SubmittedTxnId({ payment }: { payment: CustomerPayment }) {
   if (!payment.customerTxnId) return null;
   return (
     <Card>
@@ -62,7 +63,7 @@ function FeeSection({
   config,
 }: {
   state: Exclude<FeeNoticeState, 'none'>;
-  payment: Payment;
+  payment: CustomerPayment;
   config: PaymentConfigQuery;
 }) {
   const contact = config.data?.contactNumber ?? null;

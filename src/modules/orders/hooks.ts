@@ -4,12 +4,14 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
 import { apiFetch } from '@/lib/fetcher';
-import type { Order, OrderEvent, OrderItem, Payment, Address } from '@prisma/client';
+import type { Order, OrderEvent, OrderItem, Address } from '@prisma/client';
 
-type OrderListItem = Order & { items: OrderItem[]; payments: Payment[] };
+import type { CustomerPayment } from '@/contracts/payments';
+
+type OrderListItem = Order & { items: OrderItem[]; payments: CustomerPayment[] };
 type OrderWithDetails = Order & {
   items: OrderItem[];
-  payments: Payment[];
+  payments: CustomerPayment[];
   events: OrderEvent[];
   address: Address | null;
 };
@@ -58,7 +60,7 @@ export function useSubmitTxnId() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: { paymentId: string; txnId: string }) =>
-      apiFetch<{ payment: Payment }>('/api/payments/txn-id', { method: 'POST', body: input }),
+      apiFetch<{ payment: CustomerPayment }>('/api/payments/txn-id', { method: 'POST', body: input }),
     onSuccess: () => {
       toast.success('Transaction ID submitted');
       void qc.invalidateQueries({ queryKey: ['orders'] });

@@ -1,9 +1,34 @@
+import type { Payment } from '@prisma/client';
 import { z } from 'zod';
 
 /**
  * Customer-facing payloads. Admin-facing schemas live in
  * `src/contracts/admin.ts` if/when they grow beyond a single use.
  */
+
+/**
+ * The only Payment columns a customer-facing response may carry. Excludes
+ * rawPayload, bankRef, providerRef and verifier ids/timestamps (gateway and
+ * admin internals). Server queries build their `select` from this list, and
+ * client code types payments as `CustomerPayment`.
+ */
+export const CUSTOMER_PAYMENT_FIELDS = [
+  'id',
+  'orderId',
+  'method',
+  'status',
+  'amountCents',
+  'feeCents',
+  'feeType',
+  'feeValue',
+  'feeStatus',
+  'customerTxnId',
+  'txnSubmittedAt',
+  'createdAt',
+  'updatedAt',
+] as const satisfies readonly (keyof Payment)[];
+export type CustomerPaymentField = (typeof CUSTOMER_PAYMENT_FIELDS)[number];
+export type CustomerPayment = Pick<Payment, CustomerPaymentField>;
 
 export const submitBankReferenceSchema = z.object({
   paymentId: z.string().min(1),

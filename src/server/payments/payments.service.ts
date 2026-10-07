@@ -10,7 +10,11 @@ import {
 } from '@/server/common/errors';
 import { log } from '@/server/common/logger';
 import { orderStatusEmail, paymentResultEmail, sendMail } from '@/server/common/mailer';
-import { claimOrderStatus, restockOrderItems } from '@/server/orders/orders.service';
+import {
+  claimOrderStatus,
+  customerPaymentSelect,
+  restockOrderItems,
+} from '@/server/orders/orders.service';
 import { normalizeTxnId, type InitiatedPayment } from '@/contracts/payments';
 
 import type { CallbackOutcome, PaymentInitInput } from './gateway.interface';
@@ -247,7 +251,11 @@ export const paymentsService = {
     if (payment.status !== PaymentStatus.PENDING) {
       throw new ConflictError('Payment already processed');
     }
-    return prisma.payment.update({ where: { id: paymentId }, data: { bankRef } });
+    return prisma.payment.update({
+      where: { id: paymentId },
+      data: { bankRef },
+      select: customerPaymentSelect,
+    });
   },
 
   /**
@@ -355,7 +363,10 @@ export const paymentsService = {
             actorId: userId,
           },
         });
-        return tx.payment.findUniqueOrThrow({ where: { id: paymentId } });
+        return tx.payment.findUniqueOrThrow({
+          where: { id: paymentId },
+          select: customerPaymentSelect,
+        });
       });
     } catch (err) {
       // Lost a race on the unique index despite the pre-check.

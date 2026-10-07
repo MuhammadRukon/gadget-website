@@ -2,12 +2,29 @@ import { CodFeeStatus, OrderStatus, PaymentMethod, Prisma } from '@prisma/client
 import { prisma } from '@/lib/prisma';
 import { ConflictError, ForbiddenError, NotFoundError } from '@/server/common/errors';
 import { orderStatusEmail, sendMail } from '@/server/common/mailer';
+import { CUSTOMER_PAYMENT_FIELDS, type CustomerPaymentField } from '@/contracts/payments';
 
-const orderInclude = {
+/** Payment columns safe to return to the customer (see CUSTOMER_PAYMENT_FIELDS). */
+export const customerPaymentSelect = Object.fromEntries(
+  CUSTOMER_PAYMENT_FIELDS.map((field) => [field, true]),
+) as Record<CustomerPaymentField, true>;
+
+const baseOrderInclude = {
   items: true,
-  payments: true,
   events: { orderBy: { createdAt: 'asc' as const } },
   address: true,
+} satisfies Prisma.OrderInclude;
+
+/** Customer-facing detail: payments are trimmed to `customerPaymentSelect`. */
+const orderInclude = {
+  ...baseOrderInclude,
+  payments: { select: customerPaymentSelect },
+} satisfies Prisma.OrderInclude;
+
+/** Admin detail: the full payment row. */
+const adminOrderInclude = {
+  ...baseOrderInclude,
+  payments: true,
 } satisfies Prisma.OrderInclude;
 
 export type OrderWithDetails = Prisma.OrderGetPayload<{ include: typeof orderInclude }>;
@@ -91,7 +108,7 @@ export const ordersService = {
   listByUser(userId: string) {
     return prisma.order.findMany({
       where: { userId },
-      include: { items: true, payments: true },
+      include: { items: true, payments: { select: customerPaymentSelect } },
       orderBy: { createdAt: 'desc' },
     });
   },
@@ -117,7 +134,7 @@ export const ordersService = {
   async getAdmin(id: string) {
     const order = await prisma.order.findUnique({
       where: { id },
-      include: { ...orderInclude, user: true },
+      include: { ...adminOrderInclude, user: true },
     });
     if (!order) throw new NotFoundError('Order');
     return order;
