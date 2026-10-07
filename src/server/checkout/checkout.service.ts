@@ -1,23 +1,43 @@
-import { OrderStatus, PaymentMethod, PaymentStatus } from '@prisma/client';
+import { CodFeeStatus, OrderStatus, PaymentMethod, PaymentStatus } from '@prisma/client';
 import { randomBytes } from 'crypto';
 
 import { prisma } from '@/lib/prisma';
-import type { CheckoutInput, CheckoutQuote, StockConflictMeta } from '@/contracts/checkout';
+import type {
+  CheckoutInput,
+  CheckoutQuote,
+  PaymentMethodUnavailableMeta,
+  StockConflictMeta,
+} from '@/contracts/checkout';
+import { normalizeTxnId } from '@/contracts/payments';
 import { applyDiscount } from '@/server/common/money';
 import {
   BadRequestError,
   ConflictError,
   NotFoundError,
+  TxnIdDuplicateError,
 } from '@/server/common/errors';
 import { couponsService } from '@/server/coupons/coupons.service';
 import { cancelOrderInTx } from '@/server/orders/orders.service';
+import { findPaymentByTxnId, isTxnIdUniqueViolation } from '@/server/payments/txn-id';
+import {
+  effectiveMethods,
+  paymentSettingsService,
+} from '@/server/settings/payment-settings.service';
 
 import { computeShippingCents } from './shipping';
+import { computeOrderTotals, resolveCodFee, type ResolvedCodFee } from './totals';
 
 interface QuoteInput {
   userId: string;
   addressId: string;
   couponCode?: string;
+  paymentMethod?: PaymentMethod;
+}
+
+/** 400 for a method the admin has not enabled (or whose gateway has no credentials). */
+function paymentMethodUnavailable(method: PaymentMethod): BadRequestError {
+  const meta: PaymentMethodUnavailableMeta = { reason: 'payment_method_unavailable', method };
+  return new BadRequestError('That payment method is no longer available', meta);
 }
 
 function generateOrderNumber(): string {
@@ -155,8 +175,29 @@ export const checkoutService = {
       itemCount,
     });
 
-    const totalCents = Math.max(0, subtotalCents - discountCents) + shippingCents;
-    return { subtotalCents, discountCents, shippingCents, totalCents, couponCode };
+    const totalCents = computeOrderTotals({ subtotalCents, discountCents, shippingCents });
+
+    // A fee only ever applies to an explicitly requested COD quote.
+    let codFee: ResolvedCodFee | null = null;
+    if (input.paymentMethod) {
+      const settings = await paymentSettingsService.get();
+      if (!effectiveMethods(settings).includes(input.paymentMethod)) {
+        throw paymentMethodUnavailable(input.paymentMethod);
+      }
+      codFee = resolveCodFee({ method: input.paymentMethod, settings, totalCents });
+    }
+    const codFeeCents = codFee?.feeCents ?? 0;
+
+    return {
+      subtotalCents,
+      discountCents,
+      shippingCents,
+      totalCents,
+      couponCode,
+      codFeeCents,
+      dueOnDeliveryCents: totalCents - codFeeCents,
+      codFeeRule: codFee?.rule ?? null,
+    };
   },
 
   /**
@@ -169,11 +210,16 @@ export const checkoutService = {
    *   4. Create the `Order`, snapshotting every line into `OrderItem`
    *      (price, name, sku, image, buying price) so future catalog
    *      changes never alter past orders.
+   *      Before any stock is touched, the chosen payment method is checked
+   *      against the admin's effective settings, and the COD confirmation
+   *      fee (if any) is resolved and snapshotted on the `Payment`.
    *   5. Decrement variant stock atomically (in sorted variantId order);
    *      the conditional update is the real oversell guard.
    *   6. Bump coupon `usedCount` if applied.
-   *   7. Create the `Payment` row in PENDING (COD is auto-confirmed at the
-   *      order level; payment itself stays PENDING until cash is collected).
+   *   7. Create the `Payment` row in PENDING. COD is auto-confirmed at the
+   *      order level unless a confirmation fee applies, in which case the
+   *      order stays PENDING until an admin verifies the fee; the payment
+   *      itself stays PENDING until cash is collected.
    *   8. Append an `OrderEvent` for audit.
    * Anything failing rolls the whole thing back atomically.
    */
@@ -210,6 +256,15 @@ export const checkoutService = {
       });
       if (consumed.count !== cartItems.length) {
         throw new ConflictError('Your cart changed, please review and try again');
+      }
+
+      // Enforce the admin's payment-method settings with a single settings
+      // read via tx (`effectiveMethods` also drops gateways without
+      // credentials). Before any stock mutation: a throw rolls back,
+      // including the cart consume above.
+      const settings = await paymentSettingsService.get(tx);
+      if (!effectiveMethods(settings).includes(input.paymentMethod)) {
+        throw paymentMethodUnavailable(input.paymentMethod);
       }
 
       // 2. Re-validate availability and per-line stock.
@@ -250,7 +305,16 @@ export const checkoutService = {
         subtotalCents: subtotalCents - discountCents,
         itemCount,
       });
-      const totalCents = Math.max(0, subtotalCents - discountCents) + shippingCents;
+      const totalCents = computeOrderTotals({ subtotalCents, discountCents, shippingCents });
+
+      // COD confirmation fee: an advance credit (totalCents is unchanged).
+      const codFee = resolveCodFee({ method: input.paymentMethod, settings, totalCents });
+      // The txn id only means something when a fee is being paid; ignore it otherwise.
+      const customerTxnId =
+        codFee && input.customerTxnId ? normalizeTxnId(input.customerTxnId) : null;
+      if (customerTxnId && (await findPaymentByTxnId(tx, customerTxnId))) {
+        throw new TxnIdDuplicateError();
+      }
 
       // 4. Create order with snapshotted address + items.
       const order = await tx.order.create({
@@ -271,6 +335,7 @@ export const checkoutService = {
           discountCents,
           shippingCents,
           totalCents,
+          codFeeCents: codFee?.feeCents ?? 0,
           couponId,
           couponCode,
           notes: input.notes ?? null,
@@ -326,15 +391,30 @@ export const checkoutService = {
       }
 
       // 7. Create payment record.
-      const isCod = input.paymentMethod === PaymentMethod.COD;
-      const payment = await tx.payment.create({
-        data: {
-          orderId: order.id,
-          method: input.paymentMethod,
-          status: PaymentStatus.PENDING,
-          amountCents: totalCents,
-        },
-      });
+      let payment;
+      try {
+        payment = await tx.payment.create({
+          data: {
+            orderId: order.id,
+            method: input.paymentMethod,
+            status: PaymentStatus.PENDING,
+            amountCents: totalCents,
+            ...(codFee
+              ? {
+                  feeCents: codFee.feeCents,
+                  feeType: codFee.rule.type,
+                  feeValue: codFee.rule.value,
+                  feeStatus: CodFeeStatus.PENDING,
+                  ...(customerTxnId ? { customerTxnId, txnSubmittedAt: new Date() } : {}),
+                }
+              : {}),
+          },
+        });
+      } catch (err) {
+        // Lost a race on the unique index despite the pre-check above.
+        if (customerTxnId && isTxnIdUniqueViolation(err)) throw new TxnIdDuplicateError();
+        throw err;
+      }
 
       // 8. Audit (cart was consumed at the top of the transaction).
       await tx.orderEvent.create({
@@ -346,8 +426,18 @@ export const checkoutService = {
         },
       });
 
-      // Auto-confirm COD orders so the admin sees them in CONFIRMED state.
-      if (isCod) {
+      if (codFee) {
+        // Stays PENDING until an admin verifies the fee (paymentsService.verifyCodFee).
+        await tx.orderEvent.create({
+          data: {
+            orderId: order.id,
+            status: OrderStatus.PENDING,
+            note: 'COD confirmation fee pending',
+            actorId: userId,
+          },
+        });
+      } else if (input.paymentMethod === PaymentMethod.COD) {
+        // No fee: auto-confirm COD orders so the admin sees them in CONFIRMED state.
         await tx.order.update({
           where: { id: order.id },
           data: { status: OrderStatus.CONFIRMED },
@@ -367,7 +457,7 @@ export const checkoutService = {
         include: { items: true, payments: true },
       });
       if (!placed) throw new Error('Order disappeared after creation');
-      return { order: placed, paymentId: payment.id };
+      return { order: placed, paymentId: payment.id, feeRequired: codFee !== null };
     });
   },
 

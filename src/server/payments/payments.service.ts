@@ -59,8 +59,9 @@ export const paymentsService = {
     }
 
     if (payment.method === PaymentMethod.COD) {
-      // COD never has a gateway hop. The order was already auto-confirmed
-      // in checkoutService; nothing to redirect to.
+      // COD never has a gateway hop. checkoutService already auto-confirmed
+      // the order, or left it PENDING awaiting its confirmation fee
+      // (verifyCodFee); nothing to redirect to either way.
       return { paymentId: payment.id, redirectUrl: null };
     }
 

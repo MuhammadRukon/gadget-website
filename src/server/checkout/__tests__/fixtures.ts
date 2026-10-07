@@ -2,7 +2,17 @@
  * Live-DB fixtures for checkout tests (not a test file). Every row uses a
  * random suffix; ids are tracked so `cleanupCheckoutFixtures` can remove them.
  */
-import { CouponType, PublishStatus } from '@prisma/client';
+import {
+  CodFeeStatus,
+  CodFeeType,
+  CouponType,
+  OrderStatus,
+  PaymentMethod,
+  PaymentStatus,
+  PublishStatus,
+  type PaymentSettings,
+  UserRole,
+} from '@prisma/client';
 
 import { prisma } from '@/lib/prisma';
 
@@ -15,11 +25,152 @@ function rand() {
   return Math.random().toString(36).slice(2, 10);
 }
 
+const SETTINGS_ID = 'singleton';
+type SettingsPatch = Partial<Omit<PaymentSettings, 'id' | 'updatedAt'>>;
+
+/**
+ * The PaymentSettings singleton is shared global state. The first mutation in
+ * a test snapshots the original row (or its absence); `cleanupCheckoutFixtures`
+ * restores it. Files that mutate it, or rely on its defaults, must not run in
+ * parallel with each other (see the `settings-serial` project in vitest.config.ts).
+ */
+let settingsSnapshot: { row: PaymentSettings | null } | null = null;
+
+async function snapshotSettings() {
+  if (!settingsSnapshot) {
+    settingsSnapshot = {
+      row: await prisma.paymentSettings.findUnique({ where: { id: SETTINGS_ID } }),
+    };
+  }
+}
+
+/** Upserts the singleton as the migration defaults (COD on, fee off) overlaid with `patch`. */
+export async function setPaymentSettings(patch: SettingsPatch = {}) {
+  await snapshotSettings();
+  const data = {
+    codEnabled: true,
+    bkashEnabled: false,
+    sslcommerzEnabled: false,
+    bankTransferEnabled: false,
+    codFeeEnabled: false,
+    codFeeType: CodFeeType.FLAT,
+    codFeeValue: 10_000,
+    qrImageUrl: null,
+    qrImagePublicId: null,
+    contactNumber: null,
+    paymentNote: null,
+    updatedById: null,
+    ...patch,
+  };
+  return prisma.paymentSettings.upsert({
+    where: { id: SETTINGS_ID },
+    create: { id: SETTINGS_ID, ...data },
+    update: data,
+  });
+}
+
+/** Removes the singleton row so the code under test falls back to defaults. */
+export async function deletePaymentSettings() {
+  await snapshotSettings();
+  await prisma.paymentSettings.deleteMany({ where: { id: SETTINGS_ID } });
+}
+
+async function restoreSettings() {
+  if (!settingsSnapshot) return;
+  const { row } = settingsSnapshot;
+  settingsSnapshot = null;
+  if (row) {
+    const { id, updatedAt, ...data } = row;
+    void updatedAt;
+    await prisma.paymentSettings.upsert({ where: { id }, create: { id, ...data }, update: data });
+  } else {
+    await prisma.paymentSettings.deleteMany({ where: { id: SETTINGS_ID } });
+  }
+}
+
+export async function createAdminUser() {
+  const admin = await prisma.user.create({
+    data: { email: `checkout-admin-${rand()}@example.com`, name: 'Admin Test', role: UserRole.ADMIN },
+  });
+  createdUserIds.push(admin.id);
+  return admin;
+}
+
+export interface ManualOrderOptions {
+  userId?: string;
+  orderStatus?: OrderStatus;
+  method?: PaymentMethod;
+  feeStatus?: CodFeeStatus;
+  feeCents?: number;
+  customerTxnId?: string | null;
+  bankRef?: string | null;
+  totalCents?: number;
+}
+
+/**
+ * Hand-built order + payment (no placeOrder, no settings dependency) for
+ * payments/orders service tests. Tracked for cleanup via the user.
+ */
+export async function createManualOrder(opts: ManualOrderOptions = {}) {
+  const suffix = rand();
+  const totalCents = opts.totalCents ?? 200_000;
+  let userId = opts.userId;
+  if (!userId) {
+    const user = await prisma.user.create({
+      data: { email: `checkout-manual-${suffix}@example.com`, name: 'Manual Order Test' },
+    });
+    createdUserIds.push(user.id);
+    userId = user.id;
+  }
+  const address = await prisma.address.create({
+    data: {
+      userId,
+      recipientName: 'Manual Order Test',
+      recipientPhone: '01700000000',
+      line1: 'Test Lane 1',
+      city: 'Dhaka',
+    },
+  });
+  const order = await prisma.order.create({
+    data: {
+      orderNumber: `MANUAL-${suffix.toUpperCase()}`,
+      userId,
+      addressId: address.id,
+      status: opts.orderStatus ?? OrderStatus.PENDING,
+      shipRecipient: 'Manual Order Test',
+      shipPhone: '01700000000',
+      shipLine1: 'Test Lane 1',
+      shipCity: 'Dhaka',
+      shipCountry: 'BD',
+      subtotalCents: totalCents,
+      totalCents,
+      codFeeCents: opts.feeCents ?? 0,
+    },
+  });
+  const payment = await prisma.payment.create({
+    data: {
+      orderId: order.id,
+      method: opts.method ?? PaymentMethod.COD,
+      status: PaymentStatus.PENDING,
+      amountCents: totalCents,
+      feeStatus: opts.feeStatus ?? CodFeeStatus.NONE,
+      feeCents: opts.feeCents ?? 0,
+      feeType: opts.feeCents ? CodFeeType.FLAT : null,
+      feeValue: opts.feeCents ? opts.feeCents : null,
+      customerTxnId: opts.customerTxnId ?? null,
+      bankRef: opts.bankRef ?? null,
+    },
+  });
+  return { userId, order, payment };
+}
+
 export interface CheckoutFixtureOptions {
   stock: number;
   cartQty: number;
   /** When set, creates an active coupon with this perUserLimit. */
   couponPerUserLimit?: number;
+  /** Variant selling price in cents (default 100_000). */
+  unitPriceCents?: number;
 }
 
 /** Creates a user + address + cart (qty of `variant`) and tracks the user for cleanup. */
@@ -71,7 +222,7 @@ export async function createCheckoutFixture(opts: CheckoutFixtureOptions) {
       productId: product.id,
       sku: `CHECKOUT-TEST-${suffix}`,
       buyingPriceCents: 50_000,
-      sellingPriceCents: 100_000,
+      sellingPriceCents: opts.unitPriceCents ?? 100_000,
       stock: opts.stock,
       isActive: true,
     },
@@ -128,6 +279,7 @@ export async function cleanupCheckoutFixtures() {
   const brandIds = createdBrandIds.splice(0);
   const couponIds = createdCouponIds.splice(0);
 
+  await restoreSettings();
   // Orders cascade items/payments/events; they must go before users/coupons.
   await prisma.order.deleteMany({ where: { userId: { in: userIds } } });
   // CartItem.variant is restrict, so carts (cascade items) go before products.

@@ -7,6 +7,9 @@ import type { PaymentGateway } from '../gateway.interface';
  * simply tell the client there's nothing to redirect to. The actual
  * payment is collected when the courier hands over the parcel; admin
  * marks the order as paid via `/api/admin/payments/[id]/verify`.
+ * When a COD confirmation fee applies, the order stays PENDING until the
+ * admin verifies the fee via `/api/admin/payments/[id]/fee`; cash verify
+ * is blocked until then.
  *
  * We still implement the strategy interface so the rest of the system
  * can treat every method uniformly.
