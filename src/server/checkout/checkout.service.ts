@@ -2,37 +2,24 @@ import { CodFeeStatus, OrderStatus, PaymentMethod, PaymentStatus } from '@prisma
 import { randomBytes } from 'crypto';
 
 import { prisma } from '@/lib/prisma';
-import type {
-  CheckoutInput,
-  CheckoutQuote,
-  PaymentMethodUnavailableMeta,
-  StockConflictMeta,
-} from '@/contracts/checkout';
+import type { CheckoutInput, CheckoutQuote, StockConflictMeta } from '@/contracts/checkout';
 import { normalizeTxnId } from '@/contracts/payments';
 import { BadRequestError, ConflictError, NotFoundError } from '@/server/common/errors';
-import { couponsService } from '@/server/coupons/coupons.service';
 import { cancelOrderInTx } from '@/server/orders/orders.service';
 import { assertTxnIdFree, mapTxnIdViolation } from '@/server/payments/txn-id';
 import {
-  effectiveMethods,
+  assertMethodAvailable,
   paymentSettingsService,
 } from '@/server/settings/payment-settings.service';
 
 import { loadCart, type ResolvedCartLine } from './cart-lines';
-import { computeShippingCents } from './shipping';
-import { computeOrderTotals, resolveCodFee, type ResolvedCodFee } from './totals';
+import { priceOrder } from './pricing';
 
 interface QuoteInput {
   userId: string;
   addressId: string;
   couponCode?: string;
   paymentMethod?: PaymentMethod;
-}
-
-/** 400 for a method the admin has not enabled (or whose gateway has no credentials). */
-function paymentMethodUnavailable(method: PaymentMethod): BadRequestError {
-  const meta: PaymentMethodUnavailableMeta = { reason: 'payment_method_unavailable', method };
-  return new BadRequestError('That payment method is no longer available', meta);
 }
 
 function generateOrderNumber(): string {
@@ -87,12 +74,6 @@ function assertLineAvailable(item: {
   }
 }
 
-/** Value of a settled promise, or rethrows its rejection. */
-function unwrapSettled<T>(result: PromiseSettledResult<T>): T {
-  if (result.status === 'rejected') throw result.reason;
-  return result.value;
-}
-
 async function loadAddressOrThrow(userId: string, addressId: string) {
   const address = await prisma.address.findFirst({ where: { id: addressId, userId } });
   if (!address) throw new NotFoundError('Address');
@@ -107,58 +88,29 @@ async function loadCartLines(userId: string): Promise<ResolvedCartLine[]> {
 
 export const checkoutService = {
   async quote(input: QuoteInput): Promise<CheckoutQuote> {
-    // Independent reads run concurrently; results are unwrapped in the original
-    // order (address, cart, settings) so the first error thrown is unchanged.
-    const [addressResult, linesResult, settingsResult] = await Promise.allSettled([
-      loadAddressOrThrow(input.userId, input.addressId),
-      loadCartLines(input.userId),
-      input.paymentMethod ? paymentSettingsService.get() : Promise.resolve(null),
+    const { userId, addressId, couponCode, paymentMethod } = input;
+    // Independent reads run concurrently. Settings are only needed (and only
+    // read) when the caller asks about a payment method.
+    const [address, lines, settings] = await Promise.all([
+      loadAddressOrThrow(userId, addressId),
+      loadCartLines(userId),
+      paymentMethod ? paymentSettingsService.get() : undefined,
     ]);
-    const address = unwrapSettled(addressResult);
-    const lines = unwrapSettled(linesResult);
-    const subtotalCents = lines.reduce((sum, l) => sum + l.unitPriceCents * l.quantity, 0);
+    const payment = paymentMethod && settings ? { method: paymentMethod, settings } : undefined;
 
-    let discountCents = 0;
-    let couponCode: string | null = null;
-    if (input.couponCode) {
-      const validated = await couponsService.validate({
-        code: input.couponCode,
-        userId: input.userId,
-        subtotalCents,
-      });
-      discountCents = validated.discountCents;
-      couponCode = validated.code;
-    }
+    const priced = await priceOrder(prisma, { userId, address, lines, couponCode, payment });
+    if (payment) assertMethodAvailable(payment.settings, payment.method);
 
-    const itemCount = lines.reduce((sum, l) => sum + l.quantity, 0);
-    const shippingCents = computeShippingCents({
-      city: address.city,
-      subtotalCents: subtotalCents - discountCents,
-      itemCount,
-    });
-
-    const totalCents = computeOrderTotals({ subtotalCents, discountCents, shippingCents });
-
-    // A fee only ever applies to an explicitly requested COD quote.
-    let codFee: ResolvedCodFee | null = null;
-    if (input.paymentMethod) {
-      const settings = unwrapSettled(settingsResult)!; // loaded above whenever paymentMethod is set
-      if (!effectiveMethods(settings).includes(input.paymentMethod)) {
-        throw paymentMethodUnavailable(input.paymentMethod);
-      }
-      codFee = resolveCodFee({ method: input.paymentMethod, settings, totalCents });
-    }
-    const codFeeCents = codFee?.feeCents ?? 0;
-
+    const codFeeCents = priced.codFee?.feeCents ?? 0;
     return {
-      subtotalCents,
-      discountCents,
-      shippingCents,
-      totalCents,
-      couponCode,
+      subtotalCents: priced.subtotalCents,
+      discountCents: priced.discountCents,
+      shippingCents: priced.shippingCents,
+      totalCents: priced.totalCents,
+      couponCode: priced.couponCode,
       codFeeCents,
-      dueOnDeliveryCents: totalCents - codFeeCents,
-      codFeeRule: codFee?.rule ?? null,
+      dueOnDeliveryCents: priced.totalCents - codFeeCents,
+      codFeeRule: priced.codFee?.rule ?? null,
     };
   },
 
@@ -206,41 +158,30 @@ export const checkoutService = {
       // credentials). Before any stock mutation: a throw rolls back,
       // including the cart consume above.
       const settings = await paymentSettingsService.get(tx);
-      if (!effectiveMethods(settings).includes(input.paymentMethod)) {
-        throw paymentMethodUnavailable(input.paymentMethod);
-      }
+      assertMethodAvailable(settings, input.paymentMethod);
 
       // 2. Re-validate availability and per-line stock.
       for (const item of cartItems) {
         assertLineAvailable(item);
       }
 
-      const subtotalCents = lines.reduce((sum, l) => sum + l.unitPriceCents * l.quantity, 0);
-
-      // 3. Validate coupon (we re-run inside tx to lock in usedCount).
-      let discountCents = 0;
-      let couponId: string | null = null;
-      let couponCode: string | null = null;
-      if (input.couponCode) {
-        const validated = await couponsService.validate(
-          { code: input.couponCode, userId, subtotalCents },
-          tx,
-        );
-        discountCents = validated.discountCents;
-        couponId = validated.id;
-        couponCode = validated.code;
-      }
-
-      const itemCount = lines.reduce((sum, l) => sum + l.quantity, 0);
-      const shippingCents = computeShippingCents({
-        city: address.city,
-        subtotalCents: subtotalCents - discountCents,
-        itemCount,
+      // 3. Price the order; the coupon is re-validated inside the tx to lock in usedCount.
+      const {
+        subtotalCents,
+        discountCents,
+        couponId,
+        couponCode,
+        shippingCents,
+        totalCents,
+        codFee,
+      } = await priceOrder(tx, {
+        userId,
+        address,
+        lines,
+        couponCode: input.couponCode,
+        payment: { method: input.paymentMethod, settings },
       });
-      const totalCents = computeOrderTotals({ subtotalCents, discountCents, shippingCents });
 
-      // COD confirmation fee: an advance credit (totalCents is unchanged).
-      const codFee = resolveCodFee({ method: input.paymentMethod, settings, totalCents });
       // The txn id only means something when a fee is being paid; ignore it otherwise.
       const customerTxnId =
         codFee && input.customerTxnId ? normalizeTxnId(input.customerTxnId) : null;

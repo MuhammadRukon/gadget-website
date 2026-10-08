@@ -6,6 +6,7 @@ import {
   type PublicPaymentConfig,
 } from '@/contracts/payment-settings';
 import { prisma } from '@/lib/prisma';
+import type { PaymentMethodUnavailableMeta } from '@/contracts/checkout';
 import { BadRequestError } from '@/server/common/errors';
 import { log } from '@/server/common/logger';
 import { CLOUDINARY_FOLDER } from '@/server/media/cloudinary';
@@ -92,6 +93,13 @@ function flaggedMethods(flags: MethodFlags): PaymentMethod[] {
  */
 export function effectiveMethods(settings: MethodFlags): PaymentMethod[] {
   return flaggedMethods(settings).filter(gatewayConfigured);
+}
+
+/** 400 for a method the admin has not enabled (or whose gateway has no credentials). */
+export function assertMethodAvailable(settings: MethodFlags, method: PaymentMethod): void {
+  if (effectiveMethods(settings).includes(method)) return;
+  const meta: PaymentMethodUnavailableMeta = { reason: 'payment_method_unavailable', method };
+  throw new BadRequestError('That payment method is no longer available', meta);
 }
 
 export const paymentSettingsService = {

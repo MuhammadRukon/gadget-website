@@ -4,18 +4,6 @@ import type { CodFeeRule } from '@/contracts/payment-settings';
 
 import { computeCodConfirmationFee } from '@/lib/cod-fee/compute';
 
-/**
- * Single source of truth for order total math, shared by `quote()` and
- * `placeOrder` so the two can never drift. All values are integer cents.
- */
-export function computeOrderTotals(input: {
-  subtotalCents: number;
-  discountCents: number;
-  shippingCents: number;
-}): number {
-  return Math.max(0, input.subtotalCents - input.discountCents) + input.shippingCents;
-}
-
 export interface ResolvedCodFee {
   feeCents: number;
   rule: CodFeeRule;

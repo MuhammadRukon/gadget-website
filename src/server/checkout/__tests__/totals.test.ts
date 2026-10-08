@@ -1,7 +1,7 @@
 import { CodFeeType, PaymentMethod } from '@prisma/client';
 import { describe, expect, it } from 'vitest';
 
-import { computeOrderTotals, resolveCodFee } from '../totals';
+import { resolveCodFee } from '../totals';
 
 function settings(overrides: Partial<Parameters<typeof resolveCodFee>[0]['settings']> = {}) {
   return {
@@ -11,20 +11,6 @@ function settings(overrides: Partial<Parameters<typeof resolveCodFee>[0]['settin
     ...overrides,
   };
 }
-
-describe('computeOrderTotals', () => {
-  it('is subtotal - discount + shipping', () => {
-    expect(computeOrderTotals({ subtotalCents: 100_000, discountCents: 1_000, shippingCents: 6_000 })).toBe(
-      105_000,
-    );
-  });
-
-  it('never lets the discount push the items below zero', () => {
-    expect(computeOrderTotals({ subtotalCents: 500, discountCents: 900, shippingCents: 6_000 })).toBe(
-      6_000,
-    );
-  });
-});
 
 describe('resolveCodFee', () => {
   it('returns the flat fee and rule for COD when the fee is on', () => {
