@@ -1,6 +1,5 @@
 'use client';
 
-import Image from 'next/image';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
@@ -11,10 +10,12 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader } from '@/app/common/loader/loader';
 import { Textarea } from '@/components/ui/textarea';
-import { formatBDT } from '@/server/common/money';
 import { feeView } from '@/lib/cod-fee/view';
-import { FeeSummaryRows } from '@/modules/orders/components/fee-summary-rows';
+import { formatShipAddress } from '@/modules/orders/components/format-ship-address';
+import { OrderEventsCard } from '@/modules/orders/components/order-events-card';
+import { OrderItemsCard } from '@/modules/orders/components/order-items-card';
 import { OrderStatusBadge } from '@/modules/orders/components/order-status-badge';
+import { OrderTotalsRows } from '@/modules/orders/components/order-totals-rows';
 import { CodFeePanel } from '@/modules/admin/payments/components/cod-fee-panel';
 
 import { useAdminOrderDetail, useTransitionOrder } from '@/modules/admin/orders/hooks';
@@ -97,45 +98,12 @@ export default function AdminOrderDetailPage() {
             <CardTitle>Delivery</CardTitle>
           </CardHeader>
           <CardContent className="text-sm">
-            <p>
-              {[o.shipLine1, o.shipLine2, o.shipCity, o.shipDistrict, o.shipPostal, o.shipCountry]
-                .filter(Boolean)
-                .join(', ')}
-            </p>
+            <p>{formatShipAddress(o)}</p>
           </CardContent>
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Items</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ul className="divide-y">
-            {o.items.map((it) => (
-              <li key={it.id} className="flex gap-4 py-3">
-                <div className="relative w-16 h-16 bg-muted rounded overflow-hidden shrink-0">
-                  {it.imageUrl ? (
-                    <Image src={it.imageUrl} alt={it.productName} fill className="object-cover" />
-                  ) : null}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium line-clamp-1">{it.productName}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {it.variantName ? `${it.variantName} · ` : ''}SKU: {it.sku}
-                  </p>
-                  <p className="text-sm">
-                    {it.quantity} × {formatBDT(it.unitPriceCents)}
-                  </p>
-                </div>
-                <div className="text-sm font-medium">
-                  {formatBDT(it.unitPriceCents * it.quantity)}
-                </div>
-              </li>
-            ))}
-          </ul>
-        </CardContent>
-      </Card>
+      <OrderItemsCard items={o.items} />
 
       {feePayment ? <CodFeePanel order={o} payment={feePayment} /> : null}
 
@@ -145,23 +113,7 @@ export default function AdminOrderDetailPage() {
             <CardTitle>Summary</CardTitle>
           </CardHeader>
           <CardContent className="space-y-1 text-sm">
-            <div className="flex justify-between">
-              <span>Subtotal</span>
-              <span>{formatBDT(o.subtotalCents)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Discount {o.couponCode ? `(${o.couponCode})` : ''}</span>
-              <span>- {formatBDT(o.discountCents)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Shipping</span>
-              <span>{formatBDT(o.shippingCents)}</span>
-            </div>
-            <div className="flex justify-between border-t pt-2 mt-2 font-semibold">
-              <span>Total</span>
-              <span>{formatBDT(o.totalCents)}</span>
-            </div>
-            <FeeSummaryRows view={fee} muted />
+            <OrderTotalsRows order={o} fee={fee} mutedFee />
             <p className="pt-2 text-xs text-muted-foreground">
               Payment: {o.payments.map((p) => `${p.method} (${p.status})`).join(', ') || 'Pending'}
             </p>
@@ -216,26 +168,7 @@ export default function AdminOrderDetailPage() {
         onConfirm={() => runTransition(OrderStatus.CONFIRMED)}
       />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Audit trail</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ol className="space-y-3">
-            {o.events.map((e) => (
-              <li key={e.id} className="flex items-start gap-3 text-sm">
-                <OrderStatusBadge status={e.status} />
-                <div>
-                  <p>{e.note ?? '—'}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {new Date(e.createdAt).toLocaleString()}
-                  </p>
-                </div>
-              </li>
-            ))}
-          </ol>
-        </CardContent>
-      </Card>
+      <OrderEventsCard title="Audit trail" events={o.events} />
     </div>
   );
 }

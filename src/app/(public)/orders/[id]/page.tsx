@@ -1,6 +1,5 @@
 'use client';
 
-import Image from 'next/image';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -14,7 +13,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader } from '@/app/common/loader/loader';
 import { Textarea } from '@/components/ui/textarea';
 import type { CustomerPayment } from '@/contracts/payments';
-import { formatBDT } from '@/server/common/money';
 import { buildCodFeeWarning, buildFeeRejectedMessage } from '@/lib/cod-fee/copy';
 import { feeView, type FeeNoticeState } from '@/lib/cod-fee/view';
 import { AddTxnIdCard } from '@/modules/checkout/components/add-txn-id-card';
@@ -22,8 +20,11 @@ import { CodFeeNotice } from '@/modules/checkout/components/cod-fee-notice';
 import { PaymentConfigError } from '@/modules/checkout/components/payment-config-error';
 import { usePaymentConfig } from '@/modules/checkout/hooks';
 import { useCancelOrder, useOrderDetail } from '@/modules/orders/hooks';
-import { FeeSummaryRows } from '@/modules/orders/components/fee-summary-rows';
+import { formatShipAddress } from '@/modules/orders/components/format-ship-address';
+import { OrderEventsCard } from '@/modules/orders/components/order-events-card';
+import { OrderItemsCard } from '@/modules/orders/components/order-items-card';
 import { OrderStatusBadge } from '@/modules/orders/components/order-status-badge';
+import { OrderTotalsRows } from '@/modules/orders/components/order-totals-rows';
 import { useSubmitWarranty } from '@/modules/warranty/hooks';
 
 const CANCELLABLE: OrderStatus[] = ['PENDING', 'CONFIRMED', 'PROCESSING'];
@@ -186,36 +187,7 @@ export default function OrderDetailPage() {
         <FeeSection state={feeState} payment={feePayment} config={config} />
       ) : null}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Items</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ul className="divide-y">
-            {o.items.map((it) => (
-              <li key={it.id} className="flex gap-4 py-3">
-                <div className="relative w-16 h-16 bg-muted rounded overflow-hidden shrink-0">
-                  {it.imageUrl ? (
-                    <Image src={it.imageUrl} alt={it.productName} fill className="object-cover" />
-                  ) : null}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium line-clamp-1">{it.productName}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {it.variantName ? `${it.variantName} · ` : ''}SKU: {it.sku}
-                  </p>
-                  <p className="text-sm">
-                    {it.quantity} × {formatBDT(it.unitPriceCents)}
-                  </p>
-                </div>
-                <div className="text-sm font-medium">
-                  {formatBDT(it.unitPriceCents * it.quantity)}
-                </div>
-              </li>
-            ))}
-          </ul>
-        </CardContent>
-      </Card>
+      <OrderItemsCard items={o.items} />
 
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
@@ -225,11 +197,7 @@ export default function OrderDetailPage() {
           <CardContent className="text-sm">
             <p className="font-medium">{o.shipRecipient}</p>
             <p className="text-muted-foreground">{o.shipPhone}</p>
-            <p className="text-muted-foreground">
-              {[o.shipLine1, o.shipLine2, o.shipCity, o.shipDistrict, o.shipPostal, o.shipCountry]
-                .filter(Boolean)
-                .join(', ')}
-            </p>
+            <p className="text-muted-foreground">{formatShipAddress(o)}</p>
           </CardContent>
         </Card>
 
@@ -238,23 +206,7 @@ export default function OrderDetailPage() {
             <CardTitle>Summary</CardTitle>
           </CardHeader>
           <CardContent className="space-y-1 text-sm">
-            <div className="flex justify-between">
-              <span>Subtotal</span>
-              <span>{formatBDT(o.subtotalCents)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Discount {o.couponCode ? `(${o.couponCode})` : ''}</span>
-              <span>- {formatBDT(o.discountCents)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Shipping</span>
-              <span>{formatBDT(o.shippingCents)}</span>
-            </div>
-            <div className="flex justify-between border-t pt-2 mt-2 font-semibold">
-              <span>Total</span>
-              <span>{formatBDT(o.totalCents)}</span>
-            </div>
-            {fee ? <FeeSummaryRows view={fee} /> : null}
+            {fee ? <OrderTotalsRows order={o} fee={fee} /> : null}
             <p className="pt-2 text-xs text-muted-foreground">
               Payment:{' '}
               {o.payments[0]
@@ -265,26 +217,7 @@ export default function OrderDetailPage() {
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Tracking</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ol className="space-y-3">
-            {o.events.map((e) => (
-              <li key={e.id} className="flex items-start gap-3 text-sm">
-                <OrderStatusBadge status={e.status} />
-                <div>
-                  <p>{e.note ?? '—'}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {new Date(e.createdAt).toLocaleString()}
-                  </p>
-                </div>
-              </li>
-            ))}
-          </ol>
-        </CardContent>
-      </Card>
+      <OrderEventsCard title="Tracking" events={o.events} />
 
       {canCancel ? (
         <Card>
