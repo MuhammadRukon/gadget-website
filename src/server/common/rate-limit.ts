@@ -9,6 +9,7 @@
  */
 
 import { prisma } from '@/lib/prisma';
+import { AppError } from './errors';
 
 export interface RateLimitPolicy {
   /** How many requests are allowed in the window. */
@@ -66,10 +67,10 @@ export function clientIp(request: Request): string {
   return request.headers.get('x-real-ip') ?? 'unknown';
 }
 
-export class RateLimitedError extends Error {
+export class RateLimitedError extends AppError {
   public readonly retryAfter: number;
   constructor(retryAtMs: number) {
-    super('Too many requests; please try again later.');
+    super('RATE_LIMITED', 'Too many requests; please try again later.');
     this.name = 'RateLimitedError';
     this.retryAfter = Math.max(1, Math.ceil((retryAtMs - Date.now()) / 1000));
   }

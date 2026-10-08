@@ -12,7 +12,6 @@ import type { CheckoutInput } from '@/contracts/checkout';
 import { prisma } from '@/lib/prisma';
 import {
   BadRequestError,
-  ConflictError,
   TxnIdDuplicateError,
   statusFromError,
 } from '@/server/common/errors';
@@ -263,7 +262,6 @@ describe('placeOrder: customer transaction id', () => {
       .catch((e) => e);
 
     expect(err).toBeInstanceOf(TxnIdDuplicateError);
-    expect(err).toBeInstanceOf(ConflictError);
     expect(err.code).toBe('TXN_ID_DUPLICATE');
     expect(statusFromError(err)).toBe(409);
     expect(err.meta).toBeUndefined();

@@ -6,15 +6,9 @@
  * to HTTP responses via `statusFromError` / `toJsonError`.
  */
 
-export type ErrorCode =
-  | 'BAD_REQUEST'
-  | 'UNAUTHORIZED'
-  | 'FORBIDDEN'
-  | 'NOT_FOUND'
-  | 'CONFLICT'
-  | 'TXN_ID_DUPLICATE'
-  | 'VALIDATION_ERROR'
-  | 'INTERNAL_ERROR';
+import { ERROR_STATUS, type ErrorCode } from '@/contracts/errors';
+
+export type { ErrorCode };
 
 export class AppError extends Error {
   public readonly code: ErrorCode;
@@ -53,24 +47,21 @@ export class NotFoundError extends AppError {
 }
 
 export class ConflictError extends AppError {
-  constructor(
-    message: string,
-    meta?: Record<string, unknown>,
-    code: 'CONFLICT' | 'TXN_ID_DUPLICATE' = 'CONFLICT',
-  ) {
-    super(code, message, meta);
+  constructor(message: string, meta?: Record<string, unknown>) {
+    super('CONFLICT', message, meta);
   }
 }
 
 /**
- * A customer transaction id is already attached to another payment. Still a
- * ConflictError (409); the distinct code lets clients show specific copy.
- * Customer-facing throws carry no `meta`; admin throws carry
+ * A customer transaction id is already attached to another payment (409, with
+ * its own code so clients can show specific copy). Not a ConflictError: the
+ * code, not the class, is what the wire and the UI key on. Customer-facing
+ * throws carry no `meta`; admin throws carry
  * `{ existingOrderId, existingOrderNumber }`.
  */
-export class TxnIdDuplicateError extends ConflictError {
+export class TxnIdDuplicateError extends AppError {
   constructor(message = 'Transaction ID already exists', meta?: Record<string, unknown>) {
-    super(message, meta, 'TXN_ID_DUPLICATE');
+    super('TXN_ID_DUPLICATE', message, meta);
   }
 }
 
@@ -80,19 +71,8 @@ export class ValidationError extends AppError {
   }
 }
 
-const codeToStatus: Record<ErrorCode, number> = {
-  BAD_REQUEST: 400,
-  UNAUTHORIZED: 401,
-  FORBIDDEN: 403,
-  NOT_FOUND: 404,
-  CONFLICT: 409,
-  TXN_ID_DUPLICATE: 409,
-  VALIDATION_ERROR: 422,
-  INTERNAL_ERROR: 500,
-};
-
 export function statusFromError(err: unknown): number {
-  return err instanceof AppError ? codeToStatus[err.code] : 500;
+  return err instanceof AppError ? ERROR_STATUS[err.code] : 500;
 }
 
 export interface JsonError {

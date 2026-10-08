@@ -158,7 +158,7 @@ describe('codFeeService.adminSetTxnId', () => {
     expect(again.customerTxnId).toBe('REJ1234567');
   });
 
-  it('a duplicate throws a ConflictError carrying the existing order id and number', async () => {
+  it('a duplicate throws a TxnIdDuplicateError carrying the existing order id and number', async () => {
     const admin = await createAdminUser();
     const taken = await feePending({ customerTxnId: 'TAKEN99999' });
     const mine = await feePending({ customerTxnId: 'MINE123456' });
@@ -167,7 +167,7 @@ describe('codFeeService.adminSetTxnId', () => {
       .adminSetTxnId(admin.id, mine.payment.id, 'taken99999')
       .catch((e) => e);
 
-    expect(err).toBeInstanceOf(ConflictError);
+    expect(err).toBeInstanceOf(TxnIdDuplicateError);
     expect(err.code).toBe('TXN_ID_DUPLICATE');
     expect(err.meta).toEqual({
       existingOrderId: taken.order.id,

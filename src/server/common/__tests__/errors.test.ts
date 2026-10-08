@@ -12,6 +12,9 @@ import {
   statusFromError,
   toJsonError,
 } from '../errors';
+import { RateLimitedError } from '../rate-limit';
+import { apiErrorSchema } from '@/contracts/common';
+import { ERROR_STATUS } from '@/contracts/errors';
 
 describe('errors: statusFromError', () => {
   it('maps domain errors to HTTP status codes', () => {
@@ -52,9 +55,10 @@ describe('errors: toJsonError', () => {
 });
 
 describe('errors: TxnIdDuplicateError', () => {
-  it('is a ConflictError with its own code and optional meta', () => {
+  it('is an AppError with its own code (not a ConflictError) and optional meta', () => {
     const err = new TxnIdDuplicateError('dup', { existingOrderId: 'o1', existingOrderNumber: 'T-1' });
-    expect(err).toBeInstanceOf(ConflictError);
+    expect(err).toBeInstanceOf(AppError);
+    expect(err).not.toBeInstanceOf(ConflictError);
     expect(err.code).toBe('TXN_ID_DUPLICATE');
     expect(toJsonError(err)).toEqual({
       code: 'TXN_ID_DUPLICATE',
@@ -65,5 +69,25 @@ describe('errors: TxnIdDuplicateError', () => {
 
   it('plain ConflictError keeps the CONFLICT code', () => {
     expect(new ConflictError('x').code).toBe('CONFLICT');
+  });
+});
+
+describe('errors: single code map', () => {
+  it('every code in the map is accepted by the client apiErrorSchema', () => {
+    for (const code of Object.keys(ERROR_STATUS)) {
+      expect(apiErrorSchema.safeParse({ code, message: 'm' }).success).toBe(true);
+    }
+    expect(apiErrorSchema.safeParse({ code: 'NOPE', message: 'm' }).success).toBe(false);
+  });
+
+  it('each error class maps to its mapped status and wire code', () => {
+    expect(ERROR_STATUS).toMatchObject({ CONFLICT: 409, TXN_ID_DUPLICATE: 409, RATE_LIMITED: 429 });
+    expect(statusFromError(new RateLimitedError(Date.now() + 5000))).toBe(429);
+    expect(toJsonError(new TxnIdDuplicateError()).code).toBe('TXN_ID_DUPLICATE');
+    expect(toJsonError(new ConflictError('c', { a: 1 }))).toEqual({
+      code: 'CONFLICT',
+      message: 'c',
+      meta: { a: 1 },
+    });
   });
 });
