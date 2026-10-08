@@ -172,3 +172,19 @@ Final commit list: `9f1f7f3` (move cod fee helpers to lib), `154a72f` (policy ta
 All four phases (A, B, C, D-G plus follow-ups H and I) shipped as separate commits on `feature/admin-payment-methods-cod-fee`, behavior-preserving except the one approved UI change (WAIVED rows hidden on both order pages). 60 commits ahead of `main`, nothing pushed, no AI attribution in any commit message. Key structure changes: fee rules in one place (`src/lib/cod-fee/` with policy table and `feeView`, no client imports from `src/server` for fee logic), `payments.service.ts` 563 to 353 lines with the COD fee lifecycle in `cod-fee.service.ts`, `checkout.service.ts` 502 to 326 lines on a shared `priceOrder` + strategy `planPlacement`, one error-code map, typed gateway credential read with an 81-test sandbox-trust equivalence suite, and settings-mutating tests selected by the `*.serial.test.ts` name with a fixture guard.
 
 Remaining (not done here, by design): the follow-up list above (drop `Order.codFeeCents` and `enabledMethods[]` via NEW migrations, the `verify()`/`applyCallback` compare-and-set consistency gap, UI decomposition, quote as a keyed query, `bankRef` index). Next steps for the user: review the branch, open the PR by hand (target `dev`, standard merge, CI must pass, migration `20261007120000_payment_settings_cod_fee` applied to production first; PR body is in "PR" above, update its test counts to 451 tests), delete the orphaned Cloudinary test image if wanted. No push, merge, tag or PR was done.
+
+## Follow-up Execution Progress
+
+**Status: in progress** (started 2026-10-08, user said "Implement the follow ups")
+
+Scope: every item in "Follow-up PRs, not this one" above. Decisions made by the orchestrator (user gave a blanket yes): migration changes are NEW hand-written SQL migrations applied with `prisma migrate deploy` to the LOCAL `gadget_dev` only (never the remote DB); the `bankRef` duplicate lookup keeps its behavior and gets a functional index (`lower("bankRef")`) instead of dropping the bankRef branch; the verify()/applyCallback compare-and-set tightening is approved (user asked for the follow-ups; gateways stay off for launch); the payments page keeps its current plain reject confirm (the customer-visible reject note is NOT added there; only the order-detail panel's dialogs are extracted). Subagent-driven; one commit per logical step; verify typecheck + full tests after every phase; browser E2E + combined review at the end.
+
+| Phase | Status | Commit | Review | Notes |
+| --- | --- | --- | --- | --- |
+| 5. Schema: drop Order.codFeeCents; bankRef functional index (new migrations) | pending | — | deferred | — |
+| 6. Schema: enabledMethods array instead of 4 boolean flags (new migration + contract + form) | pending | — | deferred | — |
+| 7. Order confirmation compare-and-set (confirmOrderInTx for verify() and applyCallback) | pending | — | deferred | — |
+| 8. UI decomposition: shared order components, panel dialogs, primaryPayment | pending | — | deferred | — |
+| 9. UI decomposition: checkout-client + payment-settings-form splits | pending | — | deferred | — |
+| 10. Quote as keyed query; usePaymentConfig staleTime; narrower admin invalidation | pending | — | deferred | — |
+| Cross-Validation 2 | pending | — | pending | build, browser E2E, combined review, docs sync |
