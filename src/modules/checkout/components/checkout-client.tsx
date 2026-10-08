@@ -19,6 +19,7 @@ import {
   isTxnIdDuplicate,
 } from '@/modules/checkout/checkout-error';
 import { useCheckoutQuote, usePaymentConfig, usePlaceOrder } from '@/modules/checkout/hooks';
+import { isCodFeeActive, isFeeConfigStale } from '@/modules/checkout/checkout-quote';
 import { usePaymentSelection } from '@/modules/checkout/use-payment-selection';
 import { useCheckoutTxnId } from '@/modules/checkout/use-checkout-txn-id';
 import { CheckoutPaymentCard } from '@/modules/checkout/components/checkout-payment-card';
@@ -90,17 +91,26 @@ export function CheckoutClient() {
 
   const itemCount = cart.data?.itemCount ?? 0;
 
-  // Fee UI only reflects a settled quote for COD; while re-quoting, the old
-  // quote may belong to a different method.
-  const feeRule = quote?.codFeeRule ?? null;
-  const feeActive =
-    paymentMethod === 'COD' &&
-    !!config.data?.cod.feeEnabled &&
-    !quoting &&
-    !!quote &&
-    quote.codFeeCents > 0 &&
-    !!feeRule;
+  // Fee UI follows the settled COD quote (what the server will charge), not
+  // the 30 s cached config; contact/QR/note still come from the config.
+  const feeActive = isCodFeeActive({ paymentMethod, quoting, quote });
   const txn = useCheckoutTxnId(feeActive);
+
+  // The quote shows a fee but the cached config says it is off (an admin
+  // turned it on after the config loaded): refetch the config once. The ref
+  // keeps this from looping if the refetch still disagrees, and re-arms when
+  // the two agree again.
+  const configStale = isFeeConfigStale(feeActive, config.data?.cod.feeEnabled);
+  const refreshedStaleConfig = useRef(false);
+  useEffect(() => {
+    if (!configStale) {
+      refreshedStaleConfig.current = false;
+      return;
+    }
+    if (refreshedStaleConfig.current) return;
+    refreshedStaleConfig.current = true;
+    queryClient.invalidateQueries({ queryKey: queryKeys.paymentConfig });
+  }, [configStale, queryClient]);
 
   const ready =
     !!addressId &&
