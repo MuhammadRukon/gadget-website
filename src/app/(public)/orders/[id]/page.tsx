@@ -1,20 +1,25 @@
 'use client';
 
-import Image from 'next/image';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { OrderStatus } from '@prisma/client';
 
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader } from '@/app/common/loader/loader';
-import { Textarea } from '@/components/ui/textarea';
-import { formatBDT } from '@/server/common/money';
-import { useCancelOrder, useOrderDetail } from '@/modules/orders/hooks';
+import { feeView } from '@/lib/cod-fee/view';
+import { primaryPayment } from '@/lib/primary-payment';
+import { usePaymentConfig } from '@/modules/checkout/hooks';
+import { useOrderDetail } from '@/modules/orders/hooks';
+import { CancelOrderCard } from '@/modules/orders/components/cancel-order-card';
+import { FeeSection } from '@/modules/orders/components/order-fee-section';
+import { formatShipAddress } from '@/modules/orders/components/format-ship-address';
+import { OrderEventsCard } from '@/modules/orders/components/order-events-card';
+import { OrderItemsCard } from '@/modules/orders/components/order-items-card';
 import { OrderStatusBadge } from '@/modules/orders/components/order-status-badge';
-import { useSubmitWarranty } from '@/modules/warranty/hooks';
+import { OrderTotalsRows } from '@/modules/orders/components/order-totals-rows';
+import { WarrantyRequestCard } from '@/modules/orders/components/warranty-request-card';
 
 const CANCELLABLE: OrderStatus[] = ['PENDING', 'CONFIRMED', 'PROCESSING'];
 
@@ -24,10 +29,11 @@ export default function OrderDetailPage() {
   const id = params?.id;
   const { status } = useSession();
   const order = useOrderDetail(id);
-  const cancel = useCancelOrder(id ?? '');
-  const warranty = useSubmitWarranty(id ?? '');
-  const [reason, setReason] = useState('');
-  const [warrantyReason, setWarrantyReason] = useState('');
+  const feePayment = order.data ? primaryPayment(order.data) : undefined;
+  const fee = order.data ? feeView(feePayment, order.data) : null;
+  const feeState = fee?.customerNotice ?? 'none';
+  // Contact/QR/note are only needed while the fee is actionable.
+  const config = usePaymentConfig({ enabled: feeState === 'pending' || feeState === 'rejected' });
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -57,6 +63,7 @@ export default function OrderDetailPage() {
   }
 
   const o = order.data;
+  const payment = primaryPayment(o);
   const canCancel = CANCELLABLE.includes(o.status);
   const canRequestWarranty = o.status === 'DELIVERED';
 
@@ -72,36 +79,11 @@ export default function OrderDetailPage() {
         <OrderStatusBadge status={o.status} />
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Items</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ul className="divide-y">
-            {o.items.map((it) => (
-              <li key={it.id} className="flex gap-4 py-3">
-                <div className="relative w-16 h-16 bg-muted rounded overflow-hidden shrink-0">
-                  {it.imageUrl ? (
-                    <Image src={it.imageUrl} alt={it.productName} fill className="object-cover" />
-                  ) : null}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium line-clamp-1">{it.productName}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {it.variantName ? `${it.variantName} · ` : ''}SKU: {it.sku}
-                  </p>
-                  <p className="text-sm">
-                    {it.quantity} × {formatBDT(it.unitPriceCents)}
-                  </p>
-                </div>
-                <div className="text-sm font-medium">
-                  {formatBDT(it.unitPriceCents * it.quantity)}
-                </div>
-              </li>
-            ))}
-          </ul>
-        </CardContent>
-      </Card>
+      {feeState !== 'none' && feePayment ? (
+        <FeeSection state={feeState} payment={feePayment} config={config} />
+      ) : null}
+
+      <OrderItemsCard items={o.items} />
 
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
@@ -111,11 +93,7 @@ export default function OrderDetailPage() {
           <CardContent className="text-sm">
             <p className="font-medium">{o.shipRecipient}</p>
             <p className="text-muted-foreground">{o.shipPhone}</p>
-            <p className="text-muted-foreground">
-              {[o.shipLine1, o.shipLine2, o.shipCity, o.shipDistrict, o.shipPostal, o.shipCountry]
-                .filter(Boolean)
-                .join(', ')}
-            </p>
+            <p className="text-muted-foreground">{formatShipAddress(o)}</p>
           </CardContent>
         </Card>
 
@@ -124,104 +102,20 @@ export default function OrderDetailPage() {
             <CardTitle>Summary</CardTitle>
           </CardHeader>
           <CardContent className="space-y-1 text-sm">
-            <div className="flex justify-between">
-              <span>Subtotal</span>
-              <span>{formatBDT(o.subtotalCents)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Discount {o.couponCode ? `(${o.couponCode})` : ''}</span>
-              <span>- {formatBDT(o.discountCents)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Shipping</span>
-              <span>{formatBDT(o.shippingCents)}</span>
-            </div>
-            <div className="flex justify-between border-t pt-2 mt-2 font-semibold">
-              <span>Total</span>
-              <span>{formatBDT(o.totalCents)}</span>
-            </div>
+            {fee ? <OrderTotalsRows order={o} fee={fee} /> : null}
             <p className="pt-2 text-xs text-muted-foreground">
               Payment:{' '}
-              {o.payments[0]
-                ? `${o.payments[0].method} (${o.payments[0].status})`
-                : 'Pending'}
+              {payment ? `${payment.method} (${payment.status})` : 'Pending'}
             </p>
           </CardContent>
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Tracking</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ol className="space-y-3">
-            {o.events.map((e) => (
-              <li key={e.id} className="flex items-start gap-3 text-sm">
-                <OrderStatusBadge status={e.status} />
-                <div>
-                  <p>{e.note ?? '—'}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {new Date(e.createdAt).toLocaleString()}
-                  </p>
-                </div>
-              </li>
-            ))}
-          </ol>
-        </CardContent>
-      </Card>
+      <OrderEventsCard title="Tracking" events={o.events} />
 
-      {canCancel ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Cancel order</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Textarea
-              rows={3}
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder="Tell us why you'd like to cancel"
-            />
-            <Button
-              variant="destructive"
-              disabled={reason.trim().length < 2 || cancel.isPending}
-              onClick={() => cancel.mutate(reason.trim())}
-            >
-              {cancel.isPending ? 'Cancelling...' : 'Cancel order'}
-            </Button>
-          </CardContent>
-        </Card>
-      ) : null}
+      {canCancel ? <CancelOrderCard orderId={id ?? ''} /> : null}
 
-      {canRequestWarranty ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Request warranty service</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <p className="text-sm text-muted-foreground">
-              Describe the issue with your order. Our team will review and respond, usually
-              within two business days.
-            </p>
-            <Textarea
-              rows={4}
-              value={warrantyReason}
-              onChange={(e) => setWarrantyReason(e.target.value)}
-              placeholder="Describe the defect, when it started, and any troubleshooting you've tried."
-            />
-            <Button
-              disabled={warrantyReason.trim().length < 20 || warranty.isPending}
-              onClick={async () => {
-                await warranty.mutateAsync(warrantyReason.trim());
-                setWarrantyReason('');
-              }}
-            >
-              {warranty.isPending ? 'Submitting...' : 'Submit warranty request'}
-            </Button>
-          </CardContent>
-        </Card>
-      ) : null}
+      {canRequestWarranty ? <WarrantyRequestCard orderId={id ?? ''} /> : null}
     </div>
   );
 }

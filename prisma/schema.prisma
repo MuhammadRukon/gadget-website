@@ -25,6 +25,7 @@ model User {
   orderEvents          OrderEvent[]         @relation("OrderEventActor")
   passwordResets       PasswordResetToken[]
   paymentVerifications Payment[]            @relation("PaymentVerifier")
+  feeVerifications     Payment[]            @relation("PaymentFeeVerifier")
   reviews              Review[]
   sessions             Session[]
   warrantyRequests     WarrantyRequest[]
@@ -290,20 +291,31 @@ model OrderEvent {
 }
 
 model Payment {
-  id           String        @id @default(cuid())
-  orderId      String
-  method       PaymentMethod
-  status       PaymentStatus @default(PENDING)
-  amountCents  Int
-  providerRef  String?       @unique
-  bankRef      String?
-  rawPayload   Json?
-  verifiedById String?
-  verifiedAt   DateTime?
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  order        Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  verifiedBy   User?         @relation("PaymentVerifier", fields: [verifiedById], references: [id])
+  id              String        @id @default(cuid())
+  orderId         String
+  method          PaymentMethod
+  status          PaymentStatus @default(PENDING)
+  amountCents     Int
+  providerRef     String?       @unique
+  // Functional index Payment_bankRef_lower_idx ON lower("bankRef") lives only in
+  // migration 20261008100100_add_payment_bankref_lower_index (Prisma cannot express it).
+  bankRef         String?
+  rawPayload      Json?
+  verifiedById    String?
+  verifiedAt      DateTime?
+  feeCents        Int           @default(0)
+  feeType         CodFeeType?
+  feeValue        Int?
+  feeStatus       CodFeeStatus  @default(NONE)
+  customerTxnId   String?       @unique
+  txnSubmittedAt  DateTime?
+  feeVerifiedById String?
+  feeVerifiedAt   DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  order           Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  verifiedBy      User?         @relation("PaymentVerifier", fields: [verifiedById], references: [id])
+  feeVerifiedBy   User?         @relation("PaymentFeeVerifier", fields: [feeVerifiedById], references: [id])
 
   @@index([orderId])
   @@index([status, method])
@@ -419,4 +431,34 @@ model RateLimitBucket {
   updatedAt DateTime @updatedAt
 
   @@index([resetAt])
+}
+
+enum CodFeeType {
+  FLAT
+  PERCENT
+}
+
+enum CodFeeStatus {
+  NONE
+  PENDING
+  VERIFIED
+  REJECTED
+  WAIVED
+}
+
+/// Singleton (id = 'singleton') admin-configured payment methods and the
+/// COD confirmation fee. `codFeeValue` is cents for FLAT, an integer 1-100
+/// for PERCENT.
+model PaymentSettings {
+  id              String          @id @default("singleton")
+  enabledMethods  PaymentMethod[] @default([COD])
+  codFeeEnabled   Boolean         @default(false)
+  codFeeType      CodFeeType      @default(FLAT)
+  codFeeValue     Int             @default(0)
+  qrImageUrl      String?
+  qrImagePublicId String?
+  contactNumber   String?
+  paymentNote     String?
+  updatedAt       DateTime        @updatedAt
+  updatedById     String?
 }

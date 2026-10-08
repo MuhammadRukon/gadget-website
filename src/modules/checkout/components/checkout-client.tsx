@@ -8,28 +8,25 @@ import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader } from '@/app/common/loader/loader';
-import { ApiClientError, apiFetch } from '@/lib/fetcher';
-import { formatBDT } from '@/server/common/money';
-import type { CheckoutInput, CheckoutQuote } from '@/contracts/checkout';
+import { ApiClientError } from '@/lib/fetcher';
+import type { CheckoutInput } from '@/contracts/checkout';
 import { queryKeys } from '@/constants/queryKeys';
-import { checkoutErrorMessage } from '@/modules/checkout/checkout-error';
-import { usePlaceOrder } from '@/modules/checkout/hooks';
+import {
+  checkoutErrorMessage,
+  isPaymentMethodUnavailable,
+  isTxnIdDuplicate,
+} from '@/modules/checkout/checkout-error';
+import { useCheckoutQuote, usePaymentConfig, usePlaceOrder } from '@/modules/checkout/hooks';
+import { isCodFeeActive, isFeeConfigStale } from '@/modules/checkout/checkout-quote';
+import { usePaymentSelection } from '@/modules/checkout/use-payment-selection';
+import { useCheckoutTxnId } from '@/modules/checkout/use-checkout-txn-id';
+import { CheckoutPaymentCard } from '@/modules/checkout/components/checkout-payment-card';
+import { OrderSummaryCard } from '@/modules/checkout/components/order-summary-card';
 import { useServerCart } from '@/modules/cart/hooks';
 import { useAddresses } from '@/modules/account/hooks';
 import { AddressForm } from '@/modules/account/components/address-form';
-import { cn } from '@/lib/utils';
-
-const PAYMENT_METHODS: Array<{ id: CheckoutInput['paymentMethod']; label: string; hint?: string }> =
-  [
-    { id: 'COD', label: 'Cash on delivery (COD)' },
-    { id: 'BKASH', label: 'bKash' },
-    { id: 'SSLCOMMERZ', label: 'Card / mobile banking (SSLCommerz)' },
-    { id: 'BANK_TRANSFER', label: 'Bank transfer (manual verification)' },
-  ];
 
 export function CheckoutClient() {
   const router = useRouter();
@@ -38,18 +35,21 @@ export function CheckoutClient() {
 
   const [addressId, setAddressId] = useState<string | null>(null);
   const [showAddAddress, setShowAddAddress] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<CheckoutInput['paymentMethod']>('COD');
   const [couponCode, setCouponCode] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState<string | null>(null);
   const [notes, setNotes] = useState('');
 
-  const [quote, setQuote] = useState<CheckoutQuote | null>(null);
-  const [quoting, setQuoting] = useState(false);
   const [orderPlaced, setOrderPlaced] = useState(false);
   // Synchronous double-click guard: mutate() can fire twice before isPending re-renders.
   const submitGuard = useRef(false);
   const placeOrderMutation = usePlaceOrder();
   const queryClient = useQueryClient();
+  const config = usePaymentConfig();
+
+  const configLoading = config.isLoading;
+  const { paymentMethod, select: selectPaymentMethod } = usePaymentSelection(
+    config.data?.methods,
+  );
 
   useEffect(() => {
     if (!addressId && addresses.data && addresses.data.length > 0) {
@@ -57,41 +57,69 @@ export function CheckoutClient() {
     }
   }, [addresses.data, addressId]);
 
+  // Waits for the config so the first quote already carries the payment method.
+  const quoteQuery = useCheckoutQuote({
+    addressId,
+    couponCode: appliedCoupon,
+    paymentMethod,
+    enabled: !configLoading,
+  });
+  // A failed quote has no totals, even if an earlier answer for this selection is cached.
+  const quote = quoteQuery.isError ? null : (quoteQuery.data ?? null);
+  const quoting = quoteQuery.isFetching;
+
+  // React Query v5 has no query-level onError: handle each quote failure once.
+  const quoteError = quoteQuery.error;
+  const handledQuoteError = useRef<unknown>(null);
   useEffect(() => {
-    if (!addressId) {
-      setQuote(null);
+    if (!quoteError || handledQuoteError.current === quoteError) return;
+    handledQuoteError.current = quoteError;
+    const isApiError = quoteError instanceof ApiClientError;
+    toast.error(isApiError ? checkoutErrorMessage(quoteError) : 'Could not calculate totals');
+    // The admin turned the method off after the config loaded: refetch the
+    // list. The coupon is unrelated, so keep it.
+    if (isPaymentMethodUnavailable(quoteError)) {
+      queryClient.invalidateQueries({ queryKey: queryKeys.paymentConfig });
       return;
     }
-    let cancelled = false;
-    setQuoting(true);
-    apiFetch<CheckoutQuote>('/api/checkout/quote', {
-      method: 'POST',
-      body: { addressId, couponCode: appliedCoupon ?? undefined },
-    })
-      .then((q) => {
-        if (!cancelled) setQuote(q);
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        const isApiError = err instanceof ApiClientError;
-        toast.error(isApiError ? checkoutErrorMessage(err) : 'Could not calculate totals');
-        // Quote returns the same stock-conflict 409 as checkout; the cart snapshot is stale.
-        if (isApiError && err.status === 409) {
-          queryClient.invalidateQueries({ queryKey: queryKeys.cart });
-        }
-        setQuote(null);
-        if (appliedCoupon) setAppliedCoupon(null);
-      })
-      .finally(() => {
-        if (!cancelled) setQuoting(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [addressId, appliedCoupon, queryClient]);
+    // Quote returns the same stock-conflict 409 as checkout; the cart snapshot is stale.
+    if (isApiError && quoteError.status === 409) {
+      queryClient.invalidateQueries({ queryKey: queryKeys.cart });
+    }
+    if (appliedCoupon) setAppliedCoupon(null);
+  }, [quoteError, appliedCoupon, queryClient]);
 
   const itemCount = cart.data?.itemCount ?? 0;
-  const ready = !!addressId && itemCount > 0 && !quoting && !!quote;
+
+  // Fee UI follows the settled COD quote (what the server will charge), not
+  // the 30 s cached config; contact/QR/note still come from the config.
+  const feeActive = isCodFeeActive({ paymentMethod, quoting, quote });
+  const txn = useCheckoutTxnId(feeActive);
+
+  // The quote shows a fee but the cached config says it is off (an admin
+  // turned it on after the config loaded): refetch the config once. The ref
+  // keeps this from looping if the refetch still disagrees, and re-arms when
+  // the two agree again.
+  const configStale = isFeeConfigStale(feeActive, config.data?.cod.feeEnabled);
+  const refreshedStaleConfig = useRef(false);
+  useEffect(() => {
+    if (!configStale) {
+      refreshedStaleConfig.current = false;
+      return;
+    }
+    if (refreshedStaleConfig.current) return;
+    refreshedStaleConfig.current = true;
+    queryClient.invalidateQueries({ queryKey: queryKeys.paymentConfig });
+  }, [configStale, queryClient]);
+
+  const ready =
+    !!addressId &&
+    itemCount > 0 &&
+    !quoting &&
+    !!quote &&
+    !!config.data &&
+    !!paymentMethod &&
+    !txn.blocksOrder;
   const cartHasIssues = !!cart.data?.hasIssues;
 
   async function applyCoupon() {
@@ -99,15 +127,17 @@ export function CheckoutClient() {
   }
 
   function placeOrder() {
-    if (!addressId) return;
+    if (!addressId || !paymentMethod) return;
     if (submitGuard.current) return;
     submitGuard.current = true;
+    const customerTxnId = txn.valueToSend;
     placeOrderMutation.mutate(
       {
         addressId,
         paymentMethod,
         couponCode: appliedCoupon ?? undefined,
         notes: notes || undefined,
+        ...(customerTxnId ? { customerTxnId } : {}),
       } satisfies CheckoutInput,
       {
         onSuccess: (res) => {
@@ -119,8 +149,12 @@ export function CheckoutClient() {
           }
           router.push(`/orders/${res.id}`);
         },
-        onError: () => {
+        onError: (err) => {
           submitGuard.current = false;
+          if (isTxnIdDuplicate(err)) {
+            // Cart is untouched; show the inline message and let them retry without the id.
+            txn.markServerDuplicate();
+          }
         },
       },
     );
@@ -221,34 +255,14 @@ export function CheckoutClient() {
             )}
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Payment method</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {PAYMENT_METHODS.map((method) => (
-              <label
-                key={method.id}
-                className={`flex cursor-pointer items-center gap-3 rounded border p-3 ${
-                  paymentMethod === method.id ? 'border-primary' : ''
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="payment"
-                  checked={paymentMethod === method.id}
-                  onChange={() => setPaymentMethod(method.id)}
-                />
-                <span className="flex-1 text-sm">
-                  {method.label}
-                  {method.hint ? (
-                    <span className="text-muted-foreground ml-2 text-xs">({method.hint})</span>
-                  ) : null}
-                </span>
-              </label>
-            ))}
-          </CardContent>
-        </Card>
+        <CheckoutPaymentCard
+          config={config}
+          paymentMethod={paymentMethod}
+          onSelect={selectPaymentMethod}
+          feeActive={feeActive}
+          quote={quote}
+          txnFieldProps={txn.fieldProps}
+        />
         <Card>
           <CardHeader>
             <CardTitle>Notes (optional)</CardTitle>
@@ -265,66 +279,19 @@ export function CheckoutClient() {
       </div>
 
       <aside className="lg:sticky lg:top-4 lg:self-start">
-        <Card>
-          <CardHeader>
-            <CardTitle>Order summary</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="space-y-2">
-              <Label htmlFor="coupon">Coupon</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="coupon"
-                  value={couponCode}
-                  onChange={(e) => setCouponCode(e.target.value.trim())}
-                  placeholder="Code"
-                  className="w-full"
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={applyCoupon}
-                  disabled={!couponCode}
-                  className={cn('px-6 ', couponCode ? '!bg-black !border-black' : 'opacity-50')}
-                >
-                  Apply
-                </Button>
-              </div>
-              {appliedCoupon ? (
-                <p className="text-xs text-muted-foreground">Applied: {appliedCoupon}</p>
-              ) : null}
-            </div>
-            <div className="space-y-1 text-sm">
-              <div className="flex justify-between">
-                <span>Subtotal</span>
-                <span>{formatBDT(quote?.subtotalCents ?? cart.data?.subtotalCents ?? 0)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Discount</span>
-                <span>- {formatBDT(quote?.discountCents ?? 0)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Shipping</span>
-                <span>{quote ? formatBDT(quote.shippingCents) : '...'}</span>
-              </div>
-              <div className="flex justify-between font-semibold pt-2 border-t mt-2">
-                <span>Total</span>
-                <span>{quote ? formatBDT(quote.totalCents) : '...'}</span>
-              </div>
-            </div>
-            <Button
-              className="w-full"
-              size="lg"
-              disabled={!ready || submitting}
-              onClick={placeOrder}
-            >
-              {submitting ? 'Placing order...' : 'Place order'}
-            </Button>
-            <p className="text-xs text-muted-foreground">
-              By placing your order you agree to the standard terms of sale.
-            </p>
-          </CardContent>
-        </Card>
+        <OrderSummaryCard
+          couponCode={couponCode}
+          onCouponCodeChange={setCouponCode}
+          appliedCoupon={appliedCoupon}
+          onApplyCoupon={applyCoupon}
+          quote={quote}
+          quoting={quoting}
+          cartSubtotalCents={cart.data?.subtotalCents}
+          feeActive={feeActive}
+          placeOrderDisabled={!ready || submitting}
+          submitting={submitting}
+          onPlaceOrder={placeOrder}
+        />
       </aside>
     </section>
   );

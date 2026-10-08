@@ -1,13 +1,31 @@
-import { Prisma, OrderStatus } from '@prisma/client';
+import { OrderStatus, PaymentMethod, Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { ConflictError, ForbiddenError, NotFoundError } from '@/server/common/errors';
 import { orderStatusEmail, sendMail } from '@/server/common/mailer';
+import { CUSTOMER_PAYMENT_FIELDS, type CustomerPaymentField } from '@/contracts/payments';
+import { FEE_ACTIONS, feeFrom } from '@/lib/cod-fee/policy';
 
-const orderInclude = {
+/** Payment columns safe to return to the customer (see CUSTOMER_PAYMENT_FIELDS). */
+export const customerPaymentSelect = Object.fromEntries(
+  CUSTOMER_PAYMENT_FIELDS.map((field) => [field, true]),
+) as Record<CustomerPaymentField, true>;
+
+const baseOrderInclude = {
   items: true,
-  payments: true,
   events: { orderBy: { createdAt: 'asc' as const } },
   address: true,
+} satisfies Prisma.OrderInclude;
+
+/** Customer-facing detail: payments are trimmed to `customerPaymentSelect`. */
+const orderInclude = {
+  ...baseOrderInclude,
+  payments: { select: customerPaymentSelect },
+} satisfies Prisma.OrderInclude;
+
+/** Admin detail: the full payment row. */
+const adminOrderInclude = {
+  ...baseOrderInclude,
+  payments: true,
 } satisfies Prisma.OrderInclude;
 
 export type OrderWithDetails = Prisma.OrderGetPayload<{ include: typeof orderInclude }>;
@@ -87,11 +105,46 @@ const ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   [OrderStatus.CANCELLED]: [],
 };
 
+/**
+ * Confirm an order inside an existing transaction: compare-and-set the status
+ * from `from` to CONFIRMED, then (only if claimed) append the CONFIRMED event.
+ * Returns false, writing nothing, when `from` cannot move to CONFIRMED or a
+ * concurrent writer (cancel, another confirm) changed the status first, so a
+ * confirm can never overwrite a CANCELLED order.
+ *
+ * Lock order: this claims the order row, so call it before touching the
+ * payment row, like `ordersService.transition` and `codFeeService.verifyFee`.
+ */
+export async function confirmOrderInTx(
+  tx: Prisma.TransactionClient,
+  order: { id: string },
+  opts: { from: OrderStatus; note: string; actorId?: string },
+): Promise<boolean> {
+  if (!ALLOWED_TRANSITIONS[opts.from].includes(OrderStatus.CONFIRMED)) return false;
+
+  const claimed = await claimOrderStatus(
+    tx,
+    { id: order.id, status: opts.from },
+    { status: OrderStatus.CONFIRMED },
+  );
+  if (!claimed) return false;
+
+  await tx.orderEvent.create({
+    data: {
+      orderId: order.id,
+      status: OrderStatus.CONFIRMED,
+      note: opts.note,
+      actorId: opts.actorId,
+    },
+  });
+  return true;
+}
+
 export const ordersService = {
   listByUser(userId: string) {
     return prisma.order.findMany({
       where: { userId },
-      include: { items: true, payments: true },
+      include: { items: true, payments: { select: customerPaymentSelect } },
       orderBy: { createdAt: 'desc' },
     });
   },
@@ -117,7 +170,7 @@ export const ordersService = {
   async getAdmin(id: string) {
     const order = await prisma.order.findUnique({
       where: { id },
-      include: { ...orderInclude, user: true },
+      include: { ...adminOrderInclude, user: true },
     });
     if (!order) throw new NotFoundError('Order');
     return order;
@@ -158,6 +211,10 @@ export const ordersService = {
    * ALLOWED_TRANSITIONS (e.g. DELIVERED -> PENDING, re-cancelling an
    * already-cancelled order). Cancelling restocks the order's items,
    * matching customer self-cancel behavior.
+   *
+   * Confirming a PENDING order whose COD confirmation fee is unverified
+   * (PENDING/REJECTED) is allowed but waives the fee (feeStatus -> WAIVED)
+   * in the same transaction, and the event note records that.
    */
   async transition(adminId: string, orderId: string, status: OrderStatus, note?: string) {
     const { updated, customerEmail } = await prisma.$transaction(async (tx) => {
@@ -184,8 +241,26 @@ export const ordersService = {
         await restockOrderItems(tx, order.items);
       }
 
+      // Lock order is order row (claimed above) then payment row, matching
+      // codFeeService.verifyFee.
+      let eventNote = note ?? null;
+      if (order.status === OrderStatus.PENDING && status === OrderStatus.CONFIRMED) {
+        const waived = await tx.payment.updateMany({
+          where: {
+            orderId,
+            method: PaymentMethod.COD,
+            feeStatus: { in: feeFrom('waive') },
+          },
+          data: { feeStatus: FEE_ACTIONS.waive.to },
+        });
+        if (waived.count > 0) {
+          const waiver = 'Confirmed without confirmation fee (waived by admin)';
+          eventNote = note ? `${waiver}: ${note}` : waiver;
+        }
+      }
+
       await tx.orderEvent.create({
-        data: { orderId, status, note: note ?? null, actorId: adminId },
+        data: { orderId, status, note: eventNote, actorId: adminId },
       });
       return { updated, customerEmail: order.user.email };
     });

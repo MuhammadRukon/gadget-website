@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { ERROR_CODES } from './errors';
+
 export const idSchema = z.string().min(1);
 
 export const paginationQuerySchema = z.object({
@@ -15,15 +17,7 @@ export const cursorPageSchema = <T extends z.ZodTypeAny>(item: T) =>
   });
 
 export const apiErrorSchema = z.object({
-  code: z.enum([
-    'BAD_REQUEST',
-    'UNAUTHORIZED',
-    'FORBIDDEN',
-    'NOT_FOUND',
-    'CONFLICT',
-    'VALIDATION_ERROR',
-    'INTERNAL_ERROR',
-  ]),
+  code: z.enum(ERROR_CODES),
   message: z.string(),
   meta: z.record(z.string(), z.unknown()).optional(),
 });

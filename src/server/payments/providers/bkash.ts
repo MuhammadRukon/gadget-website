@@ -3,6 +3,8 @@ import { PaymentMethod, PaymentStatus } from '@prisma/client';
 import { log } from '@/server/common/logger';
 import { takaToCents } from '@/server/common/money';
 
+import { BKASH_ENV, readEnv } from '../gateway-creds';
+
 import type {
   CallbackOutcome,
   PaymentGateway,
@@ -75,13 +77,16 @@ interface BkashCreds {
 }
 
 function getCreds(): BkashCreds | null {
-  const baseUrl = process.env.BKASH_BASE_URL;
-  const appKey = process.env.BKASH_APP_KEY;
-  const appSecret = process.env.BKASH_APP_SECRET;
-  const username = process.env.BKASH_USERNAME;
-  const password = process.env.BKASH_PASSWORD;
-  if (!baseUrl || !appKey || !appSecret || !username || !password) return null;
-  return { baseUrl, appKey, appSecret, username, password };
+  const e = readEnv(BKASH_ENV, process.env);
+  return (
+    e && {
+      baseUrl: e.BKASH_BASE_URL,
+      appKey: e.BKASH_APP_KEY,
+      appSecret: e.BKASH_APP_SECRET,
+      username: e.BKASH_USERNAME,
+      password: e.BKASH_PASSWORD,
+    }
+  );
 }
 
 async function grantToken(creds: BkashCreds): Promise<string> {
