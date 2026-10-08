@@ -45,7 +45,7 @@ UI (src/app pages, src/modules components+hooks)
 Key invariants:
 
 - **`src/server/common/http.ts` is the only server-layer file allowed to import `next/server`.** It owns `requireSession()`, `requireAdminSession()`, `jsonError()`. Services must stay free of Next imports.
-- Errors: throw `AppError` subclasses from `src/server/common/errors.ts`; routes `catch → jsonError(err)`, which maps `ErrorCode` to HTTP status and special-cases `RateLimitedError` (429 + Retry-After) and `ZodError` (422).
+- Errors: throw `AppError` subclasses from `src/server/common/errors.ts`; routes `catch → jsonError(err)`, which maps `ErrorCode` (from `src/contracts/errors.ts`) to HTTP status and special-cases `RateLimitedError` (429 + Retry-After), `TxnIdDuplicateError` (409), and `ZodError` (422).
 - **Money is integer cents (BDT paisa) everywhere.** Never floats. Helpers in `src/server/common/money.ts`.
 - Order items are **snapshotted** (name/sku/price copied at checkout) so historical orders stay correct when the catalog changes.
 - The repo layer is inconsistent by drift: `catalog.repo.ts` / `reviews.repo.ts` hold real queries; `cart.repo.ts`, `orders.repo.ts`, `coupons.repo.ts` are `{ prisma }` passthroughs and their services call Prisma directly. Don't assume a repo exists.
@@ -71,8 +71,8 @@ Forms use react-hook-form + `zodResolver` with the *same* contract schema. Toast
 
 ### Payments (strategy pattern)
 
-- `src/server/payments/gateway.interface.ts` defines `PaymentGateway { init, parseCallback }`. Providers are **DB-free**; `payments.service.ts` owns all persistence and idempotency.
-- `registry.ts` maps `PaymentMethod` to a provider: `cod` (auto-confirm when no fee applies), `bank-transfer` (customer submits ref, admin verifies), `bkash` (grant/create/execute token flow), `sslcommerz` (hosted checkout + validator API).
+- `src/server/payments/gateway.interface.ts` defines `PaymentGateway { planPlacement?, init, parseCallback }`. `planPlacement` (optional, pure) returns `PlacementPlan` describing order creation (initial status, events, fee snapshot); providers are **DB-free**; `payments.service.ts` owns all persistence and idempotency.
+- `registry.ts` maps `PaymentMethod` to a provider: `cod` (implements `planPlacement`; with no fee auto-confirms), `bank-transfer` (customer submits ref, admin verifies), `bkash` (grant/create/execute token flow), `sslcommerz` (hosted checkout + validator API).
 - **Payments settings** — singleton `PaymentSettings` model controls which methods are active (`codEnabled`, `bkashEnabled`, `sslcommerzEnabled`, `bankTransferEnabled`). `placeOrder` and `quote` reject any method not in the effective enabled set (admin-configured AND gateway has credentials) with 400 `BadRequestError`. Configuration read via `tx` client inside the transaction.
 - COD confirmation fee (optional, via settings): when enabled, COD orders stay **PENDING** until admin verifies the fee via `POST /api/admin/payments/[id]/fee` (outcome: VERIFIED/REJECTED). Fee snapshot stored on Payment (type: FLAT/PERCENT, value, computed feeCents, status). Fee is advance credit — total unchanged, due-on-delivery = total − fee for PENDING/VERIFIED, null customer txn id is add-only (unique index, customer can add once before admin verifies/rejects).
 - Callback routes are thin wrappers over `src/app/api/payments/_handlers.ts`.
@@ -82,11 +82,11 @@ Forms use react-hook-form + `zodResolver` with the *same* contract schema. Toast
 ### Checkout
 
 1. `POST /api/checkout/quote` — read-only: accepts optional `paymentMethod`; returns subtotal + coupon validation + shipping (`shipping.ts`: Dhaka 60 BDT / outside 120 BDT, free at 5000 BDT and above), plus `codFeeCents`, `dueOnDeliveryCents` (= total − fee), and `codFeeRule` (null if no fee or non-COD method).
-2. `POST /api/checkout` — `placeOrder` in one `prisma.$transaction`: read settings via `tx`, re-validate stock/coupon/method (reject disabled methods), snapshot items, snapshot fee on `Payment` if applicable (feeCents/feeType/feeValue/feeStatus: PENDING), store `codFeeCents` on `Order`, decrement stock, bump coupon usage, create `Payment`, clear cart, write `OrderEvent`. Optional `customerTxnId` (trimmed, uppercased) stored only when fee applies; duplicate check is atomic via unique index. Response adds `feeRequired: boolean`.
+2. `POST /api/checkout` — `placeOrder` in one `prisma.$transaction`, in this order: consume the cart (count-checked delete); read settings via `tx` and reject a disabled method; check line availability/stock; `priceOrder` (coupon re-validated via `tx`, shipping, totals, COD fee via the strategy's `planPlacement`); `customerTxnId` duplicate pre-check; conditional stock decrement; conditional coupon bump; then ONE nested `order.create` carrying the items (snapshots), the `Payment` (with fee snapshot feeCents/feeType/feeValue/feeStatus: PENDING) and the `OrderEvent`s (explicit increasing `createdAt`). `codFeeCents` is stored on `Order`. Optional `customerTxnId` (trimmed, uppercased) stored only when fee applies; the unique index is the atomic guard and a lost race maps to `TxnIdDuplicateError`. Response adds `feeRequired: boolean`.
 3. `GET /api/checkout/config` (user auth, `force-dynamic`, `no-store` cache) — returns enabled methods (set intersection of admin-flagged and gateway-configured), plus `cod: { feeEnabled, type, value }`, `qrImageUrl`, `contactNumber`, `paymentNote` (all nullable, always present even if fee off, so orders can show contact/QR when placed under fee and later disabled).
 4. The **route** (not the service) then calls `paymentsService.kickoff` outside the transaction to get the redirect URL.
 
-Multi-step DB writes go inside `prisma.$transaction` and must pass the `tx` client to any helper called within. Known violation: coupon re-validation in checkout uses the global client.
+Multi-step DB writes go inside `prisma.$transaction` and must pass the `tx` client to any helper called within (checkout does, including coupon re-validation).
 
 ### Cart
 
@@ -96,7 +96,7 @@ Logged-in carts are `Cart`/`CartItem` rows (unique per `userId`; `getCart` uses 
 
 `PENDING → CONFIRMED → PROCESSING → SHIPPED → DELIVERED`, plus `CANCELLED`. Admin transitions go through `ordersService.transition`, validated against an explicit `ALLOWED_TRANSITIONS` map. Both admin and customer cancellation restock atomically via `restockOrderItems`. Every transition writes an `OrderEvent` — that's the audit trail rendered on both the customer and admin order pages.
 
-**COD confirmation fee flow**: when COD fee applies, the order enters PENDING with fee status PENDING; `paymentsService.verifyCodFee` with outcome VERIFIED sets Payment.feeStatus to VERIFIED and confirms the order to CONFIRMED (async email sent after commit); outcome REJECTED sets feeStatus to REJECTED and order stays PENDING. Admin `ordersService.transition` PENDING→CONFIRMED with fee PENDING or REJECTED auto-waives it (sets feeStatus: WAIVED). Cash verify is blocked while fee is PENDING or REJECTED. Customer cannot edit an approved txn id.
+**COD confirmation fee flow**: when COD fee applies, the order enters PENDING with fee status PENDING; `codFeeService.verifyFee` with outcome VERIFIED sets Payment.feeStatus to VERIFIED and confirms the order to CONFIRMED (async email sent after commit); outcome REJECTED sets feeStatus to REJECTED and order stays PENDING. Admin `ordersService.transition` PENDING→CONFIRMED with fee PENDING or REJECTED auto-waives it (sets feeStatus: WAIVED). Cash verify is blocked while fee is PENDING or REJECTED. Customer cannot edit an approved txn id.
 
 ## Conventions
 
@@ -108,7 +108,7 @@ Logged-in carts are `Cart`/`CartItem` rows (unique per `userId`; `getCart` uses 
 - Rate limiting (`src/server/common/rate-limit.ts`) is Postgres-backed via the `RateLimitBucket` model so it works across serverless instances. Currently applied to signup, forgot, reset, checkout, and txn-check/txn-id.
 - Mailer (`src/server/common/mailer.ts`) uses Resend; with `RESEND_API_KEY` unset it logs and skips instead of sending. **Test env blanks these vars** to prevent actual sends during test runs.
 - Component trees: `src/components/ui/*` are generated shadcn primitives (edit sparingly), `src/components/*` are shared app components. `src/app/components/*` and `src/app/common/*` are legacy storefront-specific duplicates — **prefer `src/components` for new shared work.**
-- Tests: Vitest runs in **node** environment via `vitest.config.ts` (two projects: `default` and `settings-serial` for singleton-mutating tests). **Test DB must be local**; `vitest.global-setup.ts` aborts on non-local `DATABASE_URL` unless `ALLOW_NON_LOCAL_TEST_DB=1`. Test files touching PaymentSettings or checkout fee logic must be listed in `SETTINGS_SERIAL_FILES` to run serialized (no parallel isolation). Pure functions in `src/server/common` are the easiest targets; there are no API/integration or E2E tests.
+- Tests: Vitest runs in **node** environment via `vitest.config.ts` (two projects: `parallel` and `settings-serial` for singleton-mutating tests). **Test DB must be local**; `vitest.global-setup.ts` aborts on non-local `DATABASE_URL` unless `ALLOW_NON_LOCAL_TEST_DB=1`. Test files touching PaymentSettings or checkout fee logic must be named `*.serial.test.ts` to run serialized (one forked worker, no parallel isolation); fixture helpers throw if called from non-serial files. Pure functions in `src/server/common` are the easiest targets; there are no API/integration or E2E tests.
 
 ## Git flow
 

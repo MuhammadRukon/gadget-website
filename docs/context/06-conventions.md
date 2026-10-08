@@ -22,9 +22,9 @@ Rules of thumb:
 
 ## Testing
 
-- Vitest (`npm run test`), config in `vitest.config.ts` (**node** environment, not jsdom; two projects: `default` and `settings-serial` for singleton-mutating tests).
+- Vitest (`npm run test`), config in `vitest.config.ts` (**node** environment, not jsdom; two projects: `parallel` and `settings-serial` for singleton-mutating tests).
 - **Test DB must be local** (`localhost:5433` or configured in `.env.dev`); `vitest.global-setup.ts` aborts on non-local `DATABASE_URL` unless `ALLOW_NON_LOCAL_TEST_DB=1`. Test env blanks `RESEND_API_KEY` and `EMAIL_FROM` to prevent mailer calls.
-- Tests cover pure logic and some services (live Prisma, not mocked). Pattern: pure functions in `src/server/common` are easiest; checkout/payments/orders services use real DB fixtures. Any test touching `placeOrder`, `quote`, `PaymentSettings`, or COD fee logic must be listed in `SETTINGS_SERIAL_FILES` to run serialized.
+- Tests cover pure logic and some services (live Prisma, not mocked). Pattern: pure functions in `src/server/common` are easiest; checkout/payments/orders services use real DB fixtures. Any test touching `placeOrder`, `quote`, `PaymentSettings`, or COD fee logic must be named `*.serial.test.ts` to run serialized (one forked worker); fixture helpers throw if called from non-serial files.
 - Single test file: `npx vitest run src/server/common/__tests__/money.test.ts`; single test by name: `npx vitest run -t "free shipping"`.
 
 ## Git flow
