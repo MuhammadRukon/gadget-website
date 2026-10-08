@@ -50,6 +50,14 @@ interface KickoffArgs {
   origin: string;
 }
 
+/** Thrown inside the callback transaction to roll it back when the payment CAS loses. */
+class CallbackRaceLost extends Error {}
+
+function nullOnRaceLost(err: unknown): null {
+  if (err instanceof CallbackRaceLost) return null;
+  throw err;
+}
+
 function buildUrls(origin: string, method: PaymentMethod, paymentId: string, orderId: string) {
   const base = `${origin.replace(/\/$/, '')}`;
   const provider = method.toLowerCase();
@@ -129,6 +137,10 @@ export const paymentsService = {
    * recorded, the order and its event/notification are left alone, and
    * `payments.callback.order_not_pending` is logged. The callback never errors
    * on that, so the gateway does not retry in a loop.
+   *
+   * The payment write is a compare-and-set from PENDING. If a concurrent
+   * callback won, the whole transaction (order claim, restock, events) rolls
+   * back and the current payment is returned, like the terminal no-op above.
    */
   async applyCallback(method: PaymentMethod, outcome: CallbackOutcome) {
     // The customer notification is collected inside the transaction but
@@ -215,14 +227,19 @@ export const paymentsService = {
         }
       }
 
-      const updated = await tx.payment.update({
-        where: { id: payment.id },
+      // Compare-and-set: only the call that moves the payment out of PENDING
+      // wins. A concurrent callback that got there first makes this a no-op
+      // that rolls the whole transaction back (order claim, restock, events).
+      const claimedPayment = await tx.payment.updateMany({
+        where: { id: payment.id, status: PaymentStatus.PENDING },
         data: {
           status: effectiveStatus,
           providerRef: outcome.providerRef,
           rawPayload: (outcome.rawPayload as Prisma.InputJsonValue) ?? Prisma.JsonNull,
         },
       });
+      if (claimedPayment.count !== 1) throw new CallbackRaceLost();
+      const updated = await tx.payment.findUniqueOrThrow({ where: { id: payment.id } });
 
       if (
         effectiveStatus === PaymentStatus.FAILED ||
@@ -260,7 +277,15 @@ export const paymentsService = {
         method,
       });
       return updated;
-    });
+    }).catch(nullOnRaceLost);
+
+    if (result === null) {
+      // A concurrent callback moved the payment out of PENDING first. This
+      // call's transaction rolled back (no restock, no order claim, no event),
+      // so send nothing and answer with the payment as it now stands.
+      log.info('payments.callback.lost_race', { paymentId: outcome.paymentId, method });
+      return prisma.payment.findUniqueOrThrow({ where: { id: outcome.paymentId } });
+    }
 
     if (notify) {
       const { email, orderNumber, totalCents, succeeded } = notify;

@@ -8,19 +8,31 @@
  * touch the PaymentSettings singleton.
  */
 import { OrderStatus, PaymentMethod, PaymentStatus } from '@prisma/client';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { prisma } from '@/lib/prisma';
 import { ConflictError } from '@/server/common/errors';
+import { sendMail } from '@/server/common/mailer';
 import {
   cleanupCheckoutFixtures,
   createAdminUser,
+  createCheckoutFixture,
   createManualOrder,
   eventsFor,
 } from '@/server/checkout/__tests__/fixtures';
-import { cancelOrderInTx, ordersService } from '@/server/orders/orders.service';
+import {
+  cancelOrderInTx,
+  ordersService,
+  restockOrderItems,
+} from '@/server/orders/orders.service';
 
 import { paymentsService } from '../payments.service';
+
+// Never send mail from tests, and let them count how many a callback would send.
+vi.mock('@/server/common/mailer', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/server/common/mailer')>()),
+  sendMail: vi.fn(async () => {}),
+}));
 
 const ROUNDS = 8;
 
@@ -37,6 +49,10 @@ function raceStaggered<A, B>(a: () => Promise<A>, b: () => Promise<B>) {
     [PromiseSettledResult<A>, PromiseSettledResult<B>]
   >;
 }
+
+beforeEach(() => {
+  vi.mocked(sendMail).mockClear();
+});
 
 afterEach(async () => {
   vi.restoreAllMocks();
@@ -86,6 +102,15 @@ async function actionRacingCancel(orderId: string, action: () => Promise<unknown
     await new Promise((r) => setTimeout(r, 400));
   });
   return (await pending) as { value?: unknown; error?: unknown };
+}
+
+function failed(paymentId: string, ref = 'ref') {
+  return {
+    paymentId,
+    status: PaymentStatus.FAILED,
+    providerRef: `${ref}-${paymentId}`,
+    rawPayload: {},
+  };
 }
 
 /** Warn-level structured log lines emitted while the spy was installed. */
@@ -379,5 +404,217 @@ describe('paymentsService.applyCallback confirming the order', () => {
       const events = await eventsFor(order.id);
       expect(events.filter((e) => e.status === OrderStatus.CONFIRMED)).toHaveLength(1);
     }
+  });
+});
+
+/**
+ * The payment write in `applyCallback` is a compare-and-set from PENDING, so a
+ * call that loses to another terminal callback rolls back completely (order
+ * claim, restock, events) and answers with the payment as it now stands.
+ */
+describe('paymentsService.applyCallback racing another callback', () => {
+  const QTY = 2;
+  const STOCK = 50;
+
+  async function setup() {
+    const fixture = await createCheckoutFixture({ stock: STOCK, cartQty: 1 });
+    async function newOrder() {
+      const made = await gatewayOrder();
+      await prisma.orderItem.create({
+        data: {
+          orderId: made.order.id,
+          variantId: fixture.variant.id,
+          productName: 'Race item',
+          sku: `RACE-${made.order.id}`,
+          buyingPriceCents: 50_000,
+          unitPriceCents: 100_000,
+          quantity: QTY,
+        },
+      });
+      return made;
+    }
+    const stock = async () =>
+      (
+        await prisma.productVariant.findUniqueOrThrow({
+          where: { id: fixture.variant.id },
+          select: { stock: true },
+        })
+      ).stock;
+    return { newOrder, stock };
+  }
+
+  /** The "stock restored" audit events on an order. */
+  const restockEvents = (events: { note: string | null }[]) =>
+    events.filter((e) => e.note?.includes('stock restored'));
+
+  /**
+   * Holds an open transaction that has already moved the payment to FAILED and
+   * restocked (row locked, uncommitted), starts `action` (which still reads
+   * the payment as PENDING and then blocks on the payment row), then commits.
+   * An unconditional payment write would apply the second outcome on top.
+   */
+  async function actionRacingFailedWinner(
+    orderId: string,
+    paymentId: string,
+    action: () => Promise<{ status: PaymentStatus }>,
+  ) {
+    let pending: Promise<unknown> = Promise.resolve();
+    await prisma.$transaction(async (tx) => {
+      const items = await tx.orderItem.findMany({ where: { orderId } });
+      await tx.payment.update({ where: { id: paymentId }, data: { status: PaymentStatus.FAILED } });
+      await restockOrderItems(tx, items);
+      pending = action().then(
+        (value) => ({ value }),
+        (error) => ({ error }),
+      );
+      await new Promise((r) => setTimeout(r, 400));
+    });
+    return (await pending) as { value?: { status: PaymentStatus }; error?: unknown };
+  }
+
+  it('a FAILED callback that loses to an in-flight FAILED: no second restock, no email, current payment returned', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { newOrder, stock } = await setup();
+    const { order, payment } = await newOrder();
+    const before = await stock();
+
+    const res = await actionRacingFailedWinner(order.id, payment.id, () =>
+      paymentsService.applyCallback(PaymentMethod.SSLCOMMERZ, failed(payment.id)),
+    );
+
+    expect(res.error).toBeUndefined();
+    expect(res.value?.status).toBe(PaymentStatus.FAILED);
+    expect(await stock()).toBe(before + QTY); // the winner's restock only
+    expect(restockEvents(await eventsFor(order.id))).toHaveLength(0); // loser wrote none
+    expect(sendMail).not.toHaveBeenCalled();
+  });
+
+  it('a SUCCEEDED callback that loses to an in-flight FAILED: payment stays FAILED, order claim rolled back, no email', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { newOrder, stock } = await setup();
+    const { order, payment } = await newOrder();
+    const before = await stock();
+
+    const res = await actionRacingFailedWinner(order.id, payment.id, () =>
+      paymentsService.applyCallback(PaymentMethod.SSLCOMMERZ, succeeded(payment.id)),
+    );
+
+    expect(res.error).toBeUndefined();
+    expect(res.value?.status).toBe(PaymentStatus.FAILED);
+    const pay = await prisma.payment.findUniqueOrThrow({ where: { id: payment.id } });
+    expect(pay.status).toBe(PaymentStatus.FAILED);
+    expect(pay.providerRef).toBeNull();
+    const row = await prisma.order.findUniqueOrThrow({ where: { id: order.id } });
+    expect(row.status).toBe(OrderStatus.PENDING);
+    expect(await eventsFor(order.id)).toHaveLength(0);
+    expect(await stock()).toBe(before + QTY);
+    expect(sendMail).not.toHaveBeenCalled();
+  });
+
+  it(`two concurrent FAILED callbacks restock exactly once (${ROUNDS} rounds)`, async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { newOrder, stock } = await setup();
+
+    for (let round = 0; round < ROUNDS; round++) {
+      const { order, payment } = await newOrder();
+      const before = await stock();
+      vi.mocked(sendMail).mockClear();
+
+      const [a, b] = await raceStaggered(
+        () => paymentsService.applyCallback(PaymentMethod.SSLCOMMERZ, failed(payment.id, 'a')),
+        () => paymentsService.applyCallback(PaymentMethod.SSLCOMMERZ, failed(payment.id, 'b')),
+      );
+
+      expect([a.status, b.status]).toEqual(['fulfilled', 'fulfilled']);
+      const pay = await prisma.payment.findUniqueOrThrow({ where: { id: payment.id } });
+      expect(pay.status).toBe(PaymentStatus.FAILED);
+      expect(await stock()).toBe(before + QTY);
+      expect(restockEvents(await eventsFor(order.id))).toHaveLength(1);
+      expect(sendMail).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it(`concurrent SUCCEEDED vs FAILED end consistent, never both (${ROUNDS} rounds)`, async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { newOrder, stock } = await setup();
+    const tally = { succeededWon: 0, failedWon: 0 };
+
+    for (let round = 0; round < ROUNDS; round++) {
+      const { order, payment } = await newOrder();
+      const before = await stock();
+      vi.mocked(sendMail).mockClear();
+
+      const [ok, bad] = await raceStaggered(
+        () => paymentsService.applyCallback(PaymentMethod.SSLCOMMERZ, succeeded(payment.id)),
+        () => paymentsService.applyCallback(PaymentMethod.SSLCOMMERZ, failed(payment.id)),
+      );
+
+      // Neither side errors: the loser just answers with the winning state.
+      expect([ok.status, bad.status]).toEqual(['fulfilled', 'fulfilled']);
+      const pay = await prisma.payment.findUniqueOrThrow({ where: { id: payment.id } });
+      const row = await prisma.order.findUniqueOrThrow({ where: { id: order.id } });
+      const events = await eventsFor(order.id);
+      const confirmed = events.filter((e) => e.status === OrderStatus.CONFIRMED);
+
+      if (pay.status === PaymentStatus.SUCCEEDED) {
+        tally.succeededWon++;
+        expect(row.status).toBe(OrderStatus.CONFIRMED);
+        expect(await stock()).toBe(before);
+        expect(confirmed).toHaveLength(1);
+        expect(restockEvents(events)).toHaveLength(0);
+      } else {
+        tally.failedWon++;
+        expect(pay.status).toBe(PaymentStatus.FAILED);
+        expect(row.status).toBe(OrderStatus.PENDING);
+        expect(await stock()).toBe(before + QTY);
+        expect(confirmed).toHaveLength(0);
+        expect(restockEvents(events)).toHaveLength(1);
+      }
+      // Exactly one customer email, matching the winner.
+      expect(sendMail).toHaveBeenCalledTimes(1);
+    }
+    console.info('callback SUCCEEDED-vs-FAILED rounds', JSON.stringify(tally));
+  });
+
+  it('sequential replays stay no-ops: FAILED then FAILED restocks once; FAILED then SUCCEEDED and SUCCEEDED then FAILED keep the first outcome', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { newOrder, stock } = await setup();
+
+    // FAILED, FAILED
+    const one = await newOrder();
+    const before = await stock();
+    await paymentsService.applyCallback(PaymentMethod.SSLCOMMERZ, failed(one.payment.id, 'x'));
+    const again = await paymentsService.applyCallback(
+      PaymentMethod.SSLCOMMERZ,
+      failed(one.payment.id, 'y'),
+    );
+    expect(again.status).toBe(PaymentStatus.FAILED);
+    expect(again.providerRef).toBe(`x-${one.payment.id}`);
+    expect(await stock()).toBe(before + QTY);
+    expect(restockEvents(await eventsFor(one.order.id))).toHaveLength(1);
+
+    // FAILED, then SUCCEEDED: still FAILED, order not confirmed
+    const late = await paymentsService.applyCallback(
+      PaymentMethod.SSLCOMMERZ,
+      succeeded(one.payment.id),
+    );
+    expect(late.status).toBe(PaymentStatus.FAILED);
+    const oneRow = await prisma.order.findUniqueOrThrow({ where: { id: one.order.id } });
+    expect(oneRow.status).toBe(OrderStatus.PENDING);
+
+    // SUCCEEDED, then FAILED: still SUCCEEDED, no restock
+    const two = await newOrder();
+    const beforeTwo = await stock();
+    await paymentsService.applyCallback(PaymentMethod.SSLCOMMERZ, succeeded(two.payment.id));
+    const flipped = await paymentsService.applyCallback(
+      PaymentMethod.SSLCOMMERZ,
+      failed(two.payment.id),
+    );
+    expect(flipped.status).toBe(PaymentStatus.SUCCEEDED);
+    expect(await stock()).toBe(beforeTwo);
+    const twoRow = await prisma.order.findUniqueOrThrow({ where: { id: two.order.id } });
+    expect(twoRow.status).toBe(OrderStatus.CONFIRMED);
+    // one FAILED mail + one SUCCEEDED mail only
+    expect(sendMail).toHaveBeenCalledTimes(2);
   });
 });
