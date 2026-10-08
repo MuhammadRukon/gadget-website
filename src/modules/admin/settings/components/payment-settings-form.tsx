@@ -6,7 +6,10 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
 
-import { paymentSettingsInputSchema, type PaymentSettingsInput } from '@/contracts/payment-settings';
+import {
+  paymentSettingsInputSchema,
+  type PaymentSettingsInput,
+} from '@/contracts/payment-settings';
 import { CodFeeCard } from '@/modules/admin/settings/components/cod-fee-card';
 import {
   PaymentMethodsCard,
