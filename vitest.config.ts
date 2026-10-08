@@ -8,16 +8,11 @@ import tsconfigPaths from 'vite-tsconfig-paths';
  * concurrently with each other, so they run in one project on a single
  * forked worker (files one at a time). Everything else stays parallel.
  *
- * Adding a test that calls placeOrder/quote or the settings service? List it
- * in SETTINGS_SERIAL_FILES.
+ * Adding a test that calls placeOrder/quote or the settings service? Name it
+ * `*.serial.test.ts`. The fixture helpers that mutate the singleton throw
+ * when called from any other file name, so a forgotten rename fails loudly.
  */
-const SETTINGS_SERIAL_FILES = [
-  'src/server/checkout/__tests__/checkout.service.test.ts',
-  'src/server/checkout/__tests__/checkout.fee.test.ts',
-  'src/server/settings/__tests__/payment-settings.service.test.ts',
-  'src/server/payments/__tests__/payment-routes.test.ts',
-  'src/server/settings/__tests__/settings-routes.test.ts',
-];
+const SERIAL_GLOB = 'src/**/*.serial.test.{ts,tsx}';
 
 export default defineConfig({
   plugins: [tsconfigPaths()],
@@ -37,14 +32,14 @@ export default defineConfig({
         test: {
           name: 'parallel',
           include: ['src/**/*.{test,spec}.ts', 'src/**/*.{test,spec}.tsx'],
-          exclude: ['**/node_modules/**', ...SETTINGS_SERIAL_FILES],
+          exclude: ['**/node_modules/**', SERIAL_GLOB],
         },
       },
       {
         extends: true,
         test: {
           name: 'settings-serial',
-          include: SETTINGS_SERIAL_FILES,
+          include: [SERIAL_GLOB],
           // One forked worker runs these files one at a time.
           poolOptions: { forks: { singleFork: true } },
         },

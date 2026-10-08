@@ -13,7 +13,7 @@ import {
   type PaymentSettings,
   UserRole,
 } from '@prisma/client';
-import { vi } from 'vitest';
+import { expect, vi } from 'vitest';
 
 import { prisma } from '@/lib/prisma';
 import { BKASH_ENV, SSLCOMMERZ_ENV } from '@/server/payments/gateway-creds';
@@ -35,11 +35,19 @@ type SettingsPatch = Partial<Omit<PaymentSettings, 'id' | 'updatedAt'>>;
  * The PaymentSettings singleton is shared global state. The first mutation in
  * a test snapshots the original row (or its absence); `cleanupCheckoutFixtures`
  * restores it. Files that mutate it, or rely on its defaults, must not run in
- * parallel with each other (see the `settings-serial` project in vitest.config.ts).
+ * parallel with each other: they must be named `*.serial.test.ts` so the
+ * `settings-serial` project in vitest.config.ts runs them one at a time.
  */
 let settingsSnapshot: { row: PaymentSettings | null } | null = null;
 
 async function snapshotSettings() {
+  const testPath = expect.getState().testPath ?? '';
+  if (!testPath.includes('.serial.test.')) {
+    throw new Error(
+      'Settings fixtures mutate the shared PaymentSettings singleton and must only be used from ' +
+        `a *.serial.test.ts file (the settings-serial vitest project). Rename ${testPath || 'this test file'}.`,
+    );
+  }
   if (!settingsSnapshot) {
     settingsSnapshot = {
       row: await prisma.paymentSettings.findUnique({ where: { id: SETTINGS_ID } }),
