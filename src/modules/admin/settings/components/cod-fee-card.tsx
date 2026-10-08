@@ -217,7 +217,9 @@ export function CodFeeCard({ form }: { form: UseFormReturn<PaymentSettingsInput>
                   });
                 }}
               />
-              <FormDescription>The previous QR is removed from storage when you save.</FormDescription>
+              <FormDescription>
+                The previous QR is removed from storage when you save.
+              </FormDescription>
               <FormMessage />
             </FormItem>
           )}
