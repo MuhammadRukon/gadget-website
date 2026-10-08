@@ -105,6 +105,41 @@ const ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   [OrderStatus.CANCELLED]: [],
 };
 
+/**
+ * Confirm an order inside an existing transaction: compare-and-set the status
+ * from `from` to CONFIRMED, then (only if claimed) append the CONFIRMED event.
+ * Returns false, writing nothing, when `from` cannot move to CONFIRMED or a
+ * concurrent writer (cancel, another confirm) changed the status first, so a
+ * confirm can never overwrite a CANCELLED order.
+ *
+ * Lock order: this claims the order row, so call it before touching the
+ * payment row, like `ordersService.transition` and `codFeeService.verifyFee`.
+ */
+export async function confirmOrderInTx(
+  tx: Prisma.TransactionClient,
+  order: { id: string },
+  opts: { from: OrderStatus; note: string; actorId?: string },
+): Promise<boolean> {
+  if (!ALLOWED_TRANSITIONS[opts.from].includes(OrderStatus.CONFIRMED)) return false;
+
+  const claimed = await claimOrderStatus(
+    tx,
+    { id: order.id, status: opts.from },
+    { status: OrderStatus.CONFIRMED },
+  );
+  if (!claimed) return false;
+
+  await tx.orderEvent.create({
+    data: {
+      orderId: order.id,
+      status: OrderStatus.CONFIRMED,
+      note: opts.note,
+      actorId: opts.actorId,
+    },
+  });
+  return true;
+}
+
 export const ordersService = {
   listByUser(userId: string) {
     return prisma.order.findMany({
