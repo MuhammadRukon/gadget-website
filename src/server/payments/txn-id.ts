@@ -27,9 +27,38 @@ export function findPaymentByTxnId(client: Db, txnId: string, excludePaymentId?:
   });
 }
 
-/** True for the unique-constraint violation on `Payment.customerTxnId`. */
+const TXN_ID_FIELD = 'customerTxnId';
+
+/** A P2002 target naming the txn id: a field list (exact name) or a constraint name (contains it). */
+function namesTxnIdField(target: unknown): boolean {
+  if (Array.isArray(target)) return target.some((field) => field === TXN_ID_FIELD);
+  return typeof target === 'string' && target.includes(TXN_ID_FIELD);
+}
+
+/**
+ * True only for the unique-constraint violation on `Payment.customerTxnId`.
+ * Other unique violations in the same write (e.g. `Order.orderNumber`) are not
+ * a duplicate txn id. Prisma reports the violated index in `meta.target` as a
+ * field list (`[customerTxnId]`) or, for some providers, a constraint name
+ * (`Payment_customerTxnId_key`); driver adapters nest it under
+ * `meta.driverAdapterError.cause.constraint`.
+ */
 export function isTxnIdUniqueViolation(err: unknown): boolean {
-  return err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002';
+  if (!(err instanceof Prisma.PrismaClientKnownRequestError) || err.code !== 'P2002') {
+    return false;
+  }
+  const meta = err.meta as
+    | {
+        target?: unknown;
+        driverAdapterError?: { cause?: { constraint?: { fields?: unknown; index?: unknown } } };
+      }
+    | undefined;
+  const constraint = meta?.driverAdapterError?.cause?.constraint;
+  return (
+    namesTxnIdField(meta?.target) ||
+    namesTxnIdField(constraint?.fields) ||
+    namesTxnIdField(constraint?.index)
+  );
 }
 
 export interface TxnIdCheckOptions {
@@ -65,8 +94,9 @@ export async function assertTxnIdFree(
 
 /**
  * For a write that lost a race on the `customerTxnId` unique index despite
- * `assertTxnIdFree`: maps the P2002 to the same TxnIdDuplicateError the
- * pre-check throws. Any other error is returned unchanged. Use as
+ * `assertTxnIdFree`: maps that P2002 to the same TxnIdDuplicateError the
+ * pre-check throws. Any other error, including a P2002 on a different unique
+ * index, is returned unchanged. Use as
  * `throw await mapTxnIdViolation(err, txnId, opts)`.
  */
 export async function mapTxnIdViolation(
