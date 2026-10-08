@@ -134,9 +134,10 @@ export const paymentsService = {
    * A SUCCEEDED callback claims the order row (PENDING -> CONFIRMED) before
    * the payment write. If the order is no longer PENDING (cancelled, or
    * confirmed by someone else) the claim is skipped: the payment is still
-   * recorded, the order and its event/notification are left alone, and
-   * `payments.callback.order_not_pending` is logged. The callback never errors
-   * on that, so the gateway does not retry in a loop.
+   * recorded, the order is left alone (no status change, no email),
+   * `payments.callback.order_not_pending` is logged and an audit OrderEvent
+   * ("Payment received ... review or refund") is written. The callback never
+   * errors on that, so the gateway does not retry in a loop.
    *
    * The payment write is a compare-and-set from PENDING. If a concurrent
    * callback won, the whole transaction (order claim, restock, events) rolls
@@ -218,18 +219,35 @@ export const paymentsService = {
             succeeded: true,
           };
         } else {
+          // Money arrived for an order that can no longer be confirmed. Leave
+          // the order alone but put an audit note on its timeline (no actor,
+          // no email) so an admin can review or refund. Re-read the status:
+          // the claim may have lost to a concurrent writer after our first read.
+          const now = await tx.order.findUnique({
+            where: { id: order.id },
+            select: { status: true },
+          });
+          const currentStatus = now?.status ?? order.status;
           log.warn('payments.callback.order_not_pending', {
             paymentId: payment.id,
             orderId: order.id,
             orderStatusRead: order.status,
+            orderStatusNow: currentStatus,
             method,
+          });
+          await tx.orderEvent.create({
+            data: {
+              orderId: order.id,
+              status: currentStatus,
+              note: `Payment received via ${method} after the order was ${currentStatus.toLowerCase()}; review or refund`,
+            },
           });
         }
       }
 
       // Compare-and-set: only the call that moves the payment out of PENDING
       // wins. A concurrent callback that got there first makes this a no-op
-      // that rolls the whole transaction back (order claim, restock, events).
+      // that rolls the whole transaction back (order claim, audit event).
       const claimedPayment = await tx.payment.updateMany({
         where: { id: payment.id, status: PaymentStatus.PENDING },
         data: {

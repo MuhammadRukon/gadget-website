@@ -104,6 +104,14 @@ async function actionRacingCancel(orderId: string, action: () => Promise<unknown
   return (await pending) as { value?: unknown; error?: unknown };
 }
 
+/** The audit note applyCallback writes when money arrives for a non-pending order. */
+function isAuditEvent(e: { note: string | null }) {
+  return !!e.note?.endsWith('review or refund');
+}
+function auditEvents<T extends { note: string | null }>(events: T[]) {
+  return events.filter(isAuditEvent);
+}
+
 function failed(paymentId: string, ref = 'ref') {
   return {
     paymentId,
@@ -291,6 +299,10 @@ describe('paymentsService.applyCallback confirming the order', () => {
     const events = await eventsFor(order.id);
     expect(events.some((e) => e.status === OrderStatus.CONFIRMED)).toBe(false);
     expect(warnMessages(warn)).toContain('payments.callback.order_not_pending');
+    // ...and the timeline shows money arrived on a cancelled order.
+    expect(auditEvents(events)).toHaveLength(1);
+    expect(auditEvents(events)[0].status).toBe(OrderStatus.CANCELLED);
+    expect(sendMail).not.toHaveBeenCalled();
   });
 
   it(`never leaves a CONFIRMED-after-CANCELLED order (${ROUNDS} concurrent rounds)`, async () => {
@@ -318,13 +330,17 @@ describe('paymentsService.applyCallback confirming the order', () => {
       expect(row.status).toBe(
         cancelled.status === 'fulfilled' ? OrderStatus.CANCELLED : OrderStatus.CONFIRMED,
       );
-      expect(events.filter((e) => e.status === OrderStatus.CANCELLED)).toHaveLength(
-        cancelled.status === 'fulfilled' ? 1 : 0,
-      );
+      expect(
+        events.filter((e) => e.status === OrderStatus.CANCELLED && !isAuditEvent(e)),
+      ).toHaveLength(cancelled.status === 'fulfilled' ? 1 : 0);
 
       const confirmedEvents = events.filter((e) => e.status === OrderStatus.CONFIRMED).length;
       expect(confirmedEvents).toBeLessThanOrEqual(1);
       if (cancelled.status === 'rejected') expect(confirmedEvents).toBe(1);
+      // The audit note exists exactly when the cancel got in before the confirm.
+      expect(auditEvents(events)).toHaveLength(
+        cancelled.status === 'fulfilled' && confirmedEvents === 0 ? 1 : 0,
+      );
       if (cancelled.status === 'fulfilled' && confirmedEvents === 1) tally.serial++;
       else if (cancelled.status === 'fulfilled') tally.cancelWon++;
       else tally.callbackWon++;
@@ -344,8 +360,45 @@ describe('paymentsService.applyCallback confirming the order', () => {
     expect(applied.status).toBe(PaymentStatus.SUCCEEDED);
     const row = await prisma.order.findUniqueOrThrow({ where: { id: order.id } });
     expect(row.status).toBe(OrderStatus.CANCELLED);
-    expect(await eventsFor(order.id)).toHaveLength(0);
+    // Only the audit note: no CONFIRMED event, no actor.
+    const events = await eventsFor(order.id);
+    expect(events).toHaveLength(1);
+    expect(events[0].status).toBe(OrderStatus.CANCELLED);
+    expect(events[0].actorId).toBeNull();
+    expect(events[0].note).toBe(
+      `Payment received via ${PaymentMethod.SSLCOMMERZ} after the order was cancelled; review or refund`,
+    );
     expect(warnMessages(warn)).toContain('payments.callback.order_not_pending');
+    expect(sendMail).not.toHaveBeenCalled();
+  });
+
+  it('on an already-CONFIRMED order: one audit note, never a second "Payment received" CONFIRMED event', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { order, payment } = await gatewayOrder({ orderStatus: OrderStatus.CONFIRMED });
+
+    const applied = await paymentsService.applyCallback(
+      PaymentMethod.SSLCOMMERZ,
+      succeeded(payment.id),
+    );
+    // A replay of the same callback is a terminal no-op and adds nothing.
+    await paymentsService.applyCallback(PaymentMethod.SSLCOMMERZ, succeeded(payment.id, 'replay'));
+
+    expect(applied.status).toBe(PaymentStatus.SUCCEEDED);
+    const row = await prisma.order.findUniqueOrThrow({ where: { id: order.id } });
+    expect(row.status).toBe(OrderStatus.CONFIRMED);
+    const events = await eventsFor(order.id);
+    expect(events).toHaveLength(1);
+    expect(auditEvents(events)).toHaveLength(1);
+    expect(events[0].status).toBe(OrderStatus.CONFIRMED);
+    expect(events[0].note).toBe(
+      `Payment received via ${PaymentMethod.SSLCOMMERZ} after the order was confirmed; review or refund`,
+    );
+    // The confirm note (exact "Payment received via X") was not written.
+    expect(
+      events.filter((e) => e.note === `Payment received via ${PaymentMethod.SSLCOMMERZ}`),
+    ).toHaveLength(0);
+    expect(warnMessages(warn)).toContain('payments.callback.order_not_pending');
+    expect(sendMail).not.toHaveBeenCalled();
   });
 
   it('on a PENDING order: confirms it with a "Payment received" event and no warning', async () => {
@@ -570,8 +623,10 @@ describe('paymentsService.applyCallback racing another callback', () => {
         expect(confirmed).toHaveLength(0);
         expect(restockEvents(events)).toHaveLength(1);
       }
-      // Exactly one customer email, matching the winner.
+      // Exactly one customer email, matching the winner; the loser rolled back
+      // without leaving an audit note either.
       expect(sendMail).toHaveBeenCalledTimes(1);
+      expect(auditEvents(events)).toHaveLength(0);
     }
     console.info('callback SUCCEEDED-vs-FAILED rounds', JSON.stringify(tally));
   });
