@@ -29,7 +29,7 @@ Each domain has `hooks.ts` (React Query wrappers over `src/lib/fetcher.ts`) and 
 
 - `storefront/` — product-card, product-grid, product-filters, product-detail (server component + JSON-LD), gallery, purchase panel, pagination, deferred reviews.
 - `cart/` — `guest-cart.ts` (Zustand + localStorage), `hooks.ts` (`useCart` branches guest/server; `useGuestCartMerge` on login), add-to-cart button (always qty 1).
-- `checkout/` — `checkout-payment-card.tsx`, `order-summary-card.tsx`, `txn-id-input.tsx` (blur-validated), `add-txn-id-card.tsx` (order page), hooks (`useCheckoutQuote` keyed, `usePaymentConfig`, `usePaymentSelection`, `useCheckoutTxnId`, `useTxnCheck`).
+- `checkout/` — `checkout-payment-card.tsx`, `order-summary-card.tsx`, `txn-id-input.tsx` (blur-validated), `add-txn-id-card.tsx` (order page), hooks (`useCheckoutQuote` keyed, `usePaymentConfig`, `usePaymentSelection`, `useCheckoutTxnId`, `useTxnCheck`). `checkout-quote.ts` holds pure helpers: `isCodFeeActive` (fee UI follows the settled COD quote) and `isFeeConfigStale` (quote shows a fee, cached config says off: refetch config once).
 - `orders/` — shared components (`order-items-card`, `order-events-card`, `order-totals-rows`, `cancel-order-card`, `warranty-request-card`, `order-fee-section`, `fee-summary-rows`, `format-ship-address`), admin dialogs (`admin-txn-id-dialog`, `reject-fee-dialog`, `pending-action.ts`).
 - `auth/` — server actions (`actions.ts`: signup/forgot/reset), auth-card, google-button.
 - `reviews/`, `orders/`, `account/`, `warranty/`, `admin/*` — hooks + forms.
