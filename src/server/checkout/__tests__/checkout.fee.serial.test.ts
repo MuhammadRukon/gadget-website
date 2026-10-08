@@ -10,11 +10,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { CheckoutInput } from '@/contracts/checkout';
 import { prisma } from '@/lib/prisma';
-import {
-  BadRequestError,
-  TxnIdDuplicateError,
-  statusFromError,
-} from '@/server/common/errors';
+import { BadRequestError, TxnIdDuplicateError, statusFromError } from '@/server/common/errors';
 
 import { checkoutService } from '../checkout.service';
 import {
@@ -297,9 +293,7 @@ describe('placeOrder: customer transaction id', () => {
       ]);
 
       const fulfilled = results.filter((r) => r.status === 'fulfilled');
-      const rejected = results.filter(
-        (r): r is PromiseRejectedResult => r.status === 'rejected',
-      );
+      const rejected = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected');
       expect(fulfilled).toHaveLength(1);
       expect(rejected).toHaveLength(1);
       expect(rejected[0].reason).toBeInstanceOf(TxnIdDuplicateError);
