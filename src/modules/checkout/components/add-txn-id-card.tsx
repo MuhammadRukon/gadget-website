@@ -5,11 +5,11 @@ import { useId, useState } from 'react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { ApiClientError } from '@/lib/fetcher';
 import { isTxnIdDuplicate } from '@/modules/checkout/checkout-error';
+import { TxnIdInput } from '@/modules/checkout/components/txn-id-input';
 import {
   TXN_ID_FORMAT_HINT,
   buildTxnConfirmText,
@@ -69,17 +69,13 @@ export function AddTxnIdCard({ paymentId, contactNumber }: AddTxnIdCardProps) {
         </p>
         <div className="space-y-2">
           <Label htmlFor={inputId}>Transaction ID</Label>
-          <Input
+          <TxnIdInput
             id={inputId}
             value={value}
             onChange={(e) => {
               setValue(e.target.value);
               setError(null);
             }}
-            placeholder="e.g. 9A7B3C2D1E"
-            autoComplete="off"
-            autoCapitalize="characters"
-            maxLength={64}
             aria-invalid={showFormatHint || !!error}
           />
           {showFormatHint ? (
