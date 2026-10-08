@@ -34,6 +34,12 @@ export const queryKeys = {
         paymentMethod: params.paymentMethod,
       },
     ] as const,
+  /** Admin orders: prefix, list, and detail (all details, or one by id). */
+  adminOrders: ['admin', 'orders'] as const,
+  adminOrdersList: ['admin', 'orders', 'list'] as const,
+  adminOrderDetails: ['admin', 'orders', 'detail'] as const,
+  adminOrderDetail: (id: string | undefined) => ['admin', 'orders', 'detail', id] as const,
+  adminPaymentsPending: ['admin', 'payments', 'pending'] as const,
   user: ['user'] as const,
   userById: (id: string) => ['user', id] as const,
 };

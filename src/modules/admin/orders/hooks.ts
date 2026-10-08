@@ -5,6 +5,7 @@ import type { Order, OrderEvent, OrderItem, OrderStatus, Payment } from '@prisma
 import { toast } from 'sonner';
 
 import { apiFetch } from '@/lib/fetcher';
+import { queryKeys } from '@/constants/queryKeys';
 
 interface AdminOrderListItem extends Order {
   items: OrderItem[];
@@ -19,11 +20,9 @@ interface AdminOrderDetail extends Order {
   user: { id: string; name: string | null; email: string | null } | null;
 }
 
-const KEY = ['admin', 'orders'] as const;
-
 export function useAdminOrdersList() {
   return useQuery({
-    queryKey: [...KEY, 'list'],
+    queryKey: queryKeys.adminOrdersList,
     queryFn: () =>
       apiFetch<{ items: AdminOrderListItem[] }>('/api/admin/orders').then((r) => r.items),
   });
@@ -31,7 +30,7 @@ export function useAdminOrdersList() {
 
 export function useAdminOrderDetail(id: string | undefined) {
   return useQuery({
-    queryKey: [...KEY, 'detail', id],
+    queryKey: queryKeys.adminOrderDetail(id),
     queryFn: () =>
       apiFetch<{ order: AdminOrderDetail }>(`/api/admin/orders/${id}`).then((r) => r.order),
     enabled: !!id,
@@ -48,7 +47,7 @@ export function useTransitionOrder(id: string) {
       }),
     onSuccess: () => {
       toast.success('Order updated');
-      qc.invalidateQueries({ queryKey: KEY });
+      qc.invalidateQueries({ queryKey: queryKeys.adminOrders });
     },
     onError: (err) => toast.error(err instanceof Error ? err.message : 'Could not update order'),
   });
