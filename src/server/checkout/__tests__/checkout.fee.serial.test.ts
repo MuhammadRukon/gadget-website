@@ -274,6 +274,52 @@ describe('placeOrder: customer transaction id', () => {
     expect(variant.stock).toBe(4);
   });
 
+  it('concurrent orders with the same id: exactly one wins, the loser gets TXN_ID_DUPLICATE', async () => {
+    await setPaymentSettings(FEE_ON);
+    const fx = await createCheckoutFixture({ stock: 100, cartQty: 1 });
+    const ROUNDS = 8;
+    let winners = 0;
+
+    for (let round = 0; round < ROUNDS; round++) {
+      const a = await fx.addShopper(1);
+      const b = await fx.addShopper(1);
+      const txnId = `RACE${round}${Date.now().toString(36)}`.toUpperCase();
+      const stockBefore = (
+        await prisma.productVariant.findUniqueOrThrow({ where: { id: fx.variant.id } })
+      ).stock;
+
+      // Both calls start in the same tick so their transactions overlap: the
+      // loser either hits the pre-check (winner already committed) or the
+      // unique index itself (winner uncommitted), and must map to the same error.
+      const results = await Promise.allSettled([
+        checkoutService.placeOrder(a.user.id, codInput(a.address.id, { customerTxnId: txnId })),
+        checkoutService.placeOrder(b.user.id, codInput(b.address.id, { customerTxnId: txnId })),
+      ]);
+
+      const fulfilled = results.filter((r) => r.status === 'fulfilled');
+      const rejected = results.filter(
+        (r): r is PromiseRejectedResult => r.status === 'rejected',
+      );
+      expect(fulfilled).toHaveLength(1);
+      expect(rejected).toHaveLength(1);
+      expect(rejected[0].reason).toBeInstanceOf(TxnIdDuplicateError);
+      expect(rejected[0].reason.code).toBe('TXN_ID_DUPLICATE');
+      winners += fulfilled.length;
+
+      const winnerIdx = results[0].status === 'fulfilled' ? 0 : 1;
+      const [winner, loser] = winnerIdx === 0 ? [a, b] : [b, a];
+      expect(await prisma.order.count({ where: { userId: winner.user.id } })).toBe(1);
+      expect(await prisma.order.count({ where: { userId: loser.user.id } })).toBe(0);
+      expect(await prisma.payment.count({ where: { customerTxnId: txnId } })).toBe(1);
+      expect(await prisma.cartItem.count({ where: { cart: { userId: loser.user.id } } })).toBe(1);
+      const variant = await prisma.productVariant.findUniqueOrThrow({
+        where: { id: fx.variant.id },
+      });
+      expect(variant.stock).toBe(stockBefore - 1);
+    }
+    expect(winners).toBe(ROUNDS);
+  });
+
   it('fee off: a supplied txn id is ignored (customerTxnId stays NULL)', async () => {
     await setPaymentSettings({ codFeeEnabled: false });
     const fx = await createCheckoutFixture({ stock: 5, cartQty: 1 });
