@@ -68,8 +68,7 @@ export function feeView(payment: FeeViewPayment | undefined, order: FeeViewOrder
     feeCents,
     dueCents: dueOnDeliveryCents({ totalCents: order.totalCents, feeCents, feeStatus: status }),
     customerNotice: feeNoticeState(order.status, payment),
-    showSummaryRows:
-      feeCents > 0 && status !== CodFeeStatus.NONE && status !== CodFeeStatus.WAIVED,
+    showSummaryRows: feeCents > 0 && status !== CodFeeStatus.NONE && status !== CodFeeStatus.WAIVED,
     admin: {
       canVerify,
       canReject: orderPending && canFee('reject', status),

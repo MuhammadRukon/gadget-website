@@ -21,10 +21,7 @@ export function findPaymentByTxnId(client: Db, txnId: string, excludePaymentId?:
   return client.payment.findFirst({
     where: {
       ...(excludePaymentId ? { id: { not: excludePaymentId } } : {}),
-      OR: [
-        { customerTxnId: id },
-        { bankRef: { equals: id, mode: 'insensitive' } },
-      ],
+      OR: [{ customerTxnId: id }, { bankRef: { equals: id, mode: 'insensitive' } }],
     },
     select: { id: true, order: { select: { id: true, orderNumber: true } } },
   });

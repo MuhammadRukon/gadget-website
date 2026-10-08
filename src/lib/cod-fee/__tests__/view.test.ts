@@ -67,7 +67,8 @@ describe('feeView', () => {
           );
           expect(v.customerNotice).toBe(NOTICE[status][orderStatus]);
           expect(v.showSummaryRows).toBe(
-            feeCents > 0 && (status === 'PENDING' || status === 'REJECTED' || status === 'VERIFIED'),
+            feeCents > 0 &&
+              (status === 'PENDING' || status === 'REJECTED' || status === 'VERIFIED'),
           );
           expect(v.admin).toEqual({
             canVerify: orderPending && unverified,
