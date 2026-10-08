@@ -15,6 +15,8 @@ interface OrderSummaryCardProps {
   appliedCoupon: string | null;
   onApplyCoupon: () => void;
   quote: CheckoutQuote | null;
+  /** A quote request is in flight; with no quote yet, amounts show a placeholder. */
+  quoting: boolean;
   /** Shown as the subtotal until a quote arrives. */
   cartSubtotalCents: number | undefined;
   /** Fee rows only for a settled COD quote with a fee. */
@@ -30,6 +32,7 @@ export function OrderSummaryCard({
   appliedCoupon,
   onApplyCoupon,
   quote,
+  quoting,
   cartSubtotalCents,
   feeActive,
   placeOrderDisabled,
@@ -73,7 +76,7 @@ export function OrderSummaryCard({
           </div>
           <div className="flex justify-between">
             <span>Discount</span>
-            <span>- {formatBDT(quote?.discountCents ?? 0)}</span>
+            <span>{quoting && !quote ? '...' : `- ${formatBDT(quote?.discountCents ?? 0)}`}</span>
           </div>
           <div className="flex justify-between">
             <span>Shipping</span>

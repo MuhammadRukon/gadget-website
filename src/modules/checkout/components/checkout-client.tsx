@@ -285,6 +285,7 @@ export function CheckoutClient() {
           appliedCoupon={appliedCoupon}
           onApplyCoupon={applyCoupon}
           quote={quote}
+          quoting={quoting}
           cartSubtotalCents={cart.data?.subtotalCents}
           feeActive={feeActive}
           placeOrderDisabled={!ready || submitting}
