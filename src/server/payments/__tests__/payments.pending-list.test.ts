@@ -2,7 +2,7 @@
  * `listPendingForVerification` feeds the admin payments page. Live-DB test;
  * does not touch the PaymentSettings singleton, so it runs in the parallel project.
  */
-import { CodFeeStatus, OrderStatus, PaymentMethod } from '@prisma/client';
+import { CodFeeStatus, OrderStatus, PaymentMethod, Prisma } from '@prisma/client';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { cleanupCheckoutFixtures, createManualOrder } from '@/server/checkout/__tests__/fixtures';
@@ -13,6 +13,36 @@ afterEach(async () => {
   await cleanupCheckoutFixtures();
 });
 
+/**
+ * `listPendingForVerification` lists every pending payment globally and loads
+ * each payment's order in a second query. Other test files create and delete
+ * orders concurrently (payments cascade with their order), so a payment can
+ * disappear between the two queries and Prisma throws "Inconsistent query
+ * result: Field order is required ... got null". That is a race with other
+ * files' cleanup, not a defect in the query, so retry on exactly that error.
+ */
+const MAX_RETRIES = 3;
+
+function isTransientListRace(err: unknown): boolean {
+  return (
+    err instanceof Prisma.PrismaClientUnknownRequestError &&
+    err.message.includes('Inconsistent query result') &&
+    err.message.includes('Field order is required')
+  );
+}
+
+/** The listing restricted to this test's own payments, so other files' rows never matter. */
+async function listOwn(...paymentIds: string[]) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const all = await paymentsService.listPendingForVerification();
+      return all.filter((p) => paymentIds.includes(p.id));
+    } catch (err) {
+      if (!isTransientListRace(err) || attempt >= MAX_RETRIES) throw err;
+    }
+  }
+}
+
 describe('paymentsService.listPendingForVerification', () => {
   it('returns customerTxnId, feeCents and feeStatus for a fee-pending COD payment', async () => {
     const { payment, order } = await createManualOrder({
@@ -22,8 +52,7 @@ describe('paymentsService.listPendingForVerification', () => {
       customerTxnId: 'LISTTXN1234',
     });
 
-    const items = await paymentsService.listPendingForVerification();
-    const row = items.find((p) => p.id === payment.id);
+    const [row] = await listOwn(payment.id);
 
     expect(row).toBeDefined();
     expect(row?.customerTxnId).toBe('LISTTXN1234');
@@ -35,9 +64,7 @@ describe('paymentsService.listPendingForVerification', () => {
   it('a plain COD payment reports feeStatus NONE, feeCents 0 and no txn id', async () => {
     const { payment } = await createManualOrder({ method: PaymentMethod.COD });
 
-    const row = (await paymentsService.listPendingForVerification()).find(
-      (p) => p.id === payment.id,
-    );
+    const [row] = await listOwn(payment.id);
 
     expect(row?.feeStatus).toBe(CodFeeStatus.NONE);
     expect(row?.feeCents).toBe(0);
@@ -51,9 +78,8 @@ describe('paymentsService.listPendingForVerification', () => {
       orderStatus: OrderStatus.CANCELLED,
     });
 
-    const ids = (await paymentsService.listPendingForVerification()).map((p) => p.id);
+    const ids = (await listOwn(live.payment.id, cancelled.payment.id)).map((p) => p.id);
 
-    expect(ids).toContain(live.payment.id);
-    expect(ids).not.toContain(cancelled.payment.id);
+    expect(ids).toEqual([live.payment.id]);
   });
 });
