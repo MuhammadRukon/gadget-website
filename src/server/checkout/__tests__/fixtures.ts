@@ -16,7 +16,7 @@ import {
 import { vi } from 'vitest';
 
 import { prisma } from '@/lib/prisma';
-import { GATEWAY_ENV_KEYS } from '@/server/payments/gateway-creds';
+import { BKASH_ENV, SSLCOMMERZ_ENV } from '@/server/payments/gateway-creds';
 import { DEFAULT_PAYMENT_SETTINGS } from '@/server/settings/payment-settings.service';
 
 const createdUserIds: string[] = [];
@@ -52,7 +52,7 @@ async function snapshotSettings() {
  * credentials" (blank values are falsy). Tests must `vi.unstubAllEnvs()` after.
  */
 export function clearGatewayEnv() {
-  for (const key of GATEWAY_ENV_KEYS) vi.stubEnv(key, '');
+  for (const key of [...BKASH_ENV, ...SSLCOMMERZ_ENV]) vi.stubEnv(key, '');
 }
 
 /** An order's audit trail, oldest first. */

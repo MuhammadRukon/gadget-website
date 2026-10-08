@@ -3,7 +3,7 @@ import { PaymentMethod, PaymentStatus } from '@prisma/client';
 import { log } from '@/server/common/logger';
 import { takaToCents } from '@/server/common/money';
 
-import { hasGatewayCreds } from '../gateway-creds';
+import { SSLCOMMERZ_ENV, readEnv } from '../gateway-creds';
 
 import type {
   CallbackOutcome,
@@ -60,11 +60,10 @@ interface ValidatorResponse {
 }
 
 function getCreds() {
-  if (!hasGatewayCreds(PaymentMethod.SSLCOMMERZ, process.env)) return null;
-  const id = process.env.SSLCOMMERZ_STORE_ID ?? '';
-  const pwd = process.env.SSLCOMMERZ_STORE_PASSWORD ?? '';
+  const e = readEnv(SSLCOMMERZ_ENV, process.env);
+  if (!e) return null;
   const sandbox = (process.env.SSLCOMMERZ_SANDBOX ?? 'true') === 'true';
-  return { id, pwd, sandbox };
+  return { id: e.SSLCOMMERZ_STORE_ID, pwd: e.SSLCOMMERZ_STORE_PASSWORD, sandbox };
 }
 
 async function realInit(input: PaymentInitInput): Promise<PaymentInitResult> {
