@@ -3,7 +3,7 @@ import { PaymentMethod } from '@prisma/client';
 
 import { paymentSettingsInputSchema } from '@/contracts/payment-settings';
 import { jsonError, requireAdminSession } from '@/server/common/http';
-import { gatewayConfigured } from '@/server/payments/registry';
+import { gatewayConfigured } from '@/server/payments/gateway-creds';
 import { paymentSettingsService } from '@/server/settings/payment-settings.service';
 
 // Settings change at runtime; never serve a cached copy.

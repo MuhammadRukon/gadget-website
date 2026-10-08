@@ -2,7 +2,7 @@ import { PaymentMethod } from '@prisma/client';
 
 /**
  * Pure credential-presence check for payment gateways. The providers'
- * `getCreds()` and `gatewayConfigured()` (registry) both go through this
+ * `getCreds()` and `gatewayConfigured()` both go through this
  * so the list of required env vars lives in exactly one place.
  *
  * A gateway without credentials silently falls back to the self-payable
@@ -30,4 +30,9 @@ export function hasGatewayCreds(method: PaymentMethod, env: EnvLike): boolean {
   const required = REQUIRED_ENV[method];
   if (!required) return true;
   return required.every((key) => Boolean(env[key]));
+}
+
+/** True when the method can be offered to customers, judged against the live process env. */
+export function gatewayConfigured(method: PaymentMethod): boolean {
+  return hasGatewayCreds(method, process.env);
 }

@@ -32,8 +32,10 @@ import { Textarea } from '@/components/ui/textarea';
 
 import {
   isValidCodFeeValue,
+  PAYMENT_METHOD_FLAG,
   PAYMENT_NOTE_MAX,
   paymentSettingsInputSchema,
+  pickMethodFlags,
   type PaymentSettingsInput,
 } from '@/contracts/payment-settings';
 import { formatBDT } from '@/server/common/money';
@@ -51,37 +53,32 @@ const DEFAULT_FLAT_CENTS = 10_000; // 100 BDT
 const DEFAULT_PERCENT = 10;
 const DEFAULT_SAMPLE_BDT = '498.40';
 
-const METHODS: {
-  method: PaymentMethod;
-  field: 'codEnabled' | 'bkashEnabled' | 'sslcommerzEnabled' | 'bankTransferEnabled';
-  label: string;
-  hint: string;
-}[] = [
-  {
-    method: PaymentMethod.COD,
-    field: 'codEnabled',
+const METHOD_COPY: Record<PaymentMethod, { label: string; hint: string }> = {
+  [PaymentMethod.COD]: {
     label: 'Cash on Delivery',
     hint: 'Customers pay in cash when the order arrives.',
   },
-  {
-    method: PaymentMethod.BANK_TRANSFER,
-    field: 'bankTransferEnabled',
+  [PaymentMethod.BANK_TRANSFER]: {
     label: 'Bank transfer',
     hint: 'Customers transfer manually and submit a reference; you verify it.',
   },
-  {
-    method: PaymentMethod.BKASH,
-    field: 'bkashEnabled',
+  [PaymentMethod.BKASH]: {
     label: 'bKash',
     hint: 'Online payment through the bKash gateway.',
   },
-  {
-    method: PaymentMethod.SSLCOMMERZ,
-    field: 'sslcommerzEnabled',
+  [PaymentMethod.SSLCOMMERZ]: {
     label: 'SSLCommerz',
     hint: 'Cards and mobile banking through the SSLCommerz hosted checkout.',
   },
-];
+};
+
+/** Display order of the method switches. */
+const METHODS = [
+  PaymentMethod.COD,
+  PaymentMethod.BANK_TRANSFER,
+  PaymentMethod.BKASH,
+  PaymentMethod.SSLCOMMERZ,
+].map((method) => ({ method, field: PAYMENT_METHOD_FLAG[method], ...METHOD_COPY[method] }));
 
 function defaultFeeValue(type: CodFeeType): number {
   return type === CodFeeType.PERCENT ? DEFAULT_PERCENT : DEFAULT_FLAT_CENTS;
@@ -94,10 +91,7 @@ function defaultFeeValue(type: CodFeeType): number {
  */
 function toFormValues(settings: AdminPaymentSettingsResponse['settings']): PaymentSettingsInput {
   return {
-    codEnabled: settings.codEnabled,
-    bkashEnabled: settings.bkashEnabled,
-    sslcommerzEnabled: settings.sslcommerzEnabled,
-    bankTransferEnabled: settings.bankTransferEnabled,
+    ...pickMethodFlags(settings),
     codFeeEnabled: settings.codFeeEnabled,
     codFeeType: settings.codFeeType,
     codFeeValue: isValidCodFeeValue(settings.codFeeType, settings.codFeeValue)

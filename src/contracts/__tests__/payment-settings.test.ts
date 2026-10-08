@@ -1,7 +1,11 @@
-import { CodFeeType } from '@prisma/client';
+import { CodFeeType, PaymentMethod } from '@prisma/client';
 import { describe, expect, it } from 'vitest';
 
-import { paymentSettingsInputSchema } from '../payment-settings';
+import {
+  PAYMENT_METHOD_FLAG,
+  paymentSettingsInputSchema,
+  pickMethodFlags,
+} from '../payment-settings';
 
 const valid = {
   codEnabled: true,
@@ -187,5 +191,21 @@ describe('paymentSettingsInputSchema', () => {
       codFeeEnabled: false,
     });
     expect(res.success).toBe(true);
+  });
+});
+
+describe('PAYMENT_METHOD_FLAG', () => {
+  it('maps every payment method to its own distinct flag', () => {
+    expect(Object.keys(PAYMENT_METHOD_FLAG).sort()).toEqual(Object.values(PaymentMethod).sort());
+    expect(new Set(Object.values(PAYMENT_METHOD_FLAG)).size).toBe(Object.values(PaymentMethod).length);
+  });
+
+  it('pickMethodFlags copies exactly the four method flags', () => {
+    expect(pickMethodFlags({ ...valid, bkashEnabled: true })).toEqual({
+      codEnabled: true,
+      bkashEnabled: true,
+      sslcommerzEnabled: false,
+      bankTransferEnabled: false,
+    });
   });
 });

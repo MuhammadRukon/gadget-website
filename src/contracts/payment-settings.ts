@@ -45,6 +45,25 @@ export function parseCloudinaryUploadUrl(
   return { cloudName: m[1], publicId: m[2].replace(/\.[A-Za-z0-9]+$/, '') };
 }
 
+/** Admin on/off flag columns on the PaymentSettings singleton, one per payment method. */
+export type MethodFlag = 'codEnabled' | 'bkashEnabled' | 'sslcommerzEnabled' | 'bankTransferEnabled';
+export type MethodFlags = Record<MethodFlag, boolean>;
+
+/** The one place that says which settings flag enables which payment method. */
+export const PAYMENT_METHOD_FLAG: Record<PaymentMethod, MethodFlag> = {
+  [PaymentMethod.COD]: 'codEnabled',
+  [PaymentMethod.SSLCOMMERZ]: 'sslcommerzEnabled',
+  [PaymentMethod.BKASH]: 'bkashEnabled',
+  [PaymentMethod.BANK_TRANSFER]: 'bankTransferEnabled',
+};
+
+/** Copies just the four method flags out of a settings row or input. */
+export function pickMethodFlags(source: MethodFlags): MethodFlags {
+  const flags = {} as MethodFlags;
+  for (const flag of Object.values(PAYMENT_METHOD_FLAG)) flags[flag] = source[flag];
+  return flags;
+}
+
 export const PAYMENT_NOTE_MAX = 500;
 
 /** PERCENT fee bounds (whole percent of the order grand total). */

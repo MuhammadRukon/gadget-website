@@ -17,6 +17,7 @@ import { vi } from 'vitest';
 
 import { prisma } from '@/lib/prisma';
 import { GATEWAY_ENV_KEYS } from '@/server/payments/gateway-creds';
+import { DEFAULT_PAYMENT_SETTINGS } from '@/server/settings/payment-settings.service';
 
 const createdUserIds: string[] = [];
 const createdProductIds: string[] = [];
@@ -63,18 +64,10 @@ export async function eventsFor(orderId: string) {
 export async function setPaymentSettings(patch: SettingsPatch = {}) {
   await snapshotSettings();
   const data = {
-    codEnabled: true,
-    bkashEnabled: false,
-    sslcommerzEnabled: false,
-    bankTransferEnabled: false,
-    codFeeEnabled: false,
-    codFeeType: CodFeeType.FLAT,
+    ...DEFAULT_PAYMENT_SETTINGS,
+    // Fee tests enable the fee without choosing a value; the service default
+    // (0) is not a valid FLAT fee, so the fixture keeps a 100 BDT value.
     codFeeValue: 10_000,
-    qrImageUrl: null,
-    qrImagePublicId: null,
-    contactNumber: null,
-    paymentNote: null,
-    updatedById: null,
     ...patch,
   };
   return prisma.paymentSettings.upsert({

@@ -15,7 +15,7 @@ import {
   createAdminUser,
   setPaymentSettings,
 } from '@/server/checkout/__tests__/fixtures';
-import { gatewayConfigured } from '@/server/payments/registry';
+import { gatewayConfigured } from '@/server/payments/gateway-creds';
 
 import { GET, PUT } from '@/app/api/admin/settings/payments/route';
 

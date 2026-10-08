@@ -1,9 +1,10 @@
+import { PaymentMethod } from '@prisma/client';
 import { z } from 'zod';
 
 import type { CodFeeRule } from './payment-settings';
 import { txnIdSchema } from './payments';
 
-export const paymentMethodSchema = z.enum(['COD', 'SSLCOMMERZ', 'BKASH', 'BANK_TRANSFER']);
+export const paymentMethodSchema = z.enum(PaymentMethod);
 
 export const checkoutInputSchema = z.object({
   addressId: z.string().min(1),

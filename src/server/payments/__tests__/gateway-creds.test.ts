@@ -1,8 +1,7 @@
 import { PaymentMethod } from '@prisma/client';
 import { describe, expect, it } from 'vitest';
 
-import { hasGatewayCreds } from '../gateway-creds';
-import { gatewayConfigured } from '../registry';
+import { gatewayConfigured, hasGatewayCreds } from '../gateway-creds';
 
 const BKASH_ENV = {
   BKASH_BASE_URL: 'https://example.invalid',

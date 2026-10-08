@@ -1,7 +1,10 @@
 import { CodFeeType, PaymentMethod, type Prisma, type PaymentSettings } from '@prisma/client';
 
 import {
+  PAYMENT_METHOD_FLAG,
   parseCloudinaryUploadUrl,
+  pickMethodFlags,
+  type MethodFlags,
   type PaymentSettingsInput,
   type PublicPaymentConfig,
 } from '@/contracts/payment-settings';
@@ -11,7 +14,7 @@ import { BadRequestError } from '@/server/common/errors';
 import { log } from '@/server/common/logger';
 import { CLOUDINARY_FOLDER } from '@/server/media/cloudinary';
 import { mediaService } from '@/server/media/media.service';
-import { gatewayConfigured } from '@/server/payments/registry';
+import { gatewayConfigured } from '@/server/payments/gateway-creds';
 
 /** Either the global client or an in-flight `prisma.$transaction` callback client. */
 type Db = typeof prisma | Prisma.TransactionClient;
@@ -51,38 +54,28 @@ function assertTrustedQrImage(input: Pick<PaymentSettingsInput, 'qrImageUrl' | '
 }
 
 /** Matches the migration's seeded row; returned (never written) when the row is missing. */
-function defaultSettings(): PaymentSettings {
-  return {
-    id: PAYMENT_SETTINGS_ID,
-    codEnabled: true,
-    bkashEnabled: false,
-    sslcommerzEnabled: false,
-    bankTransferEnabled: false,
-    codFeeEnabled: false,
-    codFeeType: CodFeeType.FLAT,
-    codFeeValue: 0,
-    qrImageUrl: null,
-    qrImagePublicId: null,
-    contactNumber: null,
-    paymentNote: null,
-    updatedAt: new Date(0),
-    updatedById: null,
-  };
-}
+export const DEFAULT_PAYMENT_SETTINGS: Omit<PaymentSettings, 'id' | 'updatedAt'> = {
+  codEnabled: true,
+  bkashEnabled: false,
+  sslcommerzEnabled: false,
+  bankTransferEnabled: false,
+  codFeeEnabled: false,
+  codFeeType: CodFeeType.FLAT,
+  codFeeValue: 0,
+  qrImageUrl: null,
+  qrImagePublicId: null,
+  contactNumber: null,
+  paymentNote: null,
+  updatedById: null,
+};
 
-type MethodFlags = Pick<
-  PaymentSettings,
-  'codEnabled' | 'bkashEnabled' | 'sslcommerzEnabled' | 'bankTransferEnabled'
->;
+function defaultSettings(): PaymentSettings {
+  return { id: PAYMENT_SETTINGS_ID, ...DEFAULT_PAYMENT_SETTINGS, updatedAt: new Date(0) };
+}
 
 /** Methods whose admin flag is on, in `PaymentMethod` enum order. */
 function flaggedMethods(flags: MethodFlags): PaymentMethod[] {
-  const methods: PaymentMethod[] = [];
-  if (flags.codEnabled) methods.push(PaymentMethod.COD);
-  if (flags.sslcommerzEnabled) methods.push(PaymentMethod.SSLCOMMERZ);
-  if (flags.bkashEnabled) methods.push(PaymentMethod.BKASH);
-  if (flags.bankTransferEnabled) methods.push(PaymentMethod.BANK_TRANSFER);
-  return methods;
+  return Object.values(PaymentMethod).filter((method) => flags[PAYMENT_METHOD_FLAG[method]]);
 }
 
 /**
@@ -107,15 +100,6 @@ export const paymentSettingsService = {
   async get(client: Db = prisma): Promise<PaymentSettings> {
     const row = await client.paymentSettings.findUnique({ where: { id: PAYMENT_SETTINGS_ID } });
     return row ?? defaultSettings();
-  },
-
-  /**
-   * Methods a customer may actually use: flagged on by the admin AND, for
-   * gateways, configured with credentials (an unconfigured gateway would
-   * fall back to the self-payable sandbox harness).
-   */
-  async getEffective(client: Db = prisma): Promise<PaymentMethod[]> {
-    return effectiveMethods(await paymentSettingsService.get(client));
   },
 
   /**
@@ -144,10 +128,7 @@ export const paymentSettingsService = {
     assertTrustedQrImage(input);
 
     const data = {
-      codEnabled: input.codEnabled,
-      bkashEnabled: input.bkashEnabled,
-      sslcommerzEnabled: input.sslcommerzEnabled,
-      bankTransferEnabled: input.bankTransferEnabled,
+      ...pickMethodFlags(input),
       codFeeEnabled: input.codFeeEnabled,
       codFeeType: input.codFeeType,
       codFeeValue: input.codFeeValue,
@@ -163,7 +144,7 @@ export const paymentSettingsService = {
 
       // Only newly-enabled gateways are rejected, so a gateway whose
       // credentials were removed later can still be switched off or left
-      // alone while other settings change (getEffective already hides it).
+      // alone while other settings change (effectiveMethods already hides it).
       const newlyEnabledWithoutCreds = flaggedMethods(data).filter(
         (m) => !flaggedMethods(current).includes(m) && !gatewayConfigured(m),
       );

@@ -4,7 +4,6 @@ import { bankTransferGateway } from './providers/bank-transfer';
 import { bkashGateway } from './providers/bkash';
 import { codGateway } from './providers/cod';
 import { sslcommerzGateway } from './providers/sslcommerz';
-import { hasGatewayCreds } from './gateway-creds';
 
 import { defaultPlacementPlan } from './placement';
 
@@ -24,13 +23,4 @@ export function getGateway(method: PaymentMethod): PaymentGateway {
 /** How an order paid with `method` is created (see `PaymentGateway.planPlacement`). */
 export function planPlacement(method: PaymentMethod, ctx: PlacementContext): PlacementPlan {
   return getGateway(method).planPlacement?.(ctx) ?? defaultPlacementPlan();
-}
-
-/**
- * True when the method can be offered to customers: COD and bank transfer
- * always, gateways only when their credentials are present (otherwise they
- * would fall back to the self-payable sandbox harness).
- */
-export function gatewayConfigured(method: PaymentMethod): boolean {
-  return hasGatewayCreds(method, process.env);
 }

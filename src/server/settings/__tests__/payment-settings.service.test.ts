@@ -14,7 +14,7 @@ import { BadRequestError } from '@/server/common/errors';
 import { CLOUDINARY_FOLDER } from '@/server/media/cloudinary';
 import { mediaService } from '@/server/media/media.service';
 
-import { paymentSettingsService } from '../payment-settings.service';
+import { effectiveMethods, paymentSettingsService } from '../payment-settings.service';
 
 const SINGLETON = 'singleton';
 
@@ -275,7 +275,9 @@ describe('paymentSettingsService.update', () => {
   });
 });
 
-describe('paymentSettingsService.getEffective', () => {
+describe('effectiveMethods (via paymentSettingsService.get)', () => {
+  const effective = async () => effectiveMethods(await paymentSettingsService.get());
+
   it('excludes a gateway whose flag is true but whose credentials are missing', async () => {
     await prisma.paymentSettings.upsert({
       where: { id: SINGLETON },
@@ -283,7 +285,7 @@ describe('paymentSettingsService.getEffective', () => {
       update: { codEnabled: true, bkashEnabled: true, bankTransferEnabled: true },
     });
 
-    const methods = await paymentSettingsService.getEffective();
+    const methods = await effective();
 
     expect(methods).toContain(PaymentMethod.COD);
     expect(methods).toContain(PaymentMethod.BANK_TRANSFER);
@@ -298,16 +300,18 @@ describe('paymentSettingsService.getEffective', () => {
     });
     setBkashEnv();
 
-    expect(await paymentSettingsService.getEffective()).toContain(PaymentMethod.BKASH);
+    expect(await effective()).toContain(PaymentMethod.BKASH);
   });
 
   it('falls back to COD only when the singleton row is missing', async () => {
     await prisma.paymentSettings.deleteMany({ where: { id: SINGLETON } });
-    expect(await paymentSettingsService.getEffective()).toEqual([PaymentMethod.COD]);
+    expect(await effective()).toEqual([PaymentMethod.COD]);
   });
 
   it('accepts a transaction client', async () => {
-    const methods = await prisma.$transaction((tx) => paymentSettingsService.getEffective(tx));
+    const methods = await prisma.$transaction(async (tx) =>
+      effectiveMethods(await paymentSettingsService.get(tx)),
+    );
     expect(Array.isArray(methods)).toBe(true);
   });
 });
