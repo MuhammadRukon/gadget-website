@@ -5,6 +5,7 @@ import type { Payment } from '@prisma/client';
 import { toast } from 'sonner';
 
 import { ApiClientError, apiFetch } from '@/lib/fetcher';
+import { queryKeys } from '@/constants/queryKeys';
 
 interface PendingPayment extends Payment {
   order: {
@@ -21,7 +22,7 @@ interface PendingPayment extends Payment {
 
 export function useAdminPendingPayments() {
   return useQuery({
-    queryKey: ['admin', 'payments', 'pending'],
+    queryKey: queryKeys.adminPaymentsPending,
     queryFn: () =>
       apiFetch<{ items: PendingPayment[] }>('/api/admin/payments').then((r) => r.items),
   });
@@ -75,10 +76,21 @@ export function getDuplicateTxnInfo(err: unknown): DuplicateTxnInfo | null {
   return null;
 }
 
-/** Refetch everything an admin fee/txn change can touch, without a manual reload. */
-function invalidateAdminPaymentViews(qc: ReturnType<typeof useQueryClient>) {
-  qc.invalidateQueries({ queryKey: ['admin', 'orders'] });
-  qc.invalidateQueries({ queryKey: ['admin', 'payments'] });
+/**
+ * Refetch what an admin fee/txn change can touch, without a manual reload:
+ * the orders list, that order's detail, and the pending-payments list. The
+ * order id comes from the response; when the request failed there is none, so
+ * every cached order detail is marked stale instead (only mounted ones refetch).
+ */
+function invalidateAdminPaymentViews(
+  qc: ReturnType<typeof useQueryClient>,
+  orderId: string | undefined,
+) {
+  qc.invalidateQueries({ queryKey: queryKeys.adminOrdersList });
+  qc.invalidateQueries({
+    queryKey: orderId ? queryKeys.adminOrderDetail(orderId) : queryKeys.adminOrderDetails,
+  });
+  qc.invalidateQueries({ queryKey: queryKeys.adminPaymentsPending });
 }
 
 /** Verify or reject the COD confirmation fee (`POST /api/admin/payments/[id]/fee`). */
@@ -105,7 +117,7 @@ export function useVerifyCodFee() {
     onError: (err) =>
       toast.error(err instanceof Error ? err.message : 'Could not update the confirmation fee'),
     // Also on error: a 409 means someone else already decided, so show fresh state.
-    onSettled: () => invalidateAdminPaymentViews(qc),
+    onSettled: (data) => invalidateAdminPaymentViews(qc, data?.payment.orderId),
   });
 }
 
@@ -127,6 +139,6 @@ export function useAdminSetTxnId() {
       if (getDuplicateTxnInfo(err)) return;
       toast.error(err instanceof Error ? err.message : 'Could not save the transaction ID');
     },
-    onSettled: () => invalidateAdminPaymentViews(qc),
+    onSettled: (data) => invalidateAdminPaymentViews(qc, data?.payment.orderId),
   });
 }
