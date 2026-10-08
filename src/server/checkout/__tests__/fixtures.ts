@@ -164,7 +164,6 @@ export async function createManualOrder(opts: ManualOrderOptions = {}) {
       shipCountry: 'BD',
       subtotalCents: totalCents,
       totalCents,
-      codFeeCents: opts.feeCents ?? 0,
     },
   });
   const payment = await prisma.payment.create({

@@ -54,7 +54,6 @@ describe('placeOrder: COD confirmation fee', () => {
       include: { payments: true },
     });
     expect(row.status).toBe(OrderStatus.CONFIRMED);
-    expect(row.codFeeCents).toBe(0);
     expect(row.payments[0].feeStatus).toBe(CodFeeStatus.NONE);
     expect(row.payments[0].feeCents).toBe(0);
     const notes = (await eventsFor(order.id)).map((e) => e.note ?? '');
@@ -77,7 +76,6 @@ describe('placeOrder: COD confirmation fee', () => {
     });
     const payment = row.payments[0];
     expect(row.status).toBe(OrderStatus.PENDING);
-    expect(row.codFeeCents).toBe(10_000);
     expect(payment.feeCents).toBe(10_000);
     expect(payment.feeType).toBe(CodFeeType.FLAT);
     expect(payment.feeValue).toBe(10_000);
@@ -165,9 +163,12 @@ describe('placeOrder: COD confirmation fee', () => {
 
     const { order } = await checkoutService.placeOrder(fx.user.id, codInput(fx.address.id));
 
-    const row = await prisma.order.findUniqueOrThrow({ where: { id: order.id } });
+    const row = await prisma.order.findUniqueOrThrow({
+      where: { id: order.id },
+      include: { payments: true },
+    });
     expect(row.status).toBe(OrderStatus.CONFIRMED);
-    expect(row.codFeeCents).toBe(0);
+    expect(row.payments[0].feeCents).toBe(0);
   });
 });
 
@@ -224,7 +225,7 @@ describe('placeOrder: payment method enforcement', () => {
       include: { payments: true },
     });
     expect(row.status).toBe(OrderStatus.PENDING);
-    expect(row.codFeeCents).toBe(0);
+    expect(row.payments[0].feeCents).toBe(0);
     expect(row.payments[0].feeStatus).toBe(CodFeeStatus.NONE);
   });
 });
@@ -389,6 +390,6 @@ describe('checkoutService.quote: COD fee', () => {
     );
 
     expect(order.totalCents).toBe(quote.totalCents);
-    expect(order.codFeeCents).toBe(quote.codFeeCents);
+    expect(order.payments[0].feeCents).toBe(quote.codFeeCents);
   });
 });

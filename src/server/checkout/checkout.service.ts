@@ -246,9 +246,6 @@ export const checkoutService = {
             discountCents,
             shippingCents,
             totalCents,
-            // Placement-time snapshot only. Payment.feeCents / feeStatus are
-            // authoritative: a waived or rejected fee never rewrites this value.
-            codFeeCents: plan.fee?.feeCents ?? 0,
             couponId,
             couponCode,
             notes: input.notes ?? null,
