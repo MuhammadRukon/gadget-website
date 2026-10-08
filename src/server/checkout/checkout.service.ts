@@ -3,7 +3,7 @@ import { randomBytes } from 'crypto';
 
 import { prisma } from '@/lib/prisma';
 import type { CheckoutInput, CheckoutQuote, StockConflictMeta } from '@/contracts/checkout';
-import { BadRequestError, ConflictError, NotFoundError } from '@/server/common/errors';
+import { ConflictError, NotFoundError } from '@/server/common/errors';
 import { cancelOrderInTx } from '@/server/orders/orders.service';
 import { assertTxnIdFree, mapTxnIdViolation } from '@/server/payments/txn-id';
 import {

@@ -39,9 +39,10 @@ export interface PricedOrder {
 /**
  * Single source of truth for order pricing, shared by `quote()` and
  * `placeOrder` so the two can never drift: subtotal, coupon, shipping,
- * total, and the payment method's placement plan (which carries the COD fee). Pass the transaction client from `placeOrder` so
- * the coupon is re-validated inside the transaction. All values are integer
- * cents. Does not check that the payment method is available; callers do
+ * total, and the payment method's placement plan (which carries the COD
+ * fee). Pass the transaction client from `placeOrder` so the coupon is
+ * re-validated inside the transaction. All values are integer cents. Does
+ * not check that the payment method is available; callers do
  * (`assertMethodAvailable`) at the point their flow needs it.
  */
 export async function priceOrder(
