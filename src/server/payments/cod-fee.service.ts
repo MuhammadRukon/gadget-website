@@ -17,6 +17,8 @@ import { assertTxnIdFree, findPaymentByTxnId, mapTxnIdViolation } from './txn-id
  * Lock order for every mutator that claims the order (admin txn id, fee
  * verify/reject): order row first, then payment row, matching
  * `ordersService.transition`, so concurrent callers can't deadlock.
+ * `paymentsService.verify` / `applyCallback` follow the same order through
+ * `confirmOrderInTx` (see `orders.service.ts`).
  */
 
 type Tx = Prisma.TransactionClient;
