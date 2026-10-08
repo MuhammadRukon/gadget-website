@@ -24,46 +24,13 @@ import {
   useVerifyCodFee,
   useVerifyPayment,
 } from '@/modules/admin/payments/hooks';
-
-type PendingAction =
-  | { kind: 'payment'; id: string; orderNumber: string; outcome: 'SUCCEEDED' | 'FAILED' }
-  | { kind: 'fee'; id: string; orderNumber: string; outcome: 'VERIFIED' | 'REJECTED' };
-
-function describeAction(a: PendingAction): {
-  title: string;
-  description: string;
-  confirmLabel: string;
-  destructive: boolean;
-} {
-  if (a.kind === 'fee') {
-    return a.outcome === 'VERIFIED'
-      ? {
-          title: 'Verify the confirmation fee?',
-          description: `The fee for order ${a.orderNumber} will be marked verified and the order confirmed.`,
-          confirmLabel: 'Verify fee',
-          destructive: false,
-        }
-      : {
-          title: 'Reject the confirmation fee?',
-          description: `The fee for order ${a.orderNumber} will be rejected. The order stays pending and the customer is told the fee could not be verified. You can still verify it later if it arrives.`,
-          confirmLabel: 'Reject fee',
-          destructive: true,
-        };
-  }
-  return a.outcome === 'SUCCEEDED'
-    ? {
-        title: 'Verify this payment?',
-        description: `Order ${a.orderNumber} will be marked as paid and confirmed.`,
-        confirmLabel: 'Verify',
-        destructive: false,
-      }
-    : {
-        title: 'Reject this payment?',
-        description: `The payment for order ${a.orderNumber} will be marked as failed.`,
-        confirmLabel: 'Reject',
-        destructive: true,
-      };
-}
+import {
+  describeAction,
+  makePendingAction,
+  type PendingAction,
+  type PendingActionKind,
+  type PendingActionOutcome,
+} from '@/modules/admin/payments/pending-action';
 
 export default function AdminPaymentsPage() {
   const pending = useAdminPendingPayments();
@@ -129,6 +96,16 @@ export default function AdminPaymentsPage() {
                   });
                   const { canVerify, canReject } = fee.admin;
                   const hasFee = fee.show;
+                  const ask = <K extends PendingActionKind>(
+                    kind: K,
+                    outcome: PendingActionOutcome<K>,
+                  ) =>
+                    setAction(
+                      makePendingAction(kind, outcome, {
+                        id: p.id,
+                        orderNumber: p.order.orderNumber,
+                      }),
+                    );
                   return (
                     <TableRow key={p.id}>
                       <TableCell className="font-medium">{p.order.orderNumber}</TableCell>
@@ -160,14 +137,7 @@ export default function AdminPaymentsPage() {
                               size="sm"
                               variant="outline"
                               disabled={busy}
-                              onClick={() =>
-                                setAction({
-                                  kind: 'fee',
-                                  id: p.id,
-                                  orderNumber: p.order.orderNumber,
-                                  outcome: 'VERIFIED',
-                                })
-                              }
+                              onClick={() => ask('fee', 'VERIFIED')}
                             >
                               Verify fee
                             </Button>
@@ -177,14 +147,7 @@ export default function AdminPaymentsPage() {
                                 size="sm"
                                 variant="ghost"
                                 disabled={busy}
-                                onClick={() =>
-                                  setAction({
-                                    kind: 'fee',
-                                    id: p.id,
-                                    orderNumber: p.order.orderNumber,
-                                    outcome: 'REJECTED',
-                                  })
-                                }
+                                onClick={() => ask('fee', 'REJECTED')}
                               >
                                 Reject fee
                               </Button>
@@ -196,14 +159,7 @@ export default function AdminPaymentsPage() {
                               size="sm"
                               variant="outline"
                               disabled={busy}
-                              onClick={() =>
-                                setAction({
-                                  kind: 'payment',
-                                  id: p.id,
-                                  orderNumber: p.order.orderNumber,
-                                  outcome: 'SUCCEEDED',
-                                })
-                              }
+                              onClick={() => ask('payment', 'SUCCEEDED')}
                             >
                               Verify
                             </Button>
@@ -211,14 +167,7 @@ export default function AdminPaymentsPage() {
                               size="sm"
                               variant="ghost"
                               disabled={busy}
-                              onClick={() =>
-                                setAction({
-                                  kind: 'payment',
-                                  id: p.id,
-                                  orderNumber: p.order.orderNumber,
-                                  outcome: 'FAILED',
-                                })
-                              }
+                              onClick={() => ask('payment', 'FAILED')}
                             >
                               Reject
                             </Button>
