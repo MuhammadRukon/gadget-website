@@ -1,10 +1,8 @@
 import { CodFeeType, PaymentMethod, type Prisma, type PaymentSettings } from '@prisma/client';
 
 import {
-  PAYMENT_METHOD_FLAG,
+  canonicalMethods,
   parseCloudinaryUploadUrl,
-  pickMethodFlags,
-  type MethodFlags,
   type PaymentSettingsInput,
   type PublicPaymentConfig,
 } from '@/contracts/payment-settings';
@@ -55,10 +53,7 @@ function assertTrustedQrImage(input: Pick<PaymentSettingsInput, 'qrImageUrl' | '
 
 /** Matches the migration's seeded row; returned (never written) when the row is missing. */
 export const DEFAULT_PAYMENT_SETTINGS: Omit<PaymentSettings, 'id' | 'updatedAt'> = {
-  codEnabled: true,
-  bkashEnabled: false,
-  sslcommerzEnabled: false,
-  bankTransferEnabled: false,
+  enabledMethods: [PaymentMethod.COD],
   codFeeEnabled: false,
   codFeeType: CodFeeType.FLAT,
   codFeeValue: 0,
@@ -73,23 +68,24 @@ function defaultSettings(): PaymentSettings {
   return { id: PAYMENT_SETTINGS_ID, ...DEFAULT_PAYMENT_SETTINGS, updatedAt: new Date(0) };
 }
 
-/** Methods whose admin flag is on, in `PaymentMethod` enum order. */
-function flaggedMethods(flags: MethodFlags): PaymentMethod[] {
-  return Object.values(PaymentMethod).filter((method) => flags[PAYMENT_METHOD_FLAG[method]]);
-}
-
 /**
  * Methods a customer may actually use, derived from an already-loaded
- * settings row: flagged on by the admin AND, for gateways, configured with
- * credentials. Pure, so callers holding settings (e.g. `placeOrder`) don't
- * need a second query.
+ * settings row: enabled by the admin AND, for gateways, configured with
+ * credentials. Always in `PaymentMethod` enum order, whatever order the
+ * stored array has. Pure, so callers holding settings (e.g. `placeOrder`)
+ * don't need a second query.
  */
-export function effectiveMethods(settings: MethodFlags): PaymentMethod[] {
-  return flaggedMethods(settings).filter(gatewayConfigured);
+export function effectiveMethods(
+  settings: Pick<PaymentSettings, 'enabledMethods'>,
+): PaymentMethod[] {
+  return canonicalMethods(settings.enabledMethods).filter(gatewayConfigured);
 }
 
 /** 400 for a method the admin has not enabled (or whose gateway has no credentials). */
-export function assertMethodAvailable(settings: MethodFlags, method: PaymentMethod): void {
+export function assertMethodAvailable(
+  settings: Pick<PaymentSettings, 'enabledMethods'>,
+  method: PaymentMethod,
+): void {
   if (effectiveMethods(settings).includes(method)) return;
   const meta: PaymentMethodUnavailableMeta = { reason: 'payment_method_unavailable', method };
   throw new BadRequestError('That payment method is no longer available', meta);
@@ -128,7 +124,7 @@ export const paymentSettingsService = {
     assertTrustedQrImage(input);
 
     const data = {
-      ...pickMethodFlags(input),
+      enabledMethods: canonicalMethods(input.enabledMethods),
       codFeeEnabled: input.codFeeEnabled,
       codFeeType: input.codFeeType,
       codFeeValue: input.codFeeValue,
@@ -145,8 +141,8 @@ export const paymentSettingsService = {
       // Only newly-enabled gateways are rejected, so a gateway whose
       // credentials were removed later can still be switched off or left
       // alone while other settings change (effectiveMethods already hides it).
-      const newlyEnabledWithoutCreds = flaggedMethods(data).filter(
-        (m) => !flaggedMethods(current).includes(m) && !gatewayConfigured(m),
+      const newlyEnabledWithoutCreds = data.enabledMethods.filter(
+        (m) => !current.enabledMethods.includes(m) && !gatewayConfigured(m),
       );
       if (newlyEnabledWithoutCreds.length > 0) {
         throw new BadRequestError(
@@ -154,7 +150,7 @@ export const paymentSettingsService = {
         );
       }
 
-      if (flaggedMethods(data).filter(gatewayConfigured).length === 0) {
+      if (data.enabledMethods.filter(gatewayConfigured).length === 0) {
         throw new BadRequestError('At least one payment method must remain enabled');
       }
 

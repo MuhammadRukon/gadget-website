@@ -109,8 +109,7 @@ describe('GET /api/checkout/config', () => {
     signInAs('config-user');
     await setPaymentSettings({
       codFeeEnabled: false,
-      bkashEnabled: true,
-      bankTransferEnabled: true,
+      enabledMethods: ['COD', 'BKASH', 'BANK_TRANSFER'],
       qrImageUrl: 'https://res.cloudinary.com/demo/image/upload/qr.png',
       contactNumber: '01800000000',
       paymentNote: 'Send to this number',

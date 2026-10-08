@@ -14,7 +14,11 @@ import { BadRequestError } from '@/server/common/errors';
 import { CLOUDINARY_FOLDER } from '@/server/media/cloudinary';
 import { mediaService } from '@/server/media/media.service';
 
-import { effectiveMethods, paymentSettingsService } from '../payment-settings.service';
+import {
+  DEFAULT_PAYMENT_SETTINGS,
+  effectiveMethods,
+  paymentSettingsService,
+} from '../payment-settings.service';
 
 const SINGLETON = 'singleton';
 
@@ -32,10 +36,7 @@ function setBkashEnv() {
 
 function input(overrides: Partial<PaymentSettingsInput> = {}): PaymentSettingsInput {
   return {
-    codEnabled: true,
-    bkashEnabled: false,
-    sslcommerzEnabled: false,
-    bankTransferEnabled: false,
+    enabledMethods: [PaymentMethod.COD],
     codFeeEnabled: false,
     codFeeType: CodFeeType.FLAT,
     codFeeValue: 10_000,
@@ -94,10 +95,8 @@ describe('paymentSettingsService.get', () => {
 
     const settings = await paymentSettingsService.get();
 
-    expect(settings.codEnabled).toBe(true);
-    expect(settings.bkashEnabled).toBe(false);
-    expect(settings.sslcommerzEnabled).toBe(false);
-    expect(settings.bankTransferEnabled).toBe(false);
+    expect(settings.enabledMethods).toEqual([PaymentMethod.COD]);
+    expect(settings.enabledMethods).toEqual(DEFAULT_PAYMENT_SETTINGS.enabledMethods);
     expect(settings.codFeeEnabled).toBe(false);
     expect(await prisma.paymentSettings.count({ where: { id: SINGLETON } })).toBe(0);
   });
@@ -105,46 +104,116 @@ describe('paymentSettingsService.get', () => {
   it('accepts a transaction client', async () => {
     await prisma.paymentSettings.upsert({
       where: { id: SINGLETON },
-      create: { id: SINGLETON, bankTransferEnabled: true },
-      update: { bankTransferEnabled: true },
+      create: { id: SINGLETON, enabledMethods: [PaymentMethod.BANK_TRANSFER] },
+      update: { enabledMethods: [PaymentMethod.BANK_TRANSFER] },
     });
     const settings = await prisma.$transaction((tx) => paymentSettingsService.get(tx));
-    expect(settings.bankTransferEnabled).toBe(true);
+    expect(settings.enabledMethods).toEqual([PaymentMethod.BANK_TRANSFER]);
   });
 });
 
 describe('paymentSettingsService.update', () => {
   it('throws BadRequestError when every method is disabled', async () => {
     await expect(
-      paymentSettingsService.update('admin-1', input({ codEnabled: false })),
+      paymentSettingsService.update('admin-1', input({ enabledMethods: [] })),
     ).rejects.toBeInstanceOf(BadRequestError);
   });
 
   it('throws BadRequestError when the only enabled method has no credentials', async () => {
     // Flag is on but the gateway is not configured, so nothing is effective.
     await expect(
-      paymentSettingsService.update('admin-1', input({ codEnabled: false, bkashEnabled: true })),
+      paymentSettingsService.update('admin-1', input({ enabledMethods: [PaymentMethod.BKASH] })),
     ).rejects.toBeInstanceOf(BadRequestError);
   });
 
   it('throws BadRequestError mentioning credentials when enabling BKASH without them', async () => {
     const err = await paymentSettingsService
-      .update('admin-1', input({ bkashEnabled: true }))
+      .update('admin-1', input({ enabledMethods: [PaymentMethod.COD, PaymentMethod.BKASH] }))
       .catch((e: unknown) => e);
     expect(err).toBeInstanceOf(BadRequestError);
     expect((err as BadRequestError).message).toContain('credentials');
   });
 
+  it('stores duplicate and out-of-order entries once, in enum order', async () => {
+    const saved = await paymentSettingsService.update(
+      'admin-1',
+      input({
+        enabledMethods: [
+          PaymentMethod.BANK_TRANSFER,
+          PaymentMethod.COD,
+          PaymentMethod.BANK_TRANSFER,
+          PaymentMethod.COD,
+        ],
+      }),
+    );
+    expect(saved.enabledMethods).toEqual([PaymentMethod.COD, PaymentMethod.BANK_TRANSFER]);
+  });
+
+  it('does not treat a gateway already in the stored array as newly enabled', async () => {
+    // BKASH was enabled while credentials existed; they were removed later.
+    await prisma.paymentSettings.upsert({
+      where: { id: SINGLETON },
+      create: { id: SINGLETON, enabledMethods: [PaymentMethod.COD, PaymentMethod.BKASH] },
+      update: { enabledMethods: [PaymentMethod.COD, PaymentMethod.BKASH] },
+    });
+
+    // Reordered and duplicated, with another field changed: still not "new".
+    const saved = await paymentSettingsService.update(
+      'admin-1',
+      input({
+        enabledMethods: [PaymentMethod.BKASH, PaymentMethod.COD, PaymentMethod.BKASH],
+        paymentNote: 'changed',
+      }),
+    );
+    expect(saved.enabledMethods).toEqual([PaymentMethod.COD, PaymentMethod.BKASH]);
+    expect(saved.paymentNote).toBe('changed');
+  });
+
+  it('rejects a gateway that is new relative to the stored array even if others stay', async () => {
+    await prisma.paymentSettings.upsert({
+      where: { id: SINGLETON },
+      create: { id: SINGLETON, enabledMethods: [PaymentMethod.COD] },
+      update: { enabledMethods: [PaymentMethod.COD] },
+    });
+
+    const err = await paymentSettingsService
+      .update('admin-1', input({ enabledMethods: [PaymentMethod.COD, PaymentMethod.SSLCOMMERZ] }))
+      .catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(BadRequestError);
+    expect((err as BadRequestError).message).toContain('SSLCOMMERZ');
+    expect((err as BadRequestError).message).toContain('credentials');
+  });
+
+  it('allows switching a credential-less gateway off while keeping another method', async () => {
+    await prisma.paymentSettings.upsert({
+      where: { id: SINGLETON },
+      create: { id: SINGLETON, enabledMethods: [PaymentMethod.COD, PaymentMethod.BKASH] },
+      update: { enabledMethods: [PaymentMethod.COD, PaymentMethod.BKASH] },
+    });
+
+    const saved = await paymentSettingsService.update(
+      'admin-1',
+      input({ enabledMethods: [PaymentMethod.COD] }),
+    );
+    expect(saved.enabledMethods).toEqual([PaymentMethod.COD]);
+  });
+
   it('does not persist anything when validation fails', async () => {
     await prisma.paymentSettings.deleteMany({ where: { id: SINGLETON } });
-    await paymentSettingsService.update('admin-1', input({ bkashEnabled: true })).catch(() => null);
+    await paymentSettingsService
+      .update('admin-1', input({ enabledMethods: [PaymentMethod.COD, PaymentMethod.BKASH] }))
+      .catch(() => null);
     expect(await prisma.paymentSettings.count({ where: { id: SINGLETON } })).toBe(0);
   });
 
   it('allows enabling BKASH when credentials are present', async () => {
     setBkashEnv();
-    const saved = await paymentSettingsService.update('admin-1', input({ bkashEnabled: true }));
-    expect(saved.bkashEnabled).toBe(true);
+    const saved = await paymentSettingsService.update(
+      'admin-1',
+      input({ enabledMethods: [PaymentMethod.COD, PaymentMethod.BKASH] }),
+    );
+    expect(saved.enabledMethods).toEqual([PaymentMethod.COD, PaymentMethod.BKASH]);
   });
 
   it('persists updatedById and the submitted fields', async () => {
@@ -152,7 +221,7 @@ describe('paymentSettingsService.update', () => {
     const saved = await paymentSettingsService.update(
       adminId,
       input({
-        bankTransferEnabled: true,
+        enabledMethods: [PaymentMethod.COD, PaymentMethod.BANK_TRANSFER],
         codFeeEnabled: true,
         codFeeType: CodFeeType.PERCENT,
         codFeeValue: 25,
@@ -164,7 +233,7 @@ describe('paymentSettingsService.update', () => {
 
     const row = await prisma.paymentSettings.findUniqueOrThrow({ where: { id: SINGLETON } });
     expect(row.updatedById).toBe(adminId);
-    expect(row.bankTransferEnabled).toBe(true);
+    expect(row.enabledMethods).toEqual([PaymentMethod.COD, PaymentMethod.BANK_TRANSFER]);
     expect(row.codFeeEnabled).toBe(true);
     expect(row.codFeeType).toBe(CodFeeType.PERCENT);
     expect(row.codFeeValue).toBe(25);
@@ -277,12 +346,19 @@ describe('paymentSettingsService.update', () => {
 
 describe('effectiveMethods (via paymentSettingsService.get)', () => {
   const effective = async () => effectiveMethods(await paymentSettingsService.get());
+  const { COD, BKASH, SSLCOMMERZ, BANK_TRANSFER } = PaymentMethod;
+  const store = (enabledMethods: PaymentMethod[]) =>
+    prisma.paymentSettings.upsert({
+      where: { id: SINGLETON },
+      create: { id: SINGLETON, enabledMethods },
+      update: { enabledMethods },
+    });
 
   it('excludes a gateway whose flag is true but whose credentials are missing', async () => {
     await prisma.paymentSettings.upsert({
       where: { id: SINGLETON },
-      create: { id: SINGLETON, codEnabled: true, bkashEnabled: true, bankTransferEnabled: true },
-      update: { codEnabled: true, bkashEnabled: true, bankTransferEnabled: true },
+      create: { id: SINGLETON, enabledMethods: [COD, BKASH, BANK_TRANSFER] },
+      update: { enabledMethods: [COD, BKASH, BANK_TRANSFER] },
     });
 
     const methods = await effective();
@@ -295,8 +371,8 @@ describe('effectiveMethods (via paymentSettingsService.get)', () => {
   it('includes the gateway once credentials are present', async () => {
     await prisma.paymentSettings.upsert({
       where: { id: SINGLETON },
-      create: { id: SINGLETON, bkashEnabled: true },
-      update: { bkashEnabled: true },
+      create: { id: SINGLETON, enabledMethods: [PaymentMethod.BKASH] },
+      update: { enabledMethods: [PaymentMethod.BKASH] },
     });
     setBkashEnv();
 
@@ -306,6 +382,51 @@ describe('effectiveMethods (via paymentSettingsService.get)', () => {
   it('falls back to COD only when the singleton row is missing', async () => {
     await prisma.paymentSettings.deleteMany({ where: { id: SINGLETON } });
     expect(await effective()).toEqual([PaymentMethod.COD]);
+  });
+
+  it('returns enum order whatever order the stored array has', async () => {
+    await store([BANK_TRANSFER, COD]);
+    expect(await effective()).toEqual([COD, BANK_TRANSFER]);
+
+    setBkashEnv();
+    await store([BANK_TRANSFER, BKASH, COD]);
+    expect(await effective()).toEqual([COD, BKASH, BANK_TRANSFER]);
+  });
+
+  it('lists a method once even if the stored array repeats it', async () => {
+    await store([COD, BANK_TRANSFER, COD, BANK_TRANSFER]);
+    expect(await effective()).toEqual([COD, BANK_TRANSFER]);
+  });
+
+  it('is empty for an empty stored array', async () => {
+    await store([]);
+    expect(await effective()).toEqual([]);
+  });
+
+  it('keeps the canonical order COD, SSLCOMMERZ, BKASH, BANK_TRANSFER with all credentials present', async () => {
+    setBkashEnv();
+    for (const key of ['SSLCOMMERZ_STORE_ID', 'SSLCOMMERZ_STORE_PASSWORD']) {
+      vi.stubEnv(key, 'test-value');
+    }
+    await store([BANK_TRANSFER, BKASH, SSLCOMMERZ, COD]);
+
+    expect(await effective()).toEqual([COD, SSLCOMMERZ, BKASH, BANK_TRANSFER]);
+  });
+
+  it('is a pure function of the loaded row (no query)', () => {
+    expect(effectiveMethods({ enabledMethods: [BANK_TRANSFER, COD] })).toEqual([
+      COD,
+      BANK_TRANSFER,
+    ]);
+  });
+
+  it('the DB default for a freshly created row is COD only (no enabledMethods given)', async () => {
+    await prisma.paymentSettings.deleteMany({ where: { id: SINGLETON } });
+    const row = await prisma.paymentSettings.create({ data: { id: SINGLETON } });
+
+    expect(row.enabledMethods).toEqual([COD]);
+    expect(row.enabledMethods).toEqual(DEFAULT_PAYMENT_SETTINGS.enabledMethods);
+    expect(await effective()).toEqual([COD]);
   });
 
   it('accepts a transaction client', async () => {

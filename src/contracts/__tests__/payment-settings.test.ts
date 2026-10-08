@@ -1,17 +1,10 @@
 import { CodFeeType, PaymentMethod } from '@prisma/client';
 import { describe, expect, it } from 'vitest';
 
-import {
-  PAYMENT_METHOD_FLAG,
-  paymentSettingsInputSchema,
-  pickMethodFlags,
-} from '../payment-settings';
+import { canonicalMethods, paymentSettingsInputSchema } from '../payment-settings';
 
 const valid = {
-  codEnabled: true,
-  bkashEnabled: false,
-  sslcommerzEnabled: false,
-  bankTransferEnabled: false,
+  enabledMethods: [PaymentMethod.COD],
   codFeeEnabled: true,
   codFeeType: CodFeeType.FLAT,
   codFeeValue: 10_000,
@@ -171,41 +164,93 @@ describe('paymentSettingsInputSchema', () => {
     ).toBe(true);
   });
 
-  it('has no defaults on the enabled flags', () => {
+  it('has no default on enabledMethods', () => {
     const rest: Record<string, unknown> = { ...valid };
-    delete rest.codEnabled;
+    delete rest.enabledMethods;
     expect(paymentSettingsInputSchema.safeParse(rest).success).toBe(false);
   });
 
-  it('rejects codFeeEnabled=true when codEnabled=false', () => {
-    const input = { ...valid, codEnabled: false, bankTransferEnabled: true };
+  it('accepts an empty enabledMethods (the service rejects it with a 400)', () => {
+    const res = paymentSettingsInputSchema.safeParse({
+      ...valid,
+      enabledMethods: [],
+      codFeeEnabled: false,
+    });
+    expect(res.success).toBe(true);
+  });
+
+  it('rejects an unknown method', () => {
+    const input = { ...valid, enabledMethods: [PaymentMethod.COD, 'PAYPAL'] };
+    expect(paymentSettingsInputSchema.safeParse(input).success).toBe(false);
+    expect(issuePaths(input).some((p) => p.startsWith('enabledMethods'))).toBe(true);
+  });
+
+  it('de-duplicates enabledMethods', () => {
+    const res = paymentSettingsInputSchema.safeParse({
+      ...valid,
+      enabledMethods: [PaymentMethod.COD, PaymentMethod.COD, PaymentMethod.BANK_TRANSFER],
+    });
+    expect(res.success).toBe(true);
+    if (res.success) {
+      expect(res.data.enabledMethods).toEqual([PaymentMethod.COD, PaymentMethod.BANK_TRANSFER]);
+    }
+  });
+
+  it('normalizes enabledMethods to enum order', () => {
+    const res = paymentSettingsInputSchema.safeParse({
+      ...valid,
+      enabledMethods: [PaymentMethod.BANK_TRANSFER, PaymentMethod.BKASH, PaymentMethod.COD],
+    });
+    expect(res.success).toBe(true);
+    if (res.success) {
+      expect(res.data.enabledMethods).toEqual([
+        PaymentMethod.COD,
+        PaymentMethod.BKASH,
+        PaymentMethod.BANK_TRANSFER,
+      ]);
+    }
+  });
+
+  it('rejects codFeeEnabled=true when COD is not in enabledMethods', () => {
+    const input = { ...valid, enabledMethods: [PaymentMethod.BANK_TRANSFER] };
     expect(paymentSettingsInputSchema.safeParse(input).success).toBe(false);
     expect(issuePaths(input)).toContain('codFeeEnabled');
   });
 
-  it('allows codFeeEnabled=false when codEnabled=false', () => {
+  it('accepts codFeeEnabled=true when COD is listed among other methods', () => {
     const res = paymentSettingsInputSchema.safeParse({
       ...valid,
-      codEnabled: false,
-      bankTransferEnabled: true,
+      enabledMethods: [PaymentMethod.BANK_TRANSFER, PaymentMethod.COD],
+    });
+    expect(res.success).toBe(true);
+  });
+
+  it('allows codFeeEnabled=false when COD is not in enabledMethods', () => {
+    const res = paymentSettingsInputSchema.safeParse({
+      ...valid,
+      enabledMethods: [PaymentMethod.BANK_TRANSFER],
       codFeeEnabled: false,
     });
     expect(res.success).toBe(true);
   });
 });
 
-describe('PAYMENT_METHOD_FLAG', () => {
-  it('maps every payment method to its own distinct flag', () => {
-    expect(Object.keys(PAYMENT_METHOD_FLAG).sort()).toEqual(Object.values(PaymentMethod).sort());
-    expect(new Set(Object.values(PAYMENT_METHOD_FLAG)).size).toBe(Object.values(PaymentMethod).length);
+describe('canonicalMethods', () => {
+  it('returns enum order with duplicates removed', () => {
+    expect(
+      canonicalMethods([
+        PaymentMethod.BANK_TRANSFER,
+        PaymentMethod.SSLCOMMERZ,
+        PaymentMethod.BANK_TRANSFER,
+        PaymentMethod.COD,
+      ]),
+    ).toEqual([PaymentMethod.COD, PaymentMethod.SSLCOMMERZ, PaymentMethod.BANK_TRANSFER]);
   });
 
-  it('pickMethodFlags copies exactly the four method flags', () => {
-    expect(pickMethodFlags({ ...valid, bkashEnabled: true })).toEqual({
-      codEnabled: true,
-      bkashEnabled: true,
-      sslcommerzEnabled: false,
-      bankTransferEnabled: false,
-    });
+  it('does not mutate its input and handles an empty list', () => {
+    const input = [PaymentMethod.BKASH, PaymentMethod.COD];
+    canonicalMethods(input);
+    expect(input).toEqual([PaymentMethod.BKASH, PaymentMethod.COD]);
+    expect(canonicalMethods([])).toEqual([]);
   });
 });

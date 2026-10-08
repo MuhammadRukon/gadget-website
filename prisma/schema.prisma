@@ -450,18 +450,15 @@ enum CodFeeStatus {
 /// COD confirmation fee. `codFeeValue` is cents for FLAT, an integer 1-100
 /// for PERCENT.
 model PaymentSettings {
-  id                  String     @id @default("singleton")
-  codEnabled          Boolean    @default(true)
-  bkashEnabled        Boolean    @default(false)
-  sslcommerzEnabled   Boolean    @default(false)
-  bankTransferEnabled Boolean    @default(false)
-  codFeeEnabled       Boolean    @default(false)
-  codFeeType          CodFeeType @default(FLAT)
-  codFeeValue         Int        @default(0)
-  qrImageUrl          String?
-  qrImagePublicId     String?
-  contactNumber       String?
-  paymentNote         String?
-  updatedAt           DateTime   @updatedAt
-  updatedById         String?
+  id              String          @id @default("singleton")
+  enabledMethods  PaymentMethod[] @default([COD])
+  codFeeEnabled   Boolean         @default(false)
+  codFeeType      CodFeeType      @default(FLAT)
+  codFeeValue     Int             @default(0)
+  qrImageUrl      String?
+  qrImagePublicId String?
+  contactNumber   String?
+  paymentNote     String?
+  updatedAt       DateTime        @updatedAt
+  updatedById     String?
 }

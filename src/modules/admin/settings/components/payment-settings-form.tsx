@@ -31,11 +31,10 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 
 import {
+  canonicalMethods,
   isValidCodFeeValue,
-  PAYMENT_METHOD_FLAG,
   PAYMENT_NOTE_MAX,
   paymentSettingsInputSchema,
-  pickMethodFlags,
   type PaymentSettingsInput,
 } from '@/contracts/payment-settings';
 import { formatBDT } from '@/server/common/money';
@@ -78,7 +77,7 @@ const METHODS = [
   PaymentMethod.BANK_TRANSFER,
   PaymentMethod.BKASH,
   PaymentMethod.SSLCOMMERZ,
-].map((method) => ({ method, field: PAYMENT_METHOD_FLAG[method], ...METHOD_COPY[method] }));
+].map((method) => ({ method, ...METHOD_COPY[method] }));
 
 function defaultFeeValue(type: CodFeeType): number {
   return type === CodFeeType.PERCENT ? DEFAULT_PERCENT : DEFAULT_FLAT_CENTS;
@@ -91,7 +90,7 @@ function defaultFeeValue(type: CodFeeType): number {
  */
 function toFormValues(settings: AdminPaymentSettingsResponse['settings']): PaymentSettingsInput {
   return {
-    ...pickMethodFlags(settings),
+    enabledMethods: canonicalMethods(settings.enabledMethods),
     codFeeEnabled: settings.codFeeEnabled,
     codFeeType: settings.codFeeType,
     codFeeValue: isValidCodFeeValue(settings.codFeeType, settings.codFeeValue)
@@ -176,7 +175,9 @@ export function PaymentSettingsForm({ data }: PaymentSettingsFormProps) {
   const values = useWatch({ control: form.control });
   const [sampleBdt, setSampleBdt] = useState(DEFAULT_SAMPLE_BDT);
 
-  const anyMethodOn = METHODS.some((m) => values[m.field] && gatewayConfigured[m.method]);
+  const anyMethodOn = METHODS.some(
+    (m) => values.enabledMethods?.includes(m.method) && gatewayConfigured[m.method],
+  );
 
   const preview = useMemo(() => {
     if (!values.codFeeEnabled || values.codFeeType === undefined) return null;
@@ -214,7 +215,7 @@ export function PaymentSettingsForm({ data }: PaymentSettingsFormProps) {
       ? [{ url: values.qrImageUrl, publicId: values.qrImagePublicId, alt: 'Payment QR code' }]
       : [];
 
-  const codOn = !!values.codEnabled;
+  const codOn = !!values.enabledMethods?.includes(PaymentMethod.COD);
 
   return (
     <Form {...form}>
@@ -228,41 +229,48 @@ export function PaymentSettingsForm({ data }: PaymentSettingsFormProps) {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {METHODS.map(({ method, field, label, hint }) => {
+            {METHODS.map(({ method, label, hint }) => {
               const configured = gatewayConfigured[method];
               return (
                 <FormField
                   key={method}
                   control={form.control}
-                  name={field}
-                  render={({ field: f }) => (
-                    <FormItem className="flex items-center justify-between gap-4 space-y-0 rounded-lg border p-3">
-                      <div className="space-y-1">
-                        <FormLabel className="flex flex-wrap items-center gap-2">
-                          {label}
-                          {!configured ? (
-                            <Badge variant="outline" className="text-amber-700 dark:text-amber-300">
-                              credentials missing
-                            </Badge>
-                          ) : null}
-                        </FormLabel>
-                        <FormDescription>{hint}</FormDescription>
-                      </div>
-                      <FormControl>
-                        <Switch
-                          checked={!!f.value}
-                          // A gateway without credentials can be switched off but never on.
-                          disabled={!configured && !f.value}
-                          onCheckedChange={(next) => {
-                            f.onChange(next);
-                            if (field === 'codEnabled' && !next) {
-                              form.setValue('codFeeEnabled', false, { shouldDirty: true });
-                            }
-                          }}
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
+                  name="enabledMethods"
+                  render={({ field: f }) => {
+                    const on = f.value.includes(method);
+                    return (
+                      <FormItem className="flex items-center justify-between gap-4 space-y-0 rounded-lg border p-3">
+                        <div className="space-y-1">
+                          <FormLabel className="flex flex-wrap items-center gap-2">
+                            {label}
+                            {!configured ? (
+                              <Badge
+                                variant="outline"
+                                className="text-amber-700 dark:text-amber-300"
+                              >
+                                credentials missing
+                              </Badge>
+                            ) : null}
+                          </FormLabel>
+                          <FormDescription>{hint}</FormDescription>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={on}
+                            // A gateway without credentials can be switched off but never on.
+                            disabled={!configured && !on}
+                            onCheckedChange={(next) => {
+                              const others = f.value.filter((m) => m !== method);
+                              f.onChange(canonicalMethods(next ? [...others, method] : others));
+                              if (method === PaymentMethod.COD && !next) {
+                                form.setValue('codFeeEnabled', false, { shouldDirty: true });
+                              }
+                            }}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    );
+                  }}
                 />
               );
             })}
@@ -405,7 +413,9 @@ export function PaymentSettingsForm({ data }: PaymentSettingsFormProps) {
                       onBlur={field.onBlur}
                       name={field.name}
                       ref={field.ref}
-                      onChange={(e) => field.onChange(e.target.value === '' ? null : e.target.value)}
+                      onChange={(e) =>
+                        field.onChange(e.target.value === '' ? null : e.target.value)
+                      }
                     />
                   </FormControl>
                   <FormDescription>
@@ -432,7 +442,9 @@ export function PaymentSettingsForm({ data }: PaymentSettingsFormProps) {
                       onBlur={field.onBlur}
                       name={field.name}
                       ref={field.ref}
-                      onChange={(e) => field.onChange(e.target.value === '' ? null : e.target.value)}
+                      onChange={(e) =>
+                        field.onChange(e.target.value === '' ? null : e.target.value)
+                      }
                     />
                   </FormControl>
                   <FormDescription>

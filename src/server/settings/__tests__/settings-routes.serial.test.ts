@@ -34,10 +34,7 @@ function put(body: unknown) {
 }
 
 const VALID = {
-  codEnabled: true,
-  bkashEnabled: false,
-  sslcommerzEnabled: false,
-  bankTransferEnabled: true,
+  enabledMethods: [PaymentMethod.COD, PaymentMethod.BANK_TRANSFER],
   codFeeEnabled: true,
   codFeeType: CodFeeType.FLAT,
   codFeeValue: 10_000,
@@ -76,10 +73,7 @@ describe('GET /api/admin/settings/payments', () => {
     expect(Object.keys(body.settings).sort()).toEqual(
       [
         'id',
-        'codEnabled',
-        'bkashEnabled',
-        'sslcommerzEnabled',
-        'bankTransferEnabled',
+        'enabledMethods',
         'codFeeEnabled',
         'codFeeType',
         'codFeeValue',
@@ -125,7 +119,7 @@ describe('PUT /api/admin/settings/payments', () => {
 
     expect(res.status).toBe(200);
     const row = await prisma.paymentSettings.findUniqueOrThrow({ where: { id: 'singleton' } });
-    expect(row.bankTransferEnabled).toBe(true);
+    expect(row.enabledMethods).toEqual([PaymentMethod.COD, PaymentMethod.BANK_TRANSFER]);
     expect(row.codFeeEnabled).toBe(true);
     expect(row.codFeeValue).toBe(10_000);
     expect(row.contactNumber).toBe('01800000000');
@@ -139,9 +133,7 @@ describe('PUT /api/admin/settings/payments', () => {
     const admin = await createAdminUser();
     signInAs(admin.id, 'ADMIN');
 
-    const res = await PUT(
-      put({ ...VALID, codEnabled: false, bankTransferEnabled: false, codFeeEnabled: false }),
-    );
+    const res = await PUT(put({ ...VALID, enabledMethods: [], codFeeEnabled: false }));
     const body = await res.json();
 
     expect(res.status).toBe(400);
@@ -158,11 +150,11 @@ describe('PUT /api/admin/settings/payments', () => {
     expect((await res.json()).code).toBe('VALIDATION_ERROR');
   });
 
-  it('codFeeEnabled=true with codEnabled=false -> 422', async () => {
+  it('codFeeEnabled=true without COD in enabledMethods -> 422', async () => {
     const admin = await createAdminUser();
     signInAs(admin.id, 'ADMIN');
 
-    const res = await PUT(put({ ...VALID, codEnabled: false }));
+    const res = await PUT(put({ ...VALID, enabledMethods: [PaymentMethod.BANK_TRANSFER] }));
 
     expect(res.status).toBe(422);
     expect((await res.json()).code).toBe('VALIDATION_ERROR');

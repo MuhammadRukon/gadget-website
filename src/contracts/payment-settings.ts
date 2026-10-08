@@ -45,23 +45,13 @@ export function parseCloudinaryUploadUrl(
   return { cloudName: m[1], publicId: m[2].replace(/\.[A-Za-z0-9]+$/, '') };
 }
 
-/** Admin on/off flag columns on the PaymentSettings singleton, one per payment method. */
-export type MethodFlag = 'codEnabled' | 'bkashEnabled' | 'sslcommerzEnabled' | 'bankTransferEnabled';
-export type MethodFlags = Record<MethodFlag, boolean>;
-
-/** The one place that says which settings flag enables which payment method. */
-export const PAYMENT_METHOD_FLAG: Record<PaymentMethod, MethodFlag> = {
-  [PaymentMethod.COD]: 'codEnabled',
-  [PaymentMethod.SSLCOMMERZ]: 'sslcommerzEnabled',
-  [PaymentMethod.BKASH]: 'bkashEnabled',
-  [PaymentMethod.BANK_TRANSFER]: 'bankTransferEnabled',
-};
-
-/** Copies just the four method flags out of a settings row or input. */
-export function pickMethodFlags(source: MethodFlags): MethodFlags {
-  const flags = {} as MethodFlags;
-  for (const flag of Object.values(PAYMENT_METHOD_FLAG)) flags[flag] = source[flag];
-  return flags;
+/**
+ * De-duplicates `methods` and puts them in `PaymentMethod` enum order (the
+ * order customers see), whatever order the input arrived in.
+ */
+export function canonicalMethods(methods: readonly PaymentMethod[]): PaymentMethod[] {
+  const wanted = new Set(methods);
+  return Object.values(PaymentMethod).filter((method) => wanted.has(method));
 }
 
 export const PAYMENT_NOTE_MAX = 500;
@@ -88,12 +78,10 @@ export type CodFeeRule = z.infer<typeof codFeeRuleSchema>;
 
 export const paymentSettingsInputSchema = z
   .object({
-    // No defaults on purpose: an omitted flag must be a validation error,
-    // never a silent "off" that disables a method.
-    codEnabled: z.boolean(),
-    bkashEnabled: z.boolean(),
-    sslcommerzEnabled: z.boolean(),
-    bankTransferEnabled: z.boolean(),
+    // No default on purpose: an omitted list must be a validation error, never
+    // a silent "nothing enabled". An empty list parses; the service rejects it
+    // (400) so the "at least one method" message stays in one place.
+    enabledMethods: z.array(z.enum(PaymentMethod)).transform(canonicalMethods),
     codFeeEnabled: z.boolean(),
     codFeeType: z.enum(CodFeeType),
     codFeeValue: z.number().int(),
@@ -105,12 +93,7 @@ export const paymentSettingsInputSchema = z
       })
       .nullable()
       .optional(),
-    qrImagePublicId: z
-      .string()
-      .max(512)
-      .regex(PUBLIC_ID, 'Invalid image id')
-      .nullable()
-      .optional(),
+    qrImagePublicId: z.string().max(512).regex(PUBLIC_ID, 'Invalid image id').nullable().optional(),
     contactNumber: z
       .string()
       .trim()
@@ -156,7 +139,7 @@ export const paymentSettingsInputSchema = z
       });
     }
 
-    if (v.codFeeEnabled && !v.codEnabled) {
+    if (v.codFeeEnabled && !v.enabledMethods.includes(PaymentMethod.COD)) {
       ctx.addIssue({
         code: 'custom',
         path: ['codFeeEnabled'],

@@ -189,29 +189,29 @@ describe('placeOrder: payment method enforcement', () => {
     expect(variant.stock).toBe(5);
   }
 
-  it('bkashEnabled=false: BKASH is rejected, nothing created or consumed', async () => {
+  it('BKASH not enabled: BKASH is rejected, nothing created or consumed', async () => {
     clearGatewayEnv();
-    await setPaymentSettings({ bkashEnabled: false });
+    await setPaymentSettings({ enabledMethods: ['COD'] });
     const fx = await createCheckoutFixture({ stock: 5, cartQty: 1 });
     await expectRejectedUntouched(fx, 'BKASH');
   });
 
-  it('bkashEnabled=true without credentials is rejected the same way', async () => {
+  it('BKASH enabled without credentials is rejected the same way', async () => {
     clearGatewayEnv();
-    await setPaymentSettings({ bkashEnabled: true });
+    await setPaymentSettings({ enabledMethods: ['COD', 'BKASH'] });
     const fx = await createCheckoutFixture({ stock: 5, cartQty: 1 });
     await expectRejectedUntouched(fx, 'BKASH');
   });
 
-  it('codEnabled=false: COD is rejected', async () => {
+  it('COD not enabled: COD is rejected', async () => {
     clearGatewayEnv();
-    await setPaymentSettings({ codEnabled: false, bankTransferEnabled: true });
+    await setPaymentSettings({ enabledMethods: ['BANK_TRANSFER'] });
     const fx = await createCheckoutFixture({ stock: 5, cartQty: 1 });
     await expectRejectedUntouched(fx, 'COD');
   });
 
   it('an enabled non-COD method is allowed and gets no fee', async () => {
-    await setPaymentSettings({ ...FEE_ON, bankTransferEnabled: true });
+    await setPaymentSettings({ ...FEE_ON, enabledMethods: ['COD', 'BANK_TRANSFER'] });
     const fx = await createCheckoutFixture({ stock: 5, cartQty: 1 });
 
     const { order, feeRequired } = await checkoutService.placeOrder(fx.user.id, {
@@ -347,7 +347,7 @@ describe('checkoutService.quote: COD fee', () => {
   });
 
   it('omitting paymentMethod, or BANK_TRANSFER, returns no fee', async () => {
-    await setPaymentSettings({ ...FEE_ON, bankTransferEnabled: true });
+    await setPaymentSettings({ ...FEE_ON, enabledMethods: ['COD', 'BANK_TRANSFER'] });
     const fx = await createCheckoutFixture({ stock: 5, cartQty: 1 });
     const base = { userId: fx.user.id, addressId: fx.address.id };
 
@@ -361,7 +361,7 @@ describe('checkoutService.quote: COD fee', () => {
 
   it('rejects a method that is not currently enabled', async () => {
     clearGatewayEnv();
-    await setPaymentSettings({ bkashEnabled: true });
+    await setPaymentSettings({ enabledMethods: ['COD', 'BKASH'] });
     const fx = await createCheckoutFixture({ stock: 5, cartQty: 1 });
 
     await expect(
