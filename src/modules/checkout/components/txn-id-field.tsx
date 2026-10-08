@@ -2,9 +2,9 @@
 
 import { useEffect, useId, useRef, useState } from 'react';
 
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { TXN_ID_DUPLICATE_MESSAGE } from '@/modules/checkout/checkout-error';
+import { TxnIdInput } from '@/modules/checkout/components/txn-id-input';
 import { useTxnCheck } from '@/modules/checkout/hooks';
 import {
   TXN_CHECK_UNAVAILABLE_MESSAGE,
@@ -83,15 +83,11 @@ export function TxnIdField({ value, onChange, duplicate, onDuplicateChange }: Tx
   return (
     <div className="space-y-2">
       <Label htmlFor={inputId}>Transaction ID (optional)</Label>
-      <Input
+      <TxnIdInput
         id={inputId}
         value={value}
         onChange={(e) => handleChange(e.target.value)}
         onBlur={handleBlur}
-        placeholder="e.g. 9A7B3C2D1E"
-        autoComplete="off"
-        autoCapitalize="characters"
-        maxLength={64}
         aria-invalid={duplicate || invalid}
         aria-describedby={messageId}
       />
