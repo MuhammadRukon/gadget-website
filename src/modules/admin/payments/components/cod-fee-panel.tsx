@@ -1,34 +1,18 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
+import { useState } from 'react';
 import { CodFeeStatus, OrderStatus, type Order, type Payment } from '@prisma/client';
 
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { TXN_ID_MAX, TXN_ID_MIN, txnIdSchema } from '@/contracts/payments';
 import { describeCodFeeRule } from '@/lib/cod-fee/copy';
 import { feeView } from '@/lib/cod-fee/view';
 import { formatBDT } from '@/server/common/money';
-import { DuplicateTxnDialog } from '@/modules/admin/payments/components/duplicate-txn-dialog';
+import { AdminTxnIdDialog } from '@/modules/admin/payments/components/admin-txn-id-dialog';
 import { FeeStatusBadge } from '@/modules/admin/payments/components/fee-status-badge';
-import {
-  getDuplicateTxnInfo,
-  useAdminSetTxnId,
-  useVerifyCodFee,
-  type DuplicateTxnInfo,
-} from '@/modules/admin/payments/hooks';
+import { RejectFeeDialog } from '@/modules/admin/payments/components/reject-fee-dialog';
+import { useVerifyCodFee } from '@/modules/admin/payments/hooks';
 
 interface CodFeePanelProps {
   order: Pick<Order, 'status' | 'totalCents' | 'orderNumber'>;
@@ -44,15 +28,8 @@ interface CodFeePanelProps {
  */
 export function CodFeePanel({ order, payment }: CodFeePanelProps) {
   const verifyFee = useVerifyCodFee();
-  const setTxnId = useAdminSetTxnId();
 
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [rejectOpen, setRejectOpen] = useState(false);
-  const [rejectNote, setRejectNote] = useState('');
-  const [txnOpen, setTxnOpen] = useState(false);
-  const [txnValue, setTxnValue] = useState('');
-  const [txnError, setTxnError] = useState<string | null>(null);
-  const [duplicate, setDuplicate] = useState<DuplicateTxnInfo | null>(null);
 
   const orderPending = order.status === OrderStatus.PENDING;
   const view = feeView(payment, order);
@@ -62,35 +39,6 @@ export function CodFeePanel({ order, payment }: CodFeePanelProps) {
     payment.feeType && payment.feeValue !== null
       ? describeCodFeeRule({ type: payment.feeType, value: payment.feeValue }, payment.feeCents)
       : null;
-
-  function openTxnDialog() {
-    setTxnValue(payment.customerTxnId ?? '');
-    setTxnError(null);
-    setTxnOpen(true);
-  }
-
-  function submitTxn(e: FormEvent) {
-    e.preventDefault();
-    const parsed = txnIdSchema.safeParse(txnValue);
-    if (!parsed.success) {
-      setTxnError(parsed.error.issues[0]?.message ?? 'Enter a valid transaction ID');
-      return;
-    }
-    setTxnError(null);
-    setTxnId.mutate(
-      { id: payment.id, txnId: parsed.data },
-      {
-        onSuccess: () => setTxnOpen(false),
-        onError: (err) => {
-          const dup = getDuplicateTxnInfo(err);
-          if (dup) {
-            setTxnOpen(false);
-            setDuplicate(dup);
-          }
-        },
-      },
-    );
-  }
 
   return (
     <Card>
@@ -130,11 +78,7 @@ export function CodFeePanel({ order, payment }: CodFeePanelProps) {
         </dl>
 
         <div className="flex flex-wrap gap-2 pt-1">
-          {canEditTxn ? (
-            <Button type="button" size="sm" variant="outline" onClick={openTxnDialog}>
-              {payment.customerTxnId ? 'Edit transaction ID' : 'Add transaction ID'}
-            </Button>
-          ) : null}
+          <AdminTxnIdDialog payment={payment} canEdit={canEditTxn} />
           {canVerify ? (
             <Button
               type="button"
@@ -145,20 +89,11 @@ export function CodFeePanel({ order, payment }: CodFeePanelProps) {
               Fee received — confirm order
             </Button>
           ) : null}
-          {canReject ? (
-            <Button
-              type="button"
-              size="sm"
-              variant="destructive"
-              disabled={verifyFee.isPending}
-              onClick={() => {
-                setRejectNote('');
-                setRejectOpen(true);
-              }}
-            >
-              Reject fee
-            </Button>
-          ) : null}
+          <RejectFeeDialog
+            paymentId={payment.id}
+            canReject={canReject}
+            disabled={verifyFee.isPending}
+          />
         </div>
         {payment.feeStatus === CodFeeStatus.REJECTED && orderPending ? (
           <p className="text-xs text-muted-foreground">
@@ -176,92 +111,6 @@ export function CodFeePanel({ order, payment }: CodFeePanelProps) {
         confirmLabel="Fee received — confirm order"
         onConfirm={() => verifyFee.mutate({ id: payment.id, outcome: 'VERIFIED' })}
       />
-
-      <Dialog open={rejectOpen} onOpenChange={setRejectOpen}>
-        <DialogContent>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              verifyFee.mutate(
-                { id: payment.id, outcome: 'REJECTED', note: rejectNote },
-                { onSuccess: () => setRejectOpen(false) },
-              );
-            }}
-            className="grid gap-4"
-          >
-            <DialogHeader>
-              <DialogTitle>Reject the confirmation fee?</DialogTitle>
-              <DialogDescription>
-                The order stays pending and the customer is told the fee could not be verified. You
-                can still verify the fee later if it arrives.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-2">
-              <Label htmlFor="reject-note">Note (optional)</Label>
-              <Textarea
-                id="reject-note"
-                rows={3}
-                maxLength={300}
-                value={rejectNote}
-                onChange={(e) => setRejectNote(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">
-                This note is visible to the customer on their order timeline.
-              </p>
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setRejectOpen(false)}>
-                Cancel
-              </Button>
-              <Button type="submit" variant="destructive" disabled={verifyFee.isPending}>
-                Reject fee
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={txnOpen} onOpenChange={setTxnOpen}>
-        <DialogContent>
-          <form onSubmit={submitTxn} className="grid gap-4" noValidate>
-            <DialogHeader>
-              <DialogTitle>
-                {payment.customerTxnId ? 'Edit transaction ID' : 'Add transaction ID'}
-              </DialogTitle>
-              <DialogDescription>
-                {TXN_ID_MIN} to {TXN_ID_MAX} letters and numbers. It is stored in upper case and
-                must not be used on another order.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-2">
-              <Label htmlFor="admin-txn-id">Transaction ID</Label>
-              <Input
-                id="admin-txn-id"
-                autoComplete="off"
-                value={txnValue}
-                aria-invalid={!!txnError}
-                aria-describedby={txnError ? 'admin-txn-id-error' : undefined}
-                onChange={(e) => setTxnValue(e.target.value)}
-              />
-              {txnError ? (
-                <p id="admin-txn-id-error" className="text-sm text-destructive">
-                  {txnError}
-                </p>
-              ) : null}
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setTxnOpen(false)}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={setTxnId.isPending}>
-                {setTxnId.isPending ? 'Saving...' : 'Save'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      <DuplicateTxnDialog duplicate={duplicate} onClose={() => setDuplicate(null)} />
     </Card>
   );
 }
