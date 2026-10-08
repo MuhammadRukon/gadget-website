@@ -20,17 +20,19 @@ interface RejectFeeDialogProps {
   paymentId: Payment['id'];
   /** Whether the "Reject fee" trigger shows (the dialog stays mounted regardless). */
   canReject: boolean;
-  /** Extra disable for the trigger (the panel's other fee mutation is in flight). */
-  disabled?: boolean;
+  /**
+   * The panel's single fee mutation, shared so every fee button disables while
+   * either a verify or a reject request is in flight.
+   */
+  verifyFee: ReturnType<typeof useVerifyCodFee>;
 }
 
 /**
  * Trigger button plus the reject-fee dialog (optional customer-visible note)
- * for the admin COD fee panel. Owns the note state and the REJECTED mutation.
+ * for the admin COD fee panel. Owns the note state; sends REJECTED through the
+ * panel's shared mutation.
  */
-export function RejectFeeDialog({ paymentId, canReject, disabled = false }: RejectFeeDialogProps) {
-  const verifyFee = useVerifyCodFee();
-
+export function RejectFeeDialog({ paymentId, canReject, verifyFee }: RejectFeeDialogProps) {
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectNote, setRejectNote] = useState('');
 
@@ -41,7 +43,7 @@ export function RejectFeeDialog({ paymentId, canReject, disabled = false }: Reje
           type="button"
           size="sm"
           variant="destructive"
-          disabled={disabled || verifyFee.isPending}
+          disabled={verifyFee.isPending}
           onClick={() => {
             setRejectNote('');
             setRejectOpen(true);

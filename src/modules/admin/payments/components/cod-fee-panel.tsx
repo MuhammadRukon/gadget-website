@@ -89,11 +89,7 @@ export function CodFeePanel({ order, payment }: CodFeePanelProps) {
               Fee received — confirm order
             </Button>
           ) : null}
-          <RejectFeeDialog
-            paymentId={payment.id}
-            canReject={canReject}
-            disabled={verifyFee.isPending}
-          />
+          <RejectFeeDialog paymentId={payment.id} canReject={canReject} verifyFee={verifyFee} />
         </div>
         {payment.feeStatus === CodFeeStatus.REJECTED && orderPending ? (
           <p className="text-xs text-muted-foreground">
