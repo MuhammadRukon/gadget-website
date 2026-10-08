@@ -9,7 +9,6 @@ import type {
   StockConflictMeta,
 } from '@/contracts/checkout';
 import { normalizeTxnId } from '@/contracts/payments';
-import { applyDiscount } from '@/server/common/money';
 import { BadRequestError, ConflictError, NotFoundError } from '@/server/common/errors';
 import { couponsService } from '@/server/coupons/coupons.service';
 import { cancelOrderInTx } from '@/server/orders/orders.service';
@@ -19,6 +18,7 @@ import {
   paymentSettingsService,
 } from '@/server/settings/payment-settings.service';
 
+import { loadCart, type ResolvedCartLine } from './cart-lines';
 import { computeShippingCents } from './shipping';
 import { computeOrderTotals, resolveCodFee, type ResolvedCodFee } from './totals';
 
@@ -39,18 +39,6 @@ function generateOrderNumber(): string {
   const ts = Date.now().toString(36).toUpperCase();
   const rnd = randomBytes(3).toString('hex').toUpperCase();
   return `T-${ts}-${rnd}`;
-}
-
-interface ResolvedCartLine {
-  variantId: string;
-  variantName: string | null;
-  productId: string;
-  productName: string;
-  sku: string;
-  imageUrl: string | null;
-  unitPriceCents: number;
-  buyingPriceCents: number;
-  quantity: number;
 }
 
 /** Total quantity per variant (a variant may appear on several lines). */
@@ -112,43 +100,9 @@ async function loadAddressOrThrow(userId: string, addressId: string) {
 }
 
 async function loadCartLines(userId: string): Promise<ResolvedCartLine[]> {
-  const items = await prisma.cartItem.findMany({
-    where: { cart: { userId } },
-    include: {
-      variant: {
-        include: {
-          product: {
-            select: {
-              id: true,
-              name: true,
-              status: true,
-              images: { orderBy: { sortOrder: 'asc' as const }, take: 1 },
-            },
-          },
-        },
-      },
-    },
-  });
-  if (items.length === 0) {
-    throw new BadRequestError('Cart is empty');
-  }
-
-  return items.map((item) => {
-    const v = item.variant;
-    const p = v.product;
-    assertLineAvailable(item);
-    return {
-      variantId: v.id,
-      variantName: v.name,
-      productId: p.id,
-      productName: p.name,
-      sku: v.sku,
-      imageUrl: p.images[0]?.url ?? null,
-      unitPriceCents: applyDiscount(v.sellingPriceCents, v.discountCents),
-      buyingPriceCents: v.buyingPriceCents,
-      quantity: item.quantity,
-    };
-  });
+  const { items, lines } = await loadCart(prisma, userId);
+  for (const item of items) assertLineAvailable(item);
+  return lines;
 }
 
 export const checkoutService = {
@@ -236,33 +190,14 @@ export const checkoutService = {
 
     return prisma.$transaction(async (tx) => {
       // 1. Read and consume the cart inside the transaction.
-      const cartItems = await tx.cartItem.findMany({
-        where: { cart: { userId } },
-        include: {
-          variant: {
-            include: {
-              product: {
-                select: {
-                  id: true,
-                  name: true,
-                  status: true,
-                  images: { orderBy: { sortOrder: 'asc' as const }, take: 1 },
-                },
-              },
-            },
-          },
-        },
-      });
-      if (cartItems.length === 0) {
-        throw new BadRequestError('Cart is empty');
-      }
+      const { items: cartItems, lines } = await loadCart(tx, userId);
       // Consume the cart first. A concurrent placeOrder for the same user
       // blocks on these row deletes (READ COMMITTED row locks) and then
       // finds 0 rows, so a double submit can only succeed once.
       const consumed = await tx.cartItem.deleteMany({
-        where: { id: { in: cartItems.map((i) => i.id) } },
+        where: { id: { in: lines.map((l) => l.cartItemId) } },
       });
-      if (consumed.count !== cartItems.length) {
+      if (consumed.count !== lines.length) {
         throw new ConflictError('Your cart changed, please review and try again');
       }
 
@@ -280,17 +215,6 @@ export const checkoutService = {
         assertLineAvailable(item);
       }
 
-      const lines: ResolvedCartLine[] = cartItems.map((item) => ({
-        variantId: item.variant.id,
-        variantName: item.variant.name,
-        productId: item.variant.product.id,
-        productName: item.variant.product.name,
-        sku: item.variant.sku,
-        imageUrl: item.variant.product.images[0]?.url ?? null,
-        unitPriceCents: applyDiscount(item.variant.sellingPriceCents, item.variant.discountCents),
-        buyingPriceCents: item.variant.buyingPriceCents,
-        quantity: item.quantity,
-      }));
       const subtotalCents = lines.reduce((sum, l) => sum + l.unitPriceCents * l.quantity, 0);
 
       // 3. Validate coupon (we re-run inside tx to lock in usedCount).
