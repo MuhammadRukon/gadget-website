@@ -2,127 +2,25 @@
 
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useSession } from 'next-auth/react';
-import { CheckCircle2Icon } from 'lucide-react';
 import { OrderStatus } from '@prisma/client';
 
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader } from '@/app/common/loader/loader';
-import { Textarea } from '@/components/ui/textarea';
-import type { CustomerPayment } from '@/contracts/payments';
-import { buildCodFeeWarning, buildFeeRejectedMessage } from '@/lib/cod-fee/copy';
-import { feeView, type FeeNoticeState } from '@/lib/cod-fee/view';
-import { AddTxnIdCard } from '@/modules/checkout/components/add-txn-id-card';
-import { CodFeeNotice } from '@/modules/checkout/components/cod-fee-notice';
-import { PaymentConfigError } from '@/modules/checkout/components/payment-config-error';
+import { feeView } from '@/lib/cod-fee/view';
 import { usePaymentConfig } from '@/modules/checkout/hooks';
-import { useCancelOrder, useOrderDetail } from '@/modules/orders/hooks';
+import { useOrderDetail } from '@/modules/orders/hooks';
+import { CancelOrderCard } from '@/modules/orders/components/cancel-order-card';
+import { FeeSection } from '@/modules/orders/components/order-fee-section';
 import { formatShipAddress } from '@/modules/orders/components/format-ship-address';
 import { OrderEventsCard } from '@/modules/orders/components/order-events-card';
 import { OrderItemsCard } from '@/modules/orders/components/order-items-card';
 import { OrderStatusBadge } from '@/modules/orders/components/order-status-badge';
 import { OrderTotalsRows } from '@/modules/orders/components/order-totals-rows';
-import { useSubmitWarranty } from '@/modules/warranty/hooks';
+import { WarrantyRequestCard } from '@/modules/orders/components/warranty-request-card';
 
 const CANCELLABLE: OrderStatus[] = ['PENDING', 'CONFIRMED', 'PROCESSING'];
-
-type PaymentConfigQuery = ReturnType<typeof usePaymentConfig>;
-
-/** Read-only display of the submitted id. Never an input: it is add-only. */
-function SubmittedTxnId({ payment }: { payment: CustomerPayment }) {
-  if (!payment.customerTxnId) return null;
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Transaction ID</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-1 text-sm">
-        <p className="break-all font-mono">{payment.customerTxnId}</p>
-        {payment.txnSubmittedAt ? (
-          <p className="text-xs text-muted-foreground">
-            Submitted {new Date(payment.txnSubmittedAt).toLocaleString()}
-          </p>
-        ) : null}
-      </CardContent>
-    </Card>
-  );
-}
-
-/**
- * COD confirmation-fee state. The warning is built from the Payment snapshot
- * (feeType/feeValue/feeCents), so it stays correct if the admin later changes
- * or disables the fee; only contact, QR and note come from live config.
- */
-function FeeSection({
-  state,
-  payment,
-  config,
-}: {
-  state: Exclude<FeeNoticeState, 'none'>;
-  payment: CustomerPayment;
-  config: PaymentConfigQuery;
-}) {
-  const contact = config.data?.contactNumber ?? null;
-
-  if (state === 'verified') {
-    return (
-      <Alert>
-        <CheckCircle2Icon />
-        <AlertTitle className="line-clamp-none">Confirmation fee verified</AlertTitle>
-      </Alert>
-    );
-  }
-
-  if (state === 'rejected') {
-    return (
-      <div className="space-y-4">
-        <Alert variant="destructive">
-          <AlertDescription className="text-destructive">
-            {buildFeeRejectedMessage(contact)}
-          </AlertDescription>
-        </Alert>
-        <SubmittedTxnId payment={payment} />
-      </div>
-    );
-  }
-
-  if (config.isLoading) {
-    return <p className="text-sm text-muted-foreground">Loading payment details...</p>;
-  }
-
-  if (config.isError || !config.data) {
-    return (
-      <PaymentConfigError
-        message="We could not load the payment details for your confirmation fee."
-        query={config}
-      />
-    );
-  }
-
-  return (
-    <div className="space-y-4">
-      <CodFeeNotice
-        warning={buildCodFeeWarning({
-          type: payment.feeType ?? 'FLAT',
-          value: payment.feeValue ?? payment.feeCents,
-          feeCents: payment.feeCents,
-          contactNumber: contact,
-        })}
-        qrImageUrl={config.data.qrImageUrl}
-        contactNumber={contact}
-        paymentNote={config.data.paymentNote}
-      />
-      {payment.customerTxnId ? (
-        <SubmittedTxnId payment={payment} />
-      ) : (
-        <AddTxnIdCard paymentId={payment.id} contactNumber={contact} />
-      )}
-    </div>
-  );
-}
 
 export default function OrderDetailPage() {
   const router = useRouter();
@@ -135,10 +33,6 @@ export default function OrderDetailPage() {
   const feeState = fee?.customerNotice ?? 'none';
   // Contact/QR/note are only needed while the fee is actionable.
   const config = usePaymentConfig({ enabled: feeState === 'pending' || feeState === 'rejected' });
-  const cancel = useCancelOrder(id ?? '');
-  const warranty = useSubmitWarranty(id ?? '');
-  const [reason, setReason] = useState('');
-  const [warrantyReason, setWarrantyReason] = useState('');
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -219,57 +113,9 @@ export default function OrderDetailPage() {
 
       <OrderEventsCard title="Tracking" events={o.events} />
 
-      {canCancel ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Cancel order</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Textarea
-              rows={3}
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder="Tell us why you'd like to cancel"
-            />
-            <Button
-              variant="destructive"
-              disabled={reason.trim().length < 2 || cancel.isPending}
-              onClick={() => cancel.mutate(reason.trim())}
-            >
-              {cancel.isPending ? 'Cancelling...' : 'Cancel order'}
-            </Button>
-          </CardContent>
-        </Card>
-      ) : null}
+      {canCancel ? <CancelOrderCard orderId={id ?? ''} /> : null}
 
-      {canRequestWarranty ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Request warranty service</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <p className="text-sm text-muted-foreground">
-              Describe the issue with your order. Our team will review and respond, usually
-              within two business days.
-            </p>
-            <Textarea
-              rows={4}
-              value={warrantyReason}
-              onChange={(e) => setWarrantyReason(e.target.value)}
-              placeholder="Describe the defect, when it started, and any troubleshooting you've tried."
-            />
-            <Button
-              disabled={warrantyReason.trim().length < 20 || warranty.isPending}
-              onClick={async () => {
-                await warranty.mutateAsync(warrantyReason.trim());
-                setWarrantyReason('');
-              }}
-            >
-              {warranty.isPending ? 'Submitting...' : 'Submit warranty request'}
-            </Button>
-          </CardContent>
-        </Card>
-      ) : null}
+      {canRequestWarranty ? <WarrantyRequestCard orderId={id ?? ''} /> : null}
     </div>
   );
 }
