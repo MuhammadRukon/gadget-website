@@ -14,14 +14,23 @@ type Db = typeof prisma | Prisma.TransactionClient;
  *
  * `customerTxnId` is always stored normalized (trimmed, uppercase), so it is
  * matched exactly: that keeps its unique index usable. `bankRef` is free text
- * entered before normalization existed, so it stays case-insensitive.
+ * entered before normalization existed, so it stays case-insensitive. Prisma
+ * compiles `mode: 'insensitive'` to `ILIKE`, which cannot use a btree index, so
+ * that branch is a raw `lower("bankRef") = lower($1)` lookup served by the
+ * `Payment_bankRef_lower_idx` functional index (see its migration; the Prisma
+ * schema cannot express it).
  */
-export function findPaymentByTxnId(client: Db, txnId: string, excludePaymentId?: string) {
+export async function findPaymentByTxnId(client: Db, txnId: string, excludePaymentId?: string) {
   const id = normalizeTxnId(txnId);
+  const bankRefMatches = await client.$queryRaw<{ id: string }[]>(
+    Prisma.sql`SELECT "id" FROM "Payment" WHERE lower("bankRef") = lower(${id})${
+      excludePaymentId ? Prisma.sql` AND "id" <> ${excludePaymentId}` : Prisma.empty
+    } LIMIT 1`,
+  );
   return client.payment.findFirst({
     where: {
       ...(excludePaymentId ? { id: { not: excludePaymentId } } : {}),
-      OR: [{ customerTxnId: id }, { bankRef: { equals: id, mode: 'insensitive' } }],
+      OR: [{ customerTxnId: id }, ...bankRefMatches.map((m) => ({ id: m.id }))],
     },
     select: { id: true, order: { select: { id: true, orderNumber: true } } },
   });

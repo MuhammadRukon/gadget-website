@@ -297,6 +297,8 @@ model Payment {
   status          PaymentStatus @default(PENDING)
   amountCents     Int
   providerRef     String?       @unique
+  // Functional index Payment_bankRef_lower_idx ON lower("bankRef") lives only in
+  // migration 20261008100100_add_payment_bankref_lower_index (Prisma cannot express it).
   bankRef         String?
   rawPayload      Json?
   verifiedById    String?
