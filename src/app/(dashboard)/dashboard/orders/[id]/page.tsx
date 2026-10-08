@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader } from '@/app/common/loader/loader';
 import { Textarea } from '@/components/ui/textarea';
 import { feeView } from '@/lib/cod-fee/view';
+import { primaryPayment } from '@/lib/primary-payment';
 import { formatShipAddress } from '@/modules/orders/components/format-ship-address';
 import { OrderEventsCard } from '@/modules/orders/components/order-events-card';
 import { OrderItemsCard } from '@/modules/orders/components/order-items-card';
@@ -62,8 +63,9 @@ export default function AdminOrderDetailPage() {
 
   const o = order.data;
   const nextStatus = getNextStatus(o.status);
-  const fee = feeView(o.payments[0], o);
-  const feePayment = fee.show ? o.payments[0] : null;
+  const payment = primaryPayment(o);
+  const fee = feeView(payment, o);
+  const feePayment = fee.show ? payment : null;
   // Confirming by hand while the fee is unverified (or rejected) waives it server-side.
   const confirmWaivesFee = fee.admin.confirmWaivesFee;
 

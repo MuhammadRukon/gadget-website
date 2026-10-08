@@ -9,6 +9,7 @@ import { OrderStatus } from '@prisma/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader } from '@/app/common/loader/loader';
 import { feeView } from '@/lib/cod-fee/view';
+import { primaryPayment } from '@/lib/primary-payment';
 import { usePaymentConfig } from '@/modules/checkout/hooks';
 import { useOrderDetail } from '@/modules/orders/hooks';
 import { CancelOrderCard } from '@/modules/orders/components/cancel-order-card';
@@ -28,7 +29,7 @@ export default function OrderDetailPage() {
   const id = params?.id;
   const { status } = useSession();
   const order = useOrderDetail(id);
-  const feePayment = order.data?.payments[0];
+  const feePayment = order.data ? primaryPayment(order.data) : undefined;
   const fee = order.data ? feeView(feePayment, order.data) : null;
   const feeState = fee?.customerNotice ?? 'none';
   // Contact/QR/note are only needed while the fee is actionable.
@@ -62,6 +63,7 @@ export default function OrderDetailPage() {
   }
 
   const o = order.data;
+  const payment = primaryPayment(o);
   const canCancel = CANCELLABLE.includes(o.status);
   const canRequestWarranty = o.status === 'DELIVERED';
 
@@ -103,9 +105,7 @@ export default function OrderDetailPage() {
             {fee ? <OrderTotalsRows order={o} fee={fee} /> : null}
             <p className="pt-2 text-xs text-muted-foreground">
               Payment:{' '}
-              {o.payments[0]
-                ? `${o.payments[0].method} (${o.payments[0].status})`
-                : 'Pending'}
+              {payment ? `${payment.method} (${payment.status})` : 'Pending'}
             </p>
           </CardContent>
         </Card>
