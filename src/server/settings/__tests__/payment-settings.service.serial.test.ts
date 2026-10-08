@@ -354,7 +354,7 @@ describe('effectiveMethods (via paymentSettingsService.get)', () => {
       update: { enabledMethods },
     });
 
-  it('excludes a gateway whose flag is true but whose credentials are missing', async () => {
+  it('excludes a gateway that is enabled but whose credentials are missing', async () => {
     await prisma.paymentSettings.upsert({
       where: { id: SINGLETON },
       create: { id: SINGLETON, enabledMethods: [COD, BKASH, BANK_TRANSFER] },
