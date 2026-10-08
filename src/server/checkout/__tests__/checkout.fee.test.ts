@@ -98,6 +98,30 @@ describe('placeOrder: COD confirmation fee', () => {
     expect(events.some((e) => e.status === OrderStatus.CONFIRMED)).toBe(false);
   });
 
+  it('writes the order events in placement order with strictly increasing timestamps', async () => {
+    await setPaymentSettings(FEE_ON);
+    const feeFx = await createCheckoutFixture({ stock: 5, cartQty: 1 });
+    const fee = await checkoutService.placeOrder(feeFx.user.id, codInput(feeFx.address.id));
+    const feeEvents = await eventsFor(fee.order.id);
+    expect(feeEvents.map((e) => [e.status, e.note])).toEqual([
+      [OrderStatus.PENDING, 'Order placed'],
+      [OrderStatus.PENDING, 'COD confirmation fee pending'],
+    ]);
+
+    await setPaymentSettings({ codFeeEnabled: false });
+    const autoFx = await createCheckoutFixture({ stock: 5, cartQty: 1 });
+    const auto = await checkoutService.placeOrder(autoFx.user.id, codInput(autoFx.address.id));
+    const autoEvents = await eventsFor(auto.order.id);
+    expect(autoEvents.map((e) => [e.status, e.note])).toEqual([
+      [OrderStatus.PENDING, 'Order placed'],
+      [OrderStatus.CONFIRMED, 'COD order auto-confirmed; awaiting fulfilment'],
+    ]);
+
+    for (const events of [feeEvents, autoEvents]) {
+      expect(events[1].createdAt.getTime()).toBeGreaterThan(events[0].createdAt.getTime());
+    }
+  });
+
   it('percent fee rounds up to the next 10 BDT (total 49840 -> 13000)', async () => {
     await setPaymentSettings({ ...FEE_ON, codFeeType: CodFeeType.PERCENT, codFeeValue: 25 });
     // 43840 + 6000 Dhaka shipping = 49840

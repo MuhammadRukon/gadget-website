@@ -34,7 +34,7 @@ describe('priceOrder totals', () => {
       totalCents: 106_000,
       couponId: null,
       couponCode: null,
-      codFee: null,
+      plan: null,
     });
   });
 
@@ -115,13 +115,23 @@ describe('priceOrder COD fee', () => {
       payment: { method: PaymentMethod.COD, settings },
     });
     expect(priced.totalCents).toBe(106_000);
-    expect(priced.codFee).toEqual({
+    expect(priced.plan.fee).toEqual({
       feeCents: 10_000,
       rule: { type: CodFeeType.FLAT, value: 10_000 },
     });
   });
 
-  it('resolves no fee when no payment method is given', async () => {
-    expect((await price(100_000)).codFee).toBeNull();
+  it('resolves no fee for a method that takes none', async () => {
+    const priced = await priceOrder(NO_DB, {
+      userId: 'user-1',
+      address: DHAKA,
+      lines: [{ unitPriceCents: 100_000, quantity: 1 }],
+      payment: { method: PaymentMethod.BANK_TRANSFER, settings },
+    });
+    expect(priced.plan.fee).toBeNull();
+  });
+
+  it('has no plan when no payment method is given', async () => {
+    expect((await price(100_000)).plan).toBeNull();
   });
 });

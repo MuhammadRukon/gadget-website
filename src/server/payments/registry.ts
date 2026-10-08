@@ -6,7 +6,9 @@ import { codGateway } from './providers/cod';
 import { sslcommerzGateway } from './providers/sslcommerz';
 import { hasGatewayCreds } from './gateway-creds';
 
-import type { PaymentGateway } from './gateway.interface';
+import { defaultPlacementPlan } from './placement';
+
+import type { PaymentGateway, PlacementContext, PlacementPlan } from './gateway.interface';
 
 const REGISTRY: Record<PaymentMethod, PaymentGateway> = {
   [PaymentMethod.COD]: codGateway,
@@ -17,6 +19,11 @@ const REGISTRY: Record<PaymentMethod, PaymentGateway> = {
 
 export function getGateway(method: PaymentMethod): PaymentGateway {
   return REGISTRY[method];
+}
+
+/** How an order paid with `method` is created (see `PaymentGateway.planPlacement`). */
+export function planPlacement(method: PaymentMethod, ctx: PlacementContext): PlacementPlan {
+  return getGateway(method).planPlacement?.(ctx) ?? defaultPlacementPlan();
 }
 
 /**

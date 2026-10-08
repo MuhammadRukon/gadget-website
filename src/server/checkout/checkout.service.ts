@@ -1,9 +1,8 @@
-import { CodFeeStatus, OrderStatus, PaymentMethod, PaymentStatus } from '@prisma/client';
+import { OrderStatus, PaymentStatus, type PaymentMethod } from '@prisma/client';
 import { randomBytes } from 'crypto';
 
 import { prisma } from '@/lib/prisma';
 import type { CheckoutInput, CheckoutQuote, StockConflictMeta } from '@/contracts/checkout';
-import { normalizeTxnId } from '@/contracts/payments';
 import { BadRequestError, ConflictError, NotFoundError } from '@/server/common/errors';
 import { cancelOrderInTx } from '@/server/orders/orders.service';
 import { assertTxnIdFree, mapTxnIdViolation } from '@/server/payments/txn-id';
@@ -101,7 +100,8 @@ export const checkoutService = {
     const priced = await priceOrder(prisma, { userId, address, lines, couponCode, payment });
     if (payment) assertMethodAvailable(payment.settings, payment.method);
 
-    const codFeeCents = priced.codFee?.feeCents ?? 0;
+    const codFee = priced.plan?.fee ?? null;
+    const codFeeCents = codFee?.feeCents ?? 0;
     return {
       subtotalCents: priced.subtotalCents,
       discountCents: priced.discountCents,
@@ -110,7 +110,7 @@ export const checkoutService = {
       couponCode: priced.couponCode,
       codFeeCents,
       dueOnDeliveryCents: priced.totalCents - codFeeCents,
-      codFeeRule: priced.codFee?.rule ?? null,
+      codFeeRule: codFee?.rule ?? null,
     };
   },
 
@@ -122,19 +122,20 @@ export const checkoutService = {
    *      the admin's effective settings (a throw rolls back the consume).
    *   2. Re-validate every line against current availability/stock to
    *      avoid overselling between quote and confirm.
-   *   3. Re-validate the coupon and compute totals + shipping.
-   *   4. Create the `Order`, snapshotting every line into `OrderItem`
-   *      (price, name, sku, image, buying price) so future catalog
-   *      changes never alter past orders. The COD confirmation fee (if
-   *      any) is resolved and snapshotted on the `Payment`.
-   *   5. Decrement variant stock atomically (in sorted variantId order);
+   *   3. `priceOrder`: re-validate the coupon, compute totals + shipping and
+   *      ask the payment method how to place the order (`planPlacement`:
+   *      initial status, payment fee fields, audit events; for COD this
+   *      resolves the confirmation fee).
+   *   4. Decrement variant stock atomically (in sorted variantId order);
    *      the conditional update is the real oversell guard.
-   *   6. Bump coupon `usedCount` if applied.
-   *   7. Create the `Payment` row in PENDING. COD is auto-confirmed at the
-   *      order level unless a confirmation fee applies, in which case the
+   *   5. Bump coupon `usedCount` if applied.
+   *   6. Create the `Order` with its `OrderItem` snapshots (price, name,
+   *      sku, image, buying price, so future catalog changes never alter
+   *      past orders), its `Payment` (PENDING, with the fee snapshot) and
+   *      its `OrderEvent` audit trail in one nested write. COD is
+   *      auto-confirmed unless a confirmation fee applies, in which case the
    *      order stays PENDING until an admin verifies the fee; the payment
    *      itself stays PENDING until cash is collected.
-   *   8. Append an `OrderEvent` for audit.
    * Anything failing rolls the whole thing back atomically.
    */
   async placeOrder(userId: string, input: CheckoutInput) {
@@ -166,6 +167,13 @@ export const checkoutService = {
       }
 
       // 3. Price the order; the coupon is re-validated inside the tx to lock in usedCount.
+      const priced = await priceOrder(tx, {
+        userId,
+        address,
+        lines,
+        couponCode: input.couponCode,
+        payment: { method: input.paymentMethod, settings, customerTxnId: input.customerTxnId },
+      });
       const {
         subtotalCents,
         discountCents,
@@ -173,62 +181,12 @@ export const checkoutService = {
         couponCode,
         shippingCents,
         totalCents,
-        codFee,
-      } = await priceOrder(tx, {
-        userId,
-        address,
-        lines,
-        couponCode: input.couponCode,
-        payment: { method: input.paymentMethod, settings },
-      });
-
-      // The txn id only means something when a fee is being paid; ignore it otherwise.
-      const customerTxnId =
-        codFee && input.customerTxnId ? normalizeTxnId(input.customerTxnId) : null;
+        plan,
+      } = priced;
+      const customerTxnId = plan.paymentFields.customerTxnId ?? null;
       if (customerTxnId) await assertTxnIdFree(tx, customerTxnId);
 
-      // 4. Create order with snapshotted address + items.
-      const order = await tx.order.create({
-        data: {
-          orderNumber: generateOrderNumber(),
-          userId,
-          addressId: address.id,
-          status: OrderStatus.PENDING,
-          shipRecipient: address.recipientName,
-          shipPhone: address.recipientPhone,
-          shipLine1: address.line1,
-          shipLine2: address.line2,
-          shipCity: address.city,
-          shipDistrict: address.district,
-          shipPostal: address.postalCode,
-          shipCountry: address.country,
-          subtotalCents,
-          discountCents,
-          shippingCents,
-          totalCents,
-          // Placement-time snapshot only. Payment.feeCents / feeStatus are
-          // authoritative: a waived or rejected fee never rewrites this value.
-          codFeeCents: codFee?.feeCents ?? 0,
-          couponId,
-          couponCode,
-          notes: input.notes ?? null,
-          items: {
-            create: lines.map((l) => ({
-              variantId: l.variantId,
-              productId: l.productId,
-              productName: l.productName,
-              variantName: l.variantName,
-              sku: l.sku,
-              imageUrl: l.imageUrl,
-              buyingPriceCents: l.buyingPriceCents,
-              unitPriceCents: l.unitPriceCents,
-              quantity: l.quantity,
-            })),
-          },
-        },
-      });
-
-      // 5. Decrement stock per variant (grouped, fewer writes). Conditional
+      // 4. Decrement stock per variant (grouped, fewer writes). Conditional
       // on stock still being sufficient — under concurrent checkouts for
       // the same variant, only one transaction's decrement can win; the
       // other sees `count !== 1` and fails cleanly instead of overselling.
@@ -245,7 +203,7 @@ export const checkoutService = {
         }
       }
 
-      // 6. Increment coupon usage atomically. Re-read the limit inside this
+      // 5. Increment coupon usage atomically. Re-read the limit inside this
       // transaction and only increment if still under it — closes the race
       // where concurrent checkouts could both pass validate()'s read-only
       // check and both increment past usageLimit.
@@ -263,73 +221,74 @@ export const checkoutService = {
         }
       }
 
-      // 7. Create payment record.
-      let payment;
+      // 6. Create the order with its snapshotted address + items, the
+      // payment and the audit events in one nested write, as the payment
+      // method's placement plan says. Events get explicit increasing
+      // timestamps: one nested create would otherwise stamp them all alike
+      // and the order trail is sorted by `createdAt`.
+      const eventsStart = Date.now();
       try {
-        payment = await tx.payment.create({
+        const placed = await tx.order.create({
           data: {
-            orderId: order.id,
-            method: input.paymentMethod,
-            status: PaymentStatus.PENDING,
-            amountCents: totalCents,
-            ...(codFee
-              ? {
-                  feeCents: codFee.feeCents,
-                  feeType: codFee.rule.type,
-                  feeValue: codFee.rule.value,
-                  feeStatus: CodFeeStatus.PENDING,
-                  ...(customerTxnId ? { customerTxnId, txnSubmittedAt: new Date() } : {}),
-                }
-              : {}),
+            orderNumber: generateOrderNumber(),
+            userId,
+            addressId: address.id,
+            status: plan.initialStatus,
+            shipRecipient: address.recipientName,
+            shipPhone: address.recipientPhone,
+            shipLine1: address.line1,
+            shipLine2: address.line2,
+            shipCity: address.city,
+            shipDistrict: address.district,
+            shipPostal: address.postalCode,
+            shipCountry: address.country,
+            subtotalCents,
+            discountCents,
+            shippingCents,
+            totalCents,
+            // Placement-time snapshot only. Payment.feeCents / feeStatus are
+            // authoritative: a waived or rejected fee never rewrites this value.
+            codFeeCents: plan.fee?.feeCents ?? 0,
+            couponId,
+            couponCode,
+            notes: input.notes ?? null,
+            items: {
+              create: lines.map((l) => ({
+                variantId: l.variantId,
+                productId: l.productId,
+                productName: l.productName,
+                variantName: l.variantName,
+                sku: l.sku,
+                imageUrl: l.imageUrl,
+                buyingPriceCents: l.buyingPriceCents,
+                unitPriceCents: l.unitPriceCents,
+                quantity: l.quantity,
+              })),
+            },
+            payments: {
+              create: {
+                method: input.paymentMethod,
+                status: PaymentStatus.PENDING,
+                amountCents: totalCents,
+                ...plan.paymentFields,
+              },
+            },
+            events: {
+              create: plan.events.map((event, i) => ({
+                status: event.status,
+                note: event.note,
+                actorId: userId,
+                createdAt: new Date(eventsStart + i),
+              })),
+            },
           },
+          include: { items: true, payments: true },
         });
+        return { order: placed, paymentId: placed.payments[0].id, feeRequired: plan.feeRequired };
       } catch (err) {
         // Lost a race on the unique index despite the pre-check above.
         throw customerTxnId ? await mapTxnIdViolation(err, customerTxnId) : err;
       }
-
-      // 8. Audit (cart was consumed at the top of the transaction).
-      await tx.orderEvent.create({
-        data: {
-          orderId: order.id,
-          status: OrderStatus.PENDING,
-          note: 'Order placed',
-          actorId: userId,
-        },
-      });
-
-      if (codFee) {
-        // Stays PENDING until an admin verifies the fee (codFeeService.verifyFee).
-        await tx.orderEvent.create({
-          data: {
-            orderId: order.id,
-            status: OrderStatus.PENDING,
-            note: 'COD confirmation fee pending',
-            actorId: userId,
-          },
-        });
-      } else if (input.paymentMethod === PaymentMethod.COD) {
-        // No fee: auto-confirm COD orders so the admin sees them in CONFIRMED state.
-        await tx.order.update({
-          where: { id: order.id },
-          data: { status: OrderStatus.CONFIRMED },
-        });
-        await tx.orderEvent.create({
-          data: {
-            orderId: order.id,
-            status: OrderStatus.CONFIRMED,
-            note: 'COD order auto-confirmed; awaiting fulfilment',
-            actorId: userId,
-          },
-        });
-      }
-
-      const placed = await tx.order.findUnique({
-        where: { id: order.id },
-        include: { items: true, payments: true },
-      });
-      if (!placed) throw new Error('Order disappeared after creation');
-      return { order: placed, paymentId: payment.id, feeRequired: codFee !== null };
     });
   },
 

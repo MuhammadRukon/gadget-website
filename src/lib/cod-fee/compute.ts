@@ -1,9 +1,10 @@
-import { CodFeeStatus, CodFeeType } from '@prisma/client';
+import { CodFeeStatus, CodFeeType, type PaymentSettings } from '@prisma/client';
 
 import {
   COD_PERCENT_MAX,
   COD_PERCENT_MIN,
   isValidCodFeeValue,
+  type CodFeeRule,
 } from '@/contracts/payment-settings';
 
 import { FEE_CREDITED } from './policy';
@@ -52,6 +53,34 @@ export function computeCodConfirmationFee(input: CodFeeInput): number {
     throw new Error('COD flat fee must not be negative');
   }
   return Math.min(value, totalCents);
+}
+
+export interface ResolvedCodFee {
+  feeCents: number;
+  rule: CodFeeRule;
+}
+
+/**
+ * The COD confirmation fee that applies to an order of `totalCents`, or
+ * `null` when none does (fee switched off, or the computed fee is 0). A
+ * `null` result means the COD order auto-confirms. Only the COD provider
+ * asks for this, so there is no payment-method check here.
+ */
+export function resolveCodFee(input: {
+  settings: Pick<PaymentSettings, 'codFeeEnabled' | 'codFeeType' | 'codFeeValue'>;
+  totalCents: number;
+}): ResolvedCodFee | null {
+  const { settings, totalCents } = input;
+  if (!settings.codFeeEnabled) return null;
+
+  const feeCents = computeCodConfirmationFee({
+    type: settings.codFeeType,
+    value: settings.codFeeValue,
+    totalCents,
+  });
+  if (feeCents <= 0) return null;
+
+  return { feeCents, rule: { type: settings.codFeeType, value: settings.codFeeValue } };
 }
 
 /**
