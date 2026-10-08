@@ -44,12 +44,13 @@ export function useVerifyPayment() {
         method: 'POST',
         body: { outcome, note },
       }),
-    onSuccess: (_data, vars) => {
-      toast.success(vars.outcome === 'SUCCEEDED' ? 'Payment verified' : 'Payment rejected');
-      qc.invalidateQueries({ queryKey: ['admin', 'payments'] });
-    },
+    onSuccess: (_data, vars) =>
+      toast.success(vars.outcome === 'SUCCEEDED' ? 'Payment verified' : 'Payment rejected'),
     onError: (err) =>
       toast.error(err instanceof Error ? err.message : 'Could not update payment'),
+    // Verifying can also confirm the order, so refresh the order views too. Also
+    // on error: a 409 means someone else already decided, so show fresh state.
+    onSettled: (data) => invalidateAdminPaymentViews(qc, data?.payment.orderId),
   });
 }
 
