@@ -23,16 +23,18 @@ export interface PlaceOrderResult {
 }
 
 /**
- * Enabled payment methods, COD fee rule, QR, contact and note. Never served
- * from cache: the admin can change it at any time, so every mount refetches.
+ * Enabled payment methods, COD fee rule, QR, contact and note. The admin can
+ * change it at any time, so it goes stale after 30 seconds; no refetch on
+ * window focus. Quote and place-order re-check the chosen method on the server,
+ * and a "method no longer available" answer invalidates this key.
  */
 export function usePaymentConfig({ enabled = true }: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: queryKeys.paymentConfig,
     enabled,
     queryFn: () => apiFetch<PublicPaymentConfig>('/api/checkout/config'),
-    staleTime: 0,
-    refetchOnMount: 'always',
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
     // One quick retry, then surface the error state instead of spinning.
     retry: 1,
   });
