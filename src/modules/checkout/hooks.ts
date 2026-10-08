@@ -1,14 +1,16 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { PaymentMethod } from '@prisma/client';
 import { toast } from 'sonner';
 
 import { apiFetch } from '@/lib/fetcher';
 import { queryKeys } from '@/constants/queryKeys';
-import type { CheckoutInput } from '@/contracts/checkout';
+import type { CheckoutInput, CheckoutQuote } from '@/contracts/checkout';
 import type { PublicPaymentConfig } from '@/contracts/payment-settings';
 import type { TxnCheckResult } from '@/contracts/payments';
 import { checkoutErrorMessage, isPaymentMethodUnavailable } from './checkout-error';
+import { buildQuoteBody } from './checkout-quote';
 
 export interface PlaceOrderResult {
   id: string;
@@ -33,6 +35,47 @@ export function usePaymentConfig({ enabled = true }: { enabled?: boolean } = {})
     refetchOnMount: 'always',
     // One quick retry, then surface the error state instead of spinning.
     retry: 1,
+  });
+}
+
+/**
+ * Server-side totals for one checkout selection (address, applied coupon,
+ * payment method). Every distinct selection is its own cache entry and is
+ * always fetched fresh: no placeholder data, so a new selection never shows
+ * another selection's quote, and nothing is kept once the page unmounts
+ * (`gcTime: 0`), so a return visit neither re-shows an old quote nor replays
+ * an old error. No retry: a rejected quote (stock conflict, bad coupon,
+ * method turned off) is meaningful, so the caller handles it once via `error`.
+ *
+ * `enabled` lets the caller wait (e.g. for the payment config) before the
+ * first request; it is also off until an address is chosen.
+ */
+export function useCheckoutQuote({
+  addressId,
+  couponCode,
+  paymentMethod,
+  enabled = true,
+}: {
+  addressId: string | null;
+  couponCode: string | null;
+  paymentMethod: PaymentMethod | null;
+  enabled?: boolean;
+}) {
+  return useQuery({
+    queryKey: queryKeys.checkoutQuote({ addressId, couponCode, paymentMethod }),
+    enabled: enabled && !!addressId,
+    queryFn: () => {
+      if (!addressId) throw new Error('Checkout quote requested without an address');
+      return apiFetch<CheckoutQuote>('/api/checkout/quote', {
+        method: 'POST',
+        body: buildQuoteBody({ addressId, couponCode, paymentMethod }),
+      });
+    },
+    staleTime: 0,
+    gcTime: 0,
+    retry: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 }
 

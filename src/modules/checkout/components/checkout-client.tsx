@@ -10,15 +10,15 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader } from '@/app/common/loader/loader';
-import { ApiClientError, apiFetch } from '@/lib/fetcher';
-import type { CheckoutInput, CheckoutQuote } from '@/contracts/checkout';
+import { ApiClientError } from '@/lib/fetcher';
+import type { CheckoutInput } from '@/contracts/checkout';
 import { queryKeys } from '@/constants/queryKeys';
 import {
   checkoutErrorMessage,
   isPaymentMethodUnavailable,
   isTxnIdDuplicate,
 } from '@/modules/checkout/checkout-error';
-import { usePaymentConfig, usePlaceOrder } from '@/modules/checkout/hooks';
+import { useCheckoutQuote, usePaymentConfig, usePlaceOrder } from '@/modules/checkout/hooks';
 import { usePaymentSelection } from '@/modules/checkout/use-payment-selection';
 import { useCheckoutTxnId } from '@/modules/checkout/use-checkout-txn-id';
 import { CheckoutPaymentCard } from '@/modules/checkout/components/checkout-payment-card';
@@ -38,8 +38,6 @@ export function CheckoutClient() {
   const [appliedCoupon, setAppliedCoupon] = useState<string | null>(null);
   const [notes, setNotes] = useState('');
 
-  const [quote, setQuote] = useState<CheckoutQuote | null>(null);
-  const [quoting, setQuoting] = useState(false);
   const [orderPlaced, setOrderPlaced] = useState(false);
   // Synchronous double-click guard: mutate() can fire twice before isPending re-renders.
   const submitGuard = useRef(false);
@@ -58,50 +56,37 @@ export function CheckoutClient() {
     }
   }, [addresses.data, addressId]);
 
+  // Waits for the config so the first quote already carries the payment method.
+  const quoteQuery = useCheckoutQuote({
+    addressId,
+    couponCode: appliedCoupon,
+    paymentMethod,
+    enabled: !configLoading,
+  });
+  // A failed quote has no totals, even if an earlier answer for this selection is cached.
+  const quote = quoteQuery.isError ? null : (quoteQuery.data ?? null);
+  const quoting = quoteQuery.isFetching;
+
+  // React Query v5 has no query-level onError: handle each quote failure once.
+  const quoteError = quoteQuery.error;
+  const handledQuoteError = useRef<unknown>(null);
   useEffect(() => {
-    if (!addressId) {
-      setQuote(null);
+    if (!quoteError || handledQuoteError.current === quoteError) return;
+    handledQuoteError.current = quoteError;
+    const isApiError = quoteError instanceof ApiClientError;
+    toast.error(isApiError ? checkoutErrorMessage(quoteError) : 'Could not calculate totals');
+    // The admin turned the method off after the config loaded: refetch the
+    // list. The coupon is unrelated, so keep it.
+    if (isPaymentMethodUnavailable(quoteError)) {
+      queryClient.invalidateQueries({ queryKey: queryKeys.paymentConfig });
       return;
     }
-    // Wait for the config so the first quote already carries the payment method.
-    if (configLoading) return;
-    let cancelled = false;
-    setQuoting(true);
-    apiFetch<CheckoutQuote>('/api/checkout/quote', {
-      method: 'POST',
-      body: {
-        addressId,
-        couponCode: appliedCoupon ?? undefined,
-        paymentMethod: paymentMethod ?? undefined,
-      },
-    })
-      .then((q) => {
-        if (!cancelled) setQuote(q);
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        const isApiError = err instanceof ApiClientError;
-        toast.error(isApiError ? checkoutErrorMessage(err) : 'Could not calculate totals');
-        setQuote(null);
-        // The admin turned the method off after the config loaded: refetch the
-        // list. The coupon is unrelated, so keep it.
-        if (isPaymentMethodUnavailable(err)) {
-          queryClient.invalidateQueries({ queryKey: queryKeys.paymentConfig });
-          return;
-        }
-        // Quote returns the same stock-conflict 409 as checkout; the cart snapshot is stale.
-        if (isApiError && err.status === 409) {
-          queryClient.invalidateQueries({ queryKey: queryKeys.cart });
-        }
-        if (appliedCoupon) setAppliedCoupon(null);
-      })
-      .finally(() => {
-        if (!cancelled) setQuoting(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [addressId, appliedCoupon, paymentMethod, configLoading, queryClient]);
+    // Quote returns the same stock-conflict 409 as checkout; the cart snapshot is stale.
+    if (isApiError && quoteError.status === 409) {
+      queryClient.invalidateQueries({ queryKey: queryKeys.cart });
+    }
+    if (appliedCoupon) setAppliedCoupon(null);
+  }, [quoteError, appliedCoupon, queryClient]);
 
   const itemCount = cart.data?.itemCount ?? 0;
 
