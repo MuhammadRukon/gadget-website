@@ -11,16 +11,20 @@ Hosted on Vercel free tier + Prisma-hosted Postgres. Cost-sensitive: prefer DB-b
 ## Commands
 
 ```bash
-npm run dev          # Turbopack dev server on :3000
-npm run build        # production build
+npm run dev          # Turbopack dev server on :3000 (loads .env.dev)
+npm run build        # production build (Vercel); fails locally by design, see below
 npm run lint         # eslint (next/core-web-vitals + next/typescript)
 npm run typecheck    # tsc --noEmit
-npm run test         # vitest run
+npm run test         # vitest run (loads .env.dev)
 npm run test:watch
-npm run db:seed      # tsx prisma/seed.ts — admin + demo catalog; never run against prod
+npm run db:seed      # tsx prisma/seed.ts — admin + demo catalog; local-only
 npm run db:studio
-npx prisma migrate dev   # after editing prisma/schema.prisma (needs SHADOW_DATABASE_URL)
+npm run db:migrate   # prisma migrate dev after editing prisma/schema.prisma (needs SHADOW_DATABASE_URL); local-only
+npm run db:deploy    # prisma migrate deploy against the local DB; local-only
+npm run db:status    # prisma migrate status
 ```
+
+`db:seed`, `db:migrate`, `db:deploy` and the other `db:*` scripts, plus `dev` and `test`, run through `.env.dev` and a localhost guard (`db:guard`, via npm `pre` hooks) that refuses non-local database URLs. `npm test` is DB-backed and hits the local `gadget_dev` database through that guard. Plain `npm run build` fails locally by design (`.env` keeps `DATABASE_URL` blank; Vercel uses dashboard variables); build locally with `npx dotenv -e .env.dev -- next build`. Production migrations are a manual `prisma migrate deploy` with the URL pulled from Vercel for that one command, never stored in a local file.
 
 Single test file / single test:
 
@@ -31,7 +35,7 @@ npx vitest run -t "free shipping"
 
 Vitest runs in the **node** environment (`vitest.config.ts`), not jsdom, and only picks up `src/**/*.{test,spec}.{ts,tsx}`. Tests use explicit imports (`globals: false`) — import `describe`/`it`/`expect` from `vitest`.
 
-`src/env.ts` fail-fast validates env at boot via `instrumentation.ts`; a missing required var crashes the server rather than failing later. Copy `.env.example` to `.env`.
+`src/env.ts` fail-fast validates env at boot via `instrumentation.ts`; a missing required var crashes the server rather than failing later. Copy `.env.example` to `.env.dev` for local work (production values live only in the Vercel dashboard).
 
 ## Architecture
 

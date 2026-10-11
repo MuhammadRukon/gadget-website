@@ -29,34 +29,39 @@
 
 ## Environment variables
 
-Defined in `.env` (not committed). No `.env.example` exists yet (see issues).
+Local values live in `.env.dev` (not committed); copy `.env.example` to `.env.dev` to start. Production values live only in the Vercel dashboard. `.env` keeps `DATABASE_URL` / `SHADOW_DATABASE_URL` blank on purpose so unwrapped commands fail closed.
 
 | Group | Variables |
 | --- | --- |
-| App | `APP_NAME`, `APP_DEFAULT_FROM_EMAIL`, `NEXT_PUBLIC_BASE_URL` |
+| App | `APP_NAME`, `APP_DEFAULT_FROM_EMAIL`, `NEXT_PUBLIC_APP_URL` |
 | Database | `DATABASE_URL`, `SHADOW_DATABASE_URL` |
-| Auth | `NEXTAUTH_URL`, `NEXTAUTH_SECRET`, `AUTH_TRUST_HOST` |
+| Auth | `NEXTAUTH_URL`, `NEXTAUTH_SECRET`, `AUTH_TRUST_HOST`, optional `AUTH_SECRET` (fallback read in `src/proxy.ts`) |
 | Google OAuth | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` (provider only registers if both present) |
 | Cloudinary | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`, `CLOUDINARY_UPLOAD_FOLDER`, `NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET` |
 | SSLCommerz | `SSLCOMMERZ_STORE_ID`, `SSLCOMMERZ_STORE_PASSWORD`, `SSLCOMMERZ_SANDBOX` |
 | bKash | `BKASH_BASE_URL`, `BKASH_APP_KEY`, `BKASH_APP_SECRET`, `BKASH_USERNAME`, `BKASH_PASSWORD` |
-| Seed | `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD` (defaults exist in `prisma/seed.ts` — see issues) |
+| Seed | `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`, `SEED_CUSTOMER_EMAIL`, `SEED_CUSTOMER_PASSWORD` (defaults exist in `prisma/seed.ts` — see issues) |
 
-Note: `src/app/sitemap.ts` and `src/app/robots.ts` read `NEXT_PUBLIC_APP_URL` (falling back to `NEXTAUTH_URL`), but `.env` defines `NEXT_PUBLIC_BASE_URL` — the names are inconsistent.
+Note: `src/app/sitemap.ts` and `src/app/robots.ts` read `NEXT_PUBLIC_APP_URL` (falling back to `NEXTAUTH_URL`); `src/env.ts` requires it.
 
 ## Scripts
 
 ```bash
-npm run dev        # next dev --turbopack
-npm run build      # next build
+npm run dev        # next dev --turbopack (.env.dev + db:guard)
+npm run build      # next build (Vercel; fails locally by design: .env has blank DATABASE_URL)
 npm run lint       # next lint
 npm run typecheck  # tsc --noEmit
-npm run test       # vitest run
-npm run db:seed    # tsx prisma/seed.ts
-npm run db:studio  # prisma studio
+npm run test       # vitest run (DB-backed, local gadget_dev, .env.dev + db:guard)
+npm run db:guard   # refuse non-localhost DATABASE_URL / SHADOW_DATABASE_URL
+npm run db:deploy  # prisma migrate deploy (local)
+npm run db:migrate # prisma migrate dev (local, needs SHADOW_DATABASE_URL)
+npm run db:status  # prisma migrate status
+npm run db:seed    # tsx prisma/seed.ts (local)
+npm run db:studio  # prisma studio (local)
+npm run db:backfill-email  # tsx prisma/backfill-email-verified.ts (local)
 ```
 
-`postinstall` runs `prisma generate`.
+`dev`, `test`, `test:watch` and the `db:*` scripts (except `db:status`) run `db:guard` first through npm `pre` hooks, and all load `.env.dev` via `dotenv-cli`. Local production-mode build: `npx dotenv -e .env.dev -- next build`. `postinstall` runs `prisma generate`.
 
 ## Payment sandbox mode
 
