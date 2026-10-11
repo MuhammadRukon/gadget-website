@@ -22,9 +22,7 @@
 
 ## Checklist
 
-- [ ] `npm run typecheck` and `npm test` pass locally
 - [ ] No secrets or `.env*` values in the diff
 - [ ] CI / Vercel preview build passes
 - [ ] Migration applied to production? (n/a if no schema change)
-
-  Note: `prisma migrate deploy` against production is manual: pull the production URL from Vercel for that one command in a one-off shell; never store it in a local file. The localhost-only `npm run db:*` guard intentionally blocks remote databases.
+<!-- Production migrations are manual, see README "Local vs production notes". -->

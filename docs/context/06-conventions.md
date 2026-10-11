@@ -34,10 +34,8 @@ Rules of thumb:
 ## Prisma
 
 - Schema changes: edit `prisma/schema.prisma` → `npm run db:migrate` (`prisma migrate dev`). The shadow DB is wired (`shadowDatabaseUrl = env("SHADOW_DATABASE_URL")`, local `gadget_shadow`) and is needed only by `migrate dev`.
-- `migrate dev`, `migrate reset` and `npm run db:seed` are local-only: the `db:guard` pre-hook (also run before `db:status`) enforces localhost for `DATABASE_URL` (and `SHADOW_DATABASE_URL`, which must differ from it; `db:migrate` runs the guard with `--require-shadow`, so an unset `SHADOW_DATABASE_URL` is an error). Tests are additionally protected by a Vitest `globalSetup` guard (`vitest.global-setup.ts`). `db:seed` seeds admin + demo catalog (`prisma/seed.ts`); never run it against production (default admin credentials — see issues).
-- Production migrations: `prisma migrate deploy` against production is a manual step. Pull the URL from Vercel for that one command in a one-off shell and never store it in a local file. The guard intentionally blocks `npm run db:*` for remote databases.
-- A shell-level `DATABASE_URL` beats `.env.dev` (dotenv-cli does not override existing variables), but the guard still catches a non-local value.
-- Running locally with `NODE_ENV=production` (`next build` / `next start`) changes seed, `trustHost` and other dev-only behavior; don't treat it as equivalent to `npm run dev`.
+- `migrate dev`, `migrate reset` and `npm run db:seed` are local-only. `db:seed` seeds admin + demo catalog (`prisma/seed.ts`); never run it against production (default admin credentials — see issues).
+- Guard, shell-variable precedence, production migrations and `NODE_ENV=production` caveats: see README "Local vs production notes".
 
 ## UI components
 

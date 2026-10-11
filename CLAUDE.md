@@ -24,7 +24,7 @@ npm run db:deploy    # prisma migrate deploy against the local DB; local-only
 npm run db:status    # prisma migrate status
 ```
 
-`db:seed`, `db:migrate`, `db:deploy`, `db:status` and the other `db:*` scripts, plus `dev` and `test`, run through `.env.dev` and a localhost guard (`db:guard`, via npm `pre` hooks) that refuses non-local database URLs; `db:migrate` additionally requires `SHADOW_DATABASE_URL`. `npm test` is DB-backed and hits the local `gadget_dev` database through that guard, and a Vitest `globalSetup` guard (`vitest.global-setup.ts`) also aborts a bare `npx vitest` run with an unset or non-local `DATABASE_URL`. Keep `.env` free of database URLs (a local convention, not enforced by the repo; `.env` is untracked); if an existing `.env` still holds a production URL, blank it before any unwrapped `npx prisma ...` / `npx vitest ...`. Plain `npm run build` fails locally by design (no `DATABASE_URL` in the local `.env`; Vercel uses dashboard variables); build locally with `npx dotenv -e .env.dev -- next build`. Production migrations are a manual `prisma migrate deploy` with the URL pulled from Vercel for that one command, never stored in a local file.
+These scripts load `.env.dev` and run a localhost guard that refuses non-local database URLs (`db:*` and `dev` via npm `pre` hooks; tests via the Vitest `globalSetup`), and `npm test` is DB-backed against the local `gadget_dev`. Plain `npm run build` fails locally; build with `npx dotenv -e .env.dev -- next build`. See README "Local vs production notes" for the `.env` convention, production migrations and `NODE_ENV=production` caveats.
 
 Single test file / single test:
 
