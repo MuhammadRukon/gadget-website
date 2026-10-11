@@ -9,6 +9,7 @@
  */
 
 import { prisma } from '@/lib/prisma';
+import { AppError } from './errors';
 
 export interface RateLimitPolicy {
   /** How many requests are allowed in the window. */
@@ -66,10 +67,10 @@ export function clientIp(request: Request): string {
   return request.headers.get('x-real-ip') ?? 'unknown';
 }
 
-export class RateLimitedError extends Error {
+export class RateLimitedError extends AppError {
   public readonly retryAfter: number;
   constructor(retryAtMs: number) {
-    super('Too many requests; please try again later.');
+    super('RATE_LIMITED', 'Too many requests; please try again later.');
     this.name = 'RateLimitedError';
     this.retryAfter = Math.max(1, Math.ceil((retryAtMs - Date.now()) / 1000));
   }
@@ -82,6 +83,30 @@ export class RateLimitedError extends Error {
 export async function enforceRateLimit(key: string, policy: RateLimitPolicy): Promise<void> {
   const result = await rateLimit(key, policy);
   if (!result.ok) throw new RateLimitedError(result.resetAt);
+}
+
+const USER_RATE_WINDOW_MS = 10 * 60 * 1000;
+
+/**
+ * Two-tier cap for an authenticated per-user endpoint: first a tight
+ * `${prefix}:${userId}:${ip}` bucket (10 per 10 min), then a looser
+ * `${prefix}-user:${userId}` bucket (30 per 10 min) so rotating IPs does not
+ * evade the first. Sequential on purpose: the second bucket is only charged
+ * when the first passes.
+ */
+export async function enforceUserRateLimits(
+  prefix: string,
+  userId: string,
+  request: Request,
+): Promise<void> {
+  await enforceRateLimit(`${prefix}:${userId}:${clientIp(request)}`, {
+    max: 10,
+    windowMs: USER_RATE_WINDOW_MS,
+  });
+  await enforceRateLimit(`${prefix}-user:${userId}`, {
+    max: 30,
+    windowMs: USER_RATE_WINDOW_MS,
+  });
 }
 
 /**

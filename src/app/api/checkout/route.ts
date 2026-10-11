@@ -17,7 +17,7 @@ export async function POST(request: Request) {
       windowMs: 60 * 1000,
     });
     const input = checkoutInputSchema.parse(await request.json());
-    const { order, paymentId } = await checkoutService.placeOrder(user.id, input);
+    const { order, paymentId, feeRequired } = await checkoutService.placeOrder(user.id, input);
 
     const origin = new URL(request.url).origin;
     try {
@@ -36,6 +36,7 @@ export async function POST(request: Request) {
           totalCents: order.totalCents,
           paymentId: initiated.paymentId,
           redirectUrl: initiated.redirectUrl,
+          feeRequired,
         },
         { status: 201 },
       );

@@ -32,8 +32,9 @@ All routes live under `src/app/api/**`. Auth levels: **public**, **user** (`requ
 
 | Route | Methods | Auth | Notes |
 | --- | --- | --- | --- |
-| `/api/checkout/quote` | POST | user | totals + shipping + coupon validation, read-only |
-| `/api/checkout` | POST | user | rate-limited; transactional order placement, then payment kickoff |
+| `/api/checkout/config` | GET | user | enabled payment methods, COD fee rule (type/value), QR/contact/note (all nullable) |
+| `/api/checkout/quote` | POST | user | accepts optional `paymentMethod`; returns totals + shipping + coupon validation + `codFeeCents`, `dueOnDeliveryCents`, `codFeeRule` |
+| `/api/checkout` | POST | user | rate-limited; transactional order placement, accepts optional `customerTxnId`; returns `feeRequired` flag |
 | `/api/orders` | GET | user | my orders |
 | `/api/orders/[id]` | GET/POST | user | detail; `?action=cancel` self-cancel (restocks) |
 | `/api/orders/[id]/warranty` | POST | user | file warranty claim (DELIVERED only) |
@@ -43,6 +44,8 @@ All routes live under `src/app/api/**`. Auth levels: **public**, **user** (`requ
 | Route | Methods | Auth | Notes |
 | --- | --- | --- | --- |
 | `/api/payments/bank` | POST | user | submit bank transfer reference |
+| `/api/payments/txn-check` | POST | user | rate-limited; check if COD txn ID exists; boolean response only (privacy) |
+| `/api/payments/txn-id` | POST | user | rate-limited; customer submits COD txn ID for fee-pending order; add-only |
 | `/api/payments/bkash/{success,fail,cancel}` | GET/POST | **public** | gateway callbacks → `_handlers.ts` |
 | `/api/payments/sslcommerz/{success,fail,cancel,ipn}` | POST | **public** | gateway callbacks → `_handlers.ts` |
 | `/api/payments/sandbox/{bkash,sslcommerz}` | GET | **public** | local sandbox harness pages (⚠ see issues 01) |
@@ -72,8 +75,11 @@ All routes live under `src/app/api/**`. Auth levels: **public**, **user** (`requ
 | `/api/admin/catalog/brands` (+`/[id]`) | GET/POST/PATCH/DELETE | delete blocked if products attached |
 | `/api/admin/coupons` (+`/[id]`) | GET/POST/PATCH/DELETE | delete blocked if used by orders |
 | `/api/admin/orders` (+`/[id]`) | GET/PATCH | list all (no server pagination); status transition + note |
-| `/api/admin/payments` | GET | pending COD/bank-transfer payments |
+| `/api/admin/payments` | GET | pending COD/bank-transfer/fee-verify payments |
 | `/api/admin/payments/[id]/verify` | POST | verify/reject (⚠ outcome defaults to SUCCEEDED) |
+| `/api/admin/payments/[id]/fee` | POST | COD confirmation fee: verify/reject; VERIFIED confirms order and sends email |
+| `/api/admin/payments/[id]/txn-id` | POST | admin sets/replaces COD txn ID; returns 409 on duplicate with meta.existingOrderId |
+| `/api/admin/settings/payments` | GET/PUT | read/update PaymentSettings (methods enabled, COD fee rule, QR, contact, note); GET returns `gatewayConfigured` too |
 | `/api/admin/users` (+`/[id]`) | GET/POST/PATCH | list/create/edit users incl. role; no delete |
 | `/api/admin/warranty` (+`/[id]`) | GET/PATCH | list/filter; status transition + resolution |
 | `/api/admin/media/upload` | POST | Cloudinary upload, 5 MB, type allowlist |
