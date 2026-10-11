@@ -11,27 +11,31 @@ Hosted on Vercel free tier + Prisma-hosted Postgres. Cost-sensitive: prefer DB-b
 ## Commands
 
 ```bash
-npm run dev          # Turbopack dev server on :3000
-npm run build        # production build
+npm run dev          # Turbopack dev server on :3000 (loads .env.dev)
+npm run build        # production build (Vercel); fails locally by design, see below
 npm run lint         # eslint (next/core-web-vitals + next/typescript)
 npm run typecheck    # tsc --noEmit
-npm run test         # vitest run
+npm run test         # vitest run (loads .env.dev)
 npm run test:watch
-npm run db:seed      # tsx prisma/seed.ts — admin + demo catalog; never run against prod
+npm run db:seed      # tsx prisma/seed.ts — admin + demo catalog; local-only
 npm run db:studio
-npx prisma migrate dev   # after editing prisma/schema.prisma (needs SHADOW_DATABASE_URL)
+npm run db:migrate   # prisma migrate dev after editing prisma/schema.prisma (requires SHADOW_DATABASE_URL); local-only
+npm run db:deploy    # prisma migrate deploy against the local DB; local-only
+npm run db:status    # prisma migrate status
 ```
+
+These scripts load `.env.dev` and run a localhost guard that refuses non-local database URLs (`db:*` and `dev` via npm `pre` hooks; tests via the Vitest `globalSetup`), and `npm test` is DB-backed against the local `gadget_dev`. Plain `npm run build` fails locally; build with `npx dotenv -e .env.dev -- next build`. See README "Local vs production notes" for the `.env` convention, production migrations and `NODE_ENV=production` caveats.
 
 Single test file / single test:
 
 ```bash
-npx vitest run src/server/common/__tests__/money.test.ts
-npx vitest run -t "free shipping"
+npm test -- src/server/common/__tests__/money.test.ts
+npm test -- -t "free shipping"
 ```
 
 Vitest runs in the **node** environment (`vitest.config.ts`), not jsdom, and only picks up `src/**/*.{test,spec}.{ts,tsx}`. Tests use explicit imports (`globals: false`) — import `describe`/`it`/`expect` from `vitest`.
 
-`src/env.ts` fail-fast validates env at boot via `instrumentation.ts`; a missing required var crashes the server rather than failing later. Copy `.env.example` to `.env`.
+`src/env.ts` fail-fast validates env at boot via `instrumentation.ts`; a missing required var crashes the server rather than failing later. Copy `.env.example` to `.env.dev` for local work (production values live only in the Vercel dashboard).
 
 ## Architecture
 
@@ -108,7 +112,7 @@ Logged-in carts are `Cart`/`CartItem` rows (unique per `userId`; `getCart` uses 
 - Rate limiting (`src/server/common/rate-limit.ts`) is Postgres-backed via the `RateLimitBucket` model so it works across serverless instances. Currently applied to signup, forgot, reset, checkout, and txn-check/txn-id.
 - Mailer (`src/server/common/mailer.ts`) uses Resend; with `RESEND_API_KEY` unset it logs and skips instead of sending. **Test env blanks these vars** to prevent actual sends during test runs.
 - Component trees: `src/components/ui/*` are generated shadcn primitives (edit sparingly), `src/components/*` are shared app components. `src/app/components/*` and `src/app/common/*` are legacy storefront-specific duplicates — **prefer `src/components` for new shared work.**
-- Tests: Vitest runs in **node** environment via `vitest.config.ts` (two projects: `parallel` and `settings-serial` for singleton-mutating tests). **Test DB must be local**; `vitest.global-setup.ts` aborts on non-local `DATABASE_URL` unless `ALLOW_NON_LOCAL_TEST_DB=1`. Test files touching PaymentSettings or checkout fee logic must be named `*.serial.test.ts` to run serialized (one forked worker, no parallel isolation); fixture helpers throw if called from non-serial files. Pure functions in `src/server/common` are the easiest targets; there are no API/integration or E2E tests.
+- Tests: Vitest runs in **node** environment via `vitest.config.ts` (two projects: `parallel` and `settings-serial` for singleton-mutating tests). **Test DB must be local**; `vitest.global-setup.ts` aborts on a non-local `DATABASE_URL`/`SHADOW_DATABASE_URL` or a missing `DATABASE_URL`, with no opt-out; run tests via `npm test` (dotenv-cli loads `.env.dev`). Test files touching PaymentSettings or checkout fee logic must be named `*.serial.test.ts` to run serialized (one forked worker, no parallel isolation); fixture helpers throw if called from non-serial files. Pure functions in `src/server/common` are the easiest targets; there are no API/integration or E2E tests.
 
 ## Git flow
 

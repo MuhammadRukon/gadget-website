@@ -29,34 +29,24 @@
 
 ## Environment variables
 
-Defined in `.env` (not committed). No `.env.example` exists yet (see issues).
+Local values live in `.env.dev` (not committed); copy `.env.example` to `.env.dev` to start. Production values live only in the Vercel dashboard. Keep `.env` free of database URLs; see README "Local vs production notes".
 
 | Group | Variables |
 | --- | --- |
-| App | `APP_NAME`, `APP_DEFAULT_FROM_EMAIL`, `NEXT_PUBLIC_BASE_URL` |
+| App | `APP_NAME`, `APP_DEFAULT_FROM_EMAIL`, `NEXT_PUBLIC_APP_URL` |
 | Database | `DATABASE_URL`, `SHADOW_DATABASE_URL` |
-| Auth | `NEXTAUTH_URL`, `NEXTAUTH_SECRET`, `AUTH_TRUST_HOST` |
+| Auth | `NEXTAUTH_URL`, `NEXTAUTH_SECRET`, `AUTH_TRUST_HOST`, optional `AUTH_SECRET` (fallback read in `src/proxy.ts`) |
 | Google OAuth | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` (provider only registers if both present) |
 | Cloudinary | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`, `CLOUDINARY_UPLOAD_FOLDER`, `NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET` |
 | SSLCommerz | `SSLCOMMERZ_STORE_ID`, `SSLCOMMERZ_STORE_PASSWORD`, `SSLCOMMERZ_SANDBOX` |
 | bKash | `BKASH_BASE_URL`, `BKASH_APP_KEY`, `BKASH_APP_SECRET`, `BKASH_USERNAME`, `BKASH_PASSWORD` |
-| Seed | `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD` (defaults exist in `prisma/seed.ts` — see issues) |
+| Seed | `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`, `SEED_CUSTOMER_EMAIL`, `SEED_CUSTOMER_PASSWORD` (defaults exist in `prisma/seed.ts` — see issues) |
 
-Note: `src/app/sitemap.ts` and `src/app/robots.ts` read `NEXT_PUBLIC_APP_URL` (falling back to `NEXTAUTH_URL`), but `.env` defines `NEXT_PUBLIC_BASE_URL` — the names are inconsistent.
+Note: `src/app/sitemap.ts` and `src/app/robots.ts` read `NEXT_PUBLIC_APP_URL` (falling back to `NEXTAUTH_URL`); `src/env.ts` requires it.
 
 ## Scripts
 
-```bash
-npm run dev        # next dev --turbopack
-npm run build      # next build
-npm run lint       # next lint
-npm run typecheck  # tsc --noEmit
-npm run test       # vitest run
-npm run db:seed    # tsx prisma/seed.ts
-npm run db:studio  # prisma studio
-```
-
-`postinstall` runs `prisma generate`.
+The scripts table, guard behavior and local build command live in the README ([Scripts](../../README.md#scripts), [Local vs production notes](../../README.md#local-vs-production-notes)). `postinstall` runs `prisma generate`.
 
 ## Payment sandbox mode
 

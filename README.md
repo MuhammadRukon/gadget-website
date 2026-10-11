@@ -25,22 +25,40 @@ A full-stack e-commerce MVP for gadgets/electronics targeting the Bangladesh mar
 ## Getting Started
 
 ```bash
-npm install                 # also runs prisma generate
-# create .env — see docs/context/01-overview.md for the required variables
-npx prisma migrate dev      # apply migrations
+npm ci                      # also runs prisma generate
+# create local Postgres databases gadget_dev and gadget_shadow on localhost:5433
+# (gadget_shadow is only needed by `npm run db:migrate`, i.e. prisma migrate dev)
+copy .env.example .env.dev  # PowerShell/cmd; use `cp` on macOS/Linux. Then fill in the values
+npm run db:deploy           # apply migrations to the local gadget_dev
 npm run db:seed             # seed admin + demo catalog (set SEED_ADMIN_EMAIL/PASSWORD!)
 npm run dev                 # http://localhost:3000
 ```
+
+Local configuration lives in `.env.dev` (gitignored; variables are listed in [docs/context/01-overview.md](./docs/context/01-overview.md)). See [Local vs production notes](#local-vs-production-notes) before touching `.env` or running anything outside the npm scripts.
 
 ### Scripts
 
 | Command | Purpose |
 | --- | --- |
-| `npm run dev` | Dev server (Turbopack) |
-| `npm run build` / `start` | Production build / serve |
+| `npm run dev` | Dev server (Turbopack), loads `.env.dev` |
+| `npm run build` / `start` | Production build / serve. Plain `build` fails locally by design; see [Local vs production notes](#local-vs-production-notes) |
 | `npm run lint` / `typecheck` | ESLint / `tsc --noEmit` |
-| `npm run test` | Vitest unit tests |
-| `npm run db:seed` / `db:studio` | Seed DB / Prisma Studio |
+| `npm run test` / `test:watch` | Vitest, DB-backed: runs against the local `gadget_dev` through the guard. Single file: `npm test -- src/server/common/__tests__/money.test.ts`; single test: `npm test -- -t "free shipping"` |
+| `npm run db:deploy` | `prisma migrate deploy` against the local DB |
+| `npm run db:migrate` | `prisma migrate dev` after editing `schema.prisma` (requires `SHADOW_DATABASE_URL`; the guard fails if it is unset) |
+| `npm run db:status` | `prisma migrate status` |
+| `npm run db:seed` / `db:studio` / `db:backfill-email` | Seed DB / Prisma Studio / email-verified backfill |
+| `npm run db:guard` | Refuses to continue unless `DATABASE_URL` (and `SHADOW_DATABASE_URL`, if set) point at localhost and the shadow DB differs from the main one |
+
+**How the guard works.** `dev`, `test`, `test:watch` and every `db:*` script load `.env.dev` through `dotenv-cli`. `dev` and every `db:*` script except `db:guard` itself (including `db:status`) also run the localhost guard first through npm `pre` hooks (`predev`, `predb:seed`, ...); `db:migrate` additionally requires `SHADOW_DATABASE_URL`. Tests are guarded by a Vitest `globalSetup` (`vitest.global-setup.ts`) that runs the same check, so `npm test`, `npm test -- <file>`, watch mode and a bare `npx vitest` all abort instead of running against an unchecked database; use `npm test` so `.env.dev` is loaded.
+
+### Local vs production notes
+
+- **Keep `.env` free of database URLs.** This is a local convention, not enforced by the repo (`.env` is untracked), so a command run without the `.env.dev` wrapper fails closed instead of reaching a real database. The guards check the effective environment, whatever file the values came from. **In an existing checkout whose `.env` still contains a production `DATABASE_URL` / `SHADOW_DATABASE_URL`, blank those two values BEFORE running any unwrapped `npx prisma ...` or `npx vitest ...` command.**
+- **Local builds.** Plain `npm run build` fails locally when `.env` holds no `DATABASE_URL`; build locally with `npx dotenv -e .env.dev -- next build`. Vercel uses dashboard variables.
+- **`NODE_ENV=production` locally.** Running `next build` / `next start` locally sets `NODE_ENV=production`, which changes seed behavior (`prisma/seed.ts` requires `SEED_ADMIN_*` to be set), Auth.js `trustHost` (needs `AUTH_TRUST_HOST=true`) and other dev-only behavior. Don't expect `next start` to behave like `npm run dev`.
+- **Production migrations are manual.** Run `prisma migrate deploy` against production by hand: pull the URL from Vercel for that one command in a one-off shell and never store it in a local file. The localhost guard intentionally blocks `npm run db:*` for remote databases.
+- **Shell variables win.** `dotenv-cli` does not override variables already set in the shell, so a shell-level `DATABASE_URL` beats `.env.dev`. The guard still catches a non-local value and refuses to run.
 
 ## Architecture (short version)
 
