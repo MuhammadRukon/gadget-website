@@ -222,7 +222,7 @@ Final commit list: `178012a` (cherry-picked draft plan), `ac52ec6` (revised plan
 
 | Phase | Status | Commit | Review | Notes |
 | --- | --- | --- | --- | --- |
-| 1. Local env loading | in-progress | `aa34d52` (code half) | deferred | Steps 1-2 done (general-purpose agent: needs shell for npm install). Steps 3-6 and acceptance checks blocked on [USER] env edits in the worktree. |
+| 1. Local env loading | done (3 items open) | `aa34d52` | deferred | Code by general-purpose agent (needs shell). At user's instruction the orchestrator built worktree `.env`/`.env.dev` from main `.env` (DB URLs blanked in `.env`, dev DB URLs + fresh NEXTAUTH_SECRET in `.env.dev`; user will replace `.env.dev` values later). Verified: targets, db:status, precedence proof, fail-closed, 95 tests pass, dev boot 200s, seed idempotent, mail skipped, typecheck, wrapped build exit 0. Plain `npm run build` fails by design (ZodError DATABASE_URL). Open: `gadget_shadow` DB missing on :5433 (needed Phase 2); AC "Postgres stopped -> Can't reach localhost:5433" not run (would stop user's DB service); AC Cloudinary upload to gadget-website-dev deferred to Cross-Validation e2e. |
 | 2. Safety (DB-target guard, shadowDatabaseUrl) | pending | — | deferred | — |
 | 3. Cleanups and docs | pending | — | deferred | — |
 | 4. Remote dev DB and Vercel scoping | pending | — | deferred | — |
