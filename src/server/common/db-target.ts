@@ -2,10 +2,8 @@
  * Guard against pointing local tooling (dev server, tests, seed, migrate...) at a
  * non-local database. Pure: callers pass the URLs in; nothing is read from the environment.
  *
- * Error messages expose only the host and the first path segment, never credentials,
- * query strings or the raw input. A path that looks like it holds a credential fragment
- * (an unescaped "/" in a password moves part of it into the path) is printed as
- * `/(redacted)`.
+ * An unescaped "/" in a password moves part of it into the URL path, so such paths print
+ * as `/(redacted)`.
  */
 
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
@@ -26,13 +24,9 @@ function hostOf(url: URL): string {
   return url.hostname.toLowerCase();
 }
 
-function isSuspiciousPath(url: URL): boolean {
-  return url.pathname.includes('@') || url.pathname.includes(':');
-}
-
 /** First path segment (with its leading "/"), or `/(redacted)` for a suspicious path. */
 function safePath(url: URL): string {
-  if (isSuspiciousPath(url)) return REDACTED_PATH;
+  if (url.pathname.includes('@') || url.pathname.includes(':')) return REDACTED_PATH;
   const first = url.pathname.split('/')[1];
   return first ? `/${first}` : '';
 }
@@ -40,9 +34,9 @@ function safePath(url: URL): string {
 /** `<host[:port]>/<database>` of a connection URL, without credentials or query. */
 export function describeTarget(raw: string): string {
   const url = parse(raw, 'database URL');
+  const path = safePath(url);
   // The port is dropped when the path is redacted: it may be a credential fragment.
-  if (isSuspiciousPath(url)) return `${hostOf(url)}${REDACTED_PATH}`;
-  return `${url.host.toLowerCase()}${safePath(url)}`;
+  return `${path === REDACTED_PATH ? hostOf(url) : url.host.toLowerCase()}${path}`;
 }
 
 function assertLocal(raw: string, label: string): URL {
