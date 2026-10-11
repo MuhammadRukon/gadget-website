@@ -29,7 +29,7 @@
 
 ## Environment variables
 
-Local values live in `.env.dev` (not committed); copy `.env.example` to `.env.dev` to start. Production values live only in the Vercel dashboard. `.env` keeps `DATABASE_URL` / `SHADOW_DATABASE_URL` blank on purpose so unwrapped commands fail closed.
+Local values live in `.env.dev` (not committed); copy `.env.example` to `.env.dev` to start. Production values live only in the Vercel dashboard. Keep `.env` free of database URLs (a local convention, not enforced by the repo: `.env` is untracked) so unwrapped commands fail closed; the guards check the effective environment.
 
 | Group | Variables |
 | --- | --- |
@@ -48,20 +48,20 @@ Note: `src/app/sitemap.ts` and `src/app/robots.ts` read `NEXT_PUBLIC_APP_URL` (f
 
 ```bash
 npm run dev        # next dev --turbopack (.env.dev + db:guard)
-npm run build      # next build (Vercel; fails locally by design: .env has blank DATABASE_URL)
+npm run build      # next build (Vercel uses dashboard variables; fails locally when .env holds no DATABASE_URL, a local convention not enforced by the repo; local builds: npx dotenv -e .env.dev -- next build)
 npm run lint       # next lint
 npm run typecheck  # tsc --noEmit
 npm run test       # vitest run (DB-backed, local gadget_dev, .env.dev + db:guard)
 npm run db:guard   # refuse non-localhost DATABASE_URL / SHADOW_DATABASE_URL
 npm run db:deploy  # prisma migrate deploy (local)
-npm run db:migrate # prisma migrate dev (local, needs SHADOW_DATABASE_URL)
-npm run db:status  # prisma migrate status
+npm run db:migrate # prisma migrate dev (local, requires SHADOW_DATABASE_URL)
+npm run db:status  # prisma migrate status (guarded)
 npm run db:seed    # tsx prisma/seed.ts (local)
 npm run db:studio  # prisma studio (local)
 npm run db:backfill-email  # tsx prisma/backfill-email-verified.ts (local)
 ```
 
-`dev`, `test`, `test:watch` and the `db:*` scripts (except `db:status`) run `db:guard` first through npm `pre` hooks, and all load `.env.dev` via `dotenv-cli`. Local production-mode build: `npx dotenv -e .env.dev -- next build`. `postinstall` runs `prisma generate`.
+`dev`, `test`, `test:watch` and all `db:*` scripts (including `db:status`) run `db:guard` first through npm `pre` hooks (`db:migrate` uses `--require-shadow`, so `SHADOW_DATABASE_URL` must be set), and all load `.env.dev` via `dotenv-cli`. Tests also run a Vitest `globalSetup` guard (`vitest.global-setup.ts`), so a bare `npx vitest` aborts with "DATABASE_URL is not set"; run single files with `npm test -- <path>`. Local production-mode build: `npx dotenv -e .env.dev -- next build`. `postinstall` runs `prisma generate`.
 
 ## Payment sandbox mode
 

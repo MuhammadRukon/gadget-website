@@ -34,23 +34,25 @@ npm run db:seed             # seed admin + demo catalog (set SEED_ADMIN_EMAIL/PA
 npm run dev                 # http://localhost:3000
 ```
 
-Local configuration lives in `.env.dev` (gitignored; variables are listed in [docs/context/01-overview.md](./docs/context/01-overview.md)). The `.env` file is intentionally left with blank `DATABASE_URL` / `SHADOW_DATABASE_URL`, so a command run without the `.env.dev` wrapper fails closed instead of reaching a real database.
+Local configuration lives in `.env.dev` (gitignored; variables are listed in [docs/context/01-overview.md](./docs/context/01-overview.md)). Keep `.env` free of database URLs (a local convention, not enforced by the repo: `.env` is untracked), so a command run without the `.env.dev` wrapper fails closed instead of reaching a real database. The guards check the effective environment, whatever file the values came from.
+
+**In an existing checkout whose `.env` still contains a production `DATABASE_URL` / `SHADOW_DATABASE_URL`, blank those two values BEFORE running any unwrapped `npx prisma ...` or `npx vitest ...` command.**
 
 ### Scripts
 
 | Command | Purpose |
 | --- | --- |
 | `npm run dev` | Dev server (Turbopack), loads `.env.dev` |
-| `npm run build` / `start` | Production build / serve. Plain `build` fails locally by design (blank `DATABASE_URL` in `.env`); build locally with `npx dotenv -e .env.dev -- next build` |
+| `npm run build` / `start` | Production build / serve. Plain `build` fails locally when `.env` holds no `DATABASE_URL` (a local convention; Vercel uses dashboard variables); build locally with `npx dotenv -e .env.dev -- next build` |
 | `npm run lint` / `typecheck` | ESLint / `tsc --noEmit` |
-| `npm run test` / `test:watch` | Vitest, DB-backed: runs against the local `gadget_dev` through the guard |
+| `npm run test` / `test:watch` | Vitest, DB-backed: runs against the local `gadget_dev` through the guard. Single file: `npm test -- src/server/common/__tests__/money.test.ts`; single test: `npm test -- -t "free shipping"` |
 | `npm run db:deploy` | `prisma migrate deploy` against the local DB |
-| `npm run db:migrate` | `prisma migrate dev` after editing `schema.prisma` (needs `SHADOW_DATABASE_URL`) |
+| `npm run db:migrate` | `prisma migrate dev` after editing `schema.prisma` (requires `SHADOW_DATABASE_URL`; the guard fails if it is unset) |
 | `npm run db:status` | `prisma migrate status` |
 | `npm run db:seed` / `db:studio` / `db:backfill-email` | Seed DB / Prisma Studio / email-verified backfill |
 | `npm run db:guard` | Refuses to continue unless `DATABASE_URL` (and `SHADOW_DATABASE_URL`, if set) point at localhost and the shadow DB differs from the main one |
 
-`dev`, `test`, `test:watch` and every `db:*` script except `db:guard` and `db:status` run the guard automatically through npm `pre` hooks (`predev`, `pretest`, `predb:seed`, ...), and all of them load `.env.dev` through `dotenv-cli`.
+`dev`, `test`, `test:watch` and every `db:*` script except `db:guard` itself (including `db:status`) run the guard automatically through npm `pre` hooks (`predev`, `pretest`, `predb:seed`, ...), and all of them load `.env.dev` through `dotenv-cli`. Tests are additionally protected by a Vitest `globalSetup` guard (`vitest.global-setup.ts`), so a bare `npx vitest` aborts instead of running against an unchecked database; use `npm test` so `.env.dev` is loaded.
 
 ### Local vs production notes
 

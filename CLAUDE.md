@@ -19,18 +19,18 @@ npm run test         # vitest run (loads .env.dev)
 npm run test:watch
 npm run db:seed      # tsx prisma/seed.ts — admin + demo catalog; local-only
 npm run db:studio
-npm run db:migrate   # prisma migrate dev after editing prisma/schema.prisma (needs SHADOW_DATABASE_URL); local-only
+npm run db:migrate   # prisma migrate dev after editing prisma/schema.prisma (requires SHADOW_DATABASE_URL); local-only
 npm run db:deploy    # prisma migrate deploy against the local DB; local-only
 npm run db:status    # prisma migrate status
 ```
 
-`db:seed`, `db:migrate`, `db:deploy` and the other `db:*` scripts, plus `dev` and `test`, run through `.env.dev` and a localhost guard (`db:guard`, via npm `pre` hooks) that refuses non-local database URLs. `npm test` is DB-backed and hits the local `gadget_dev` database through that guard. Plain `npm run build` fails locally by design (`.env` keeps `DATABASE_URL` blank; Vercel uses dashboard variables); build locally with `npx dotenv -e .env.dev -- next build`. Production migrations are a manual `prisma migrate deploy` with the URL pulled from Vercel for that one command, never stored in a local file.
+`db:seed`, `db:migrate`, `db:deploy`, `db:status` and the other `db:*` scripts, plus `dev` and `test`, run through `.env.dev` and a localhost guard (`db:guard`, via npm `pre` hooks) that refuses non-local database URLs; `db:migrate` additionally requires `SHADOW_DATABASE_URL`. `npm test` is DB-backed and hits the local `gadget_dev` database through that guard, and a Vitest `globalSetup` guard (`vitest.global-setup.ts`) also aborts a bare `npx vitest` run with an unset or non-local `DATABASE_URL`. Keep `.env` free of database URLs (a local convention, not enforced by the repo; `.env` is untracked); if an existing `.env` still holds a production URL, blank it before any unwrapped `npx prisma ...` / `npx vitest ...`. Plain `npm run build` fails locally by design (no `DATABASE_URL` in the local `.env`; Vercel uses dashboard variables); build locally with `npx dotenv -e .env.dev -- next build`. Production migrations are a manual `prisma migrate deploy` with the URL pulled from Vercel for that one command, never stored in a local file.
 
 Single test file / single test:
 
 ```bash
-npx vitest run src/server/common/__tests__/money.test.ts
-npx vitest run -t "free shipping"
+npm test -- src/server/common/__tests__/money.test.ts
+npm test -- -t "free shipping"
 ```
 
 Vitest runs in the **node** environment (`vitest.config.ts`), not jsdom, and only picks up `src/**/*.{test,spec}.{ts,tsx}`. Tests use explicit imports (`globals: false`) — import `describe`/`it`/`expect` from `vitest`.
