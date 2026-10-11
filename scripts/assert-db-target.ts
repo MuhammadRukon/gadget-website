@@ -2,9 +2,10 @@ import { assertLocalDatabase, describeTarget } from '../src/server/common/db-tar
 
 const databaseUrl = process.env.DATABASE_URL;
 const shadowUrl = process.env.SHADOW_DATABASE_URL;
+const requireShadow = process.argv.includes('--require-shadow');
 
 try {
-  assertLocalDatabase({ databaseUrl, shadowUrl });
+  assertLocalDatabase({ databaseUrl, shadowUrl, requireShadow });
   console.log(`DB target OK: ${describeTarget(databaseUrl as string)}`);
 } catch (err) {
   console.error(err instanceof Error ? err.message : 'DB target check failed');

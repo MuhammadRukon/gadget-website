@@ -2,12 +2,16 @@
  * Guard against pointing local tooling (dev server, tests, seed, migrate...) at a
  * non-local database. Pure: callers pass the URLs in; nothing is read from the environment.
  *
- * Error messages expose only host and pathname, never credentials, query strings or the
- * raw input.
+ * Error messages expose only the host and the first path segment, never credentials,
+ * query strings or the raw input. A path that looks like it holds a credential fragment
+ * (an unescaped "/" in a password moves part of it into the path) is printed as
+ * `/(redacted)`.
  */
 
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
 const HOST_OVERRIDE_PARAMS = new Set(['host', 'hostaddr']);
+const DEFAULT_PORT = '5432';
+const REDACTED_PATH = '/(redacted)';
 
 function parse(raw: string, label: string): URL {
   try {
@@ -22,10 +26,23 @@ function hostOf(url: URL): string {
   return url.hostname.toLowerCase();
 }
 
-/** `<host[:port]><pathname>` of a connection URL, without credentials or query. */
+function isSuspiciousPath(url: URL): boolean {
+  return url.pathname.includes('@') || url.pathname.includes(':');
+}
+
+/** First path segment (with its leading "/"), or `/(redacted)` for a suspicious path. */
+function safePath(url: URL): string {
+  if (isSuspiciousPath(url)) return REDACTED_PATH;
+  const first = url.pathname.split('/')[1];
+  return first ? `/${first}` : '';
+}
+
+/** `<host[:port]>/<database>` of a connection URL, without credentials or query. */
 export function describeTarget(raw: string): string {
   const url = parse(raw, 'database URL');
-  return `${url.host.toLowerCase()}${url.pathname}`;
+  // The port is dropped when the path is redacted: it may be a credential fragment.
+  if (isSuspiciousPath(url)) return `${hostOf(url)}${REDACTED_PATH}`;
+  return `${url.host.toLowerCase()}${safePath(url)}`;
 }
 
 function assertLocal(raw: string, label: string): URL {
@@ -34,7 +51,7 @@ function assertLocal(raw: string, label: string): URL {
 
   if (!LOCAL_HOSTS.has(host)) {
     throw new Error(
-      `${label} points to a non-local host: ${host || '(none)'}${url.pathname}. ` +
+      `${label} points to a non-local host: ${host || '(none)'}${safePath(url)}. ` +
         'Only localhost, 127.0.0.1 and [::1] are allowed.',
     );
   }
@@ -43,7 +60,7 @@ function assertLocal(raw: string, label: string): URL {
     if (HOST_OVERRIDE_PARAMS.has(key.toLowerCase())) {
       throw new Error(
         `${label} must not contain a host or hostaddr query parameter ` +
-          `(target ${host}${url.pathname}).`,
+          `(target ${host}${safePath(url)}).`,
       );
     }
   }
@@ -51,16 +68,22 @@ function assertLocal(raw: string, label: string): URL {
   return url;
 }
 
+/** Canonical host:port/db so equivalent spellings of one database compare equal. */
 function identity(url: URL): string {
-  return `${hostOf(url)}:${url.port}${url.pathname}`;
+  const host = LOCAL_HOSTS.has(hostOf(url)) ? 'localhost' : hostOf(url);
+  const port = url.port || DEFAULT_PORT;
+  const path = url.pathname.toLowerCase().replace(/\/+$/, '');
+  return `${host}:${port}${path}`;
 }
 
 export function assertLocalDatabase({
   databaseUrl,
   shadowUrl,
+  requireShadow = false,
 }: {
   databaseUrl?: string;
   shadowUrl?: string;
+  requireShadow?: boolean;
 }): void {
   if (!databaseUrl) {
     throw new Error('DATABASE_URL is not set');
@@ -68,13 +91,18 @@ export function assertLocalDatabase({
 
   const database = assertLocal(databaseUrl, 'DATABASE_URL');
 
-  if (shadowUrl) {
-    const shadow = assertLocal(shadowUrl, 'SHADOW_DATABASE_URL');
-    if (identity(shadow) === identity(database)) {
-      throw new Error(
-        `SHADOW_DATABASE_URL shadow must differ from DATABASE_URL ` +
-          `(both are ${hostOf(shadow)}${shadow.pathname}).`,
-      );
+  if (!shadowUrl) {
+    if (requireShadow) {
+      throw new Error('SHADOW_DATABASE_URL is not set');
     }
+    return;
+  }
+
+  const shadow = assertLocal(shadowUrl, 'SHADOW_DATABASE_URL');
+  if (identity(shadow) === identity(database)) {
+    throw new Error(
+      `SHADOW_DATABASE_URL must differ from DATABASE_URL ` +
+        `(both are ${hostOf(shadow)}${safePath(shadow)}).`,
+    );
   }
 }

@@ -5,7 +5,11 @@ import { assertLocalDatabase, describeTarget } from '../db-target';
 const LOCAL = 'postgresql://u:p@localhost:5433/gadget_dev';
 
 /** Run the guard and return the thrown message (fails the test if it does not throw). */
-function messageOf(args: { databaseUrl?: string; shadowUrl?: string }): string {
+function messageOf(args: {
+  databaseUrl?: string;
+  shadowUrl?: string;
+  requireShadow?: boolean;
+}): string {
   try {
     assertLocalDatabase(args);
   } catch (err) {
@@ -126,7 +130,7 @@ describe('db-target: assertLocalDatabase shadow database', () => {
 
   it('rejects a shadowUrl identical to databaseUrl', () => {
     const message = messageOf({ databaseUrl: LOCAL, shadowUrl: LOCAL });
-    expect(message.toLowerCase()).toContain('shadow must differ');
+    expect(message).toMatch(/must differ/);
     expectNoCredentialLeak(message);
   });
 
@@ -135,8 +139,50 @@ describe('db-target: assertLocalDatabase shadow database', () => {
       databaseUrl: LOCAL,
       shadowUrl: 'postgresql://other:otherpw@localhost:5433/gadget_dev',
     });
-    expect(message.toLowerCase()).toContain('shadow must differ');
+    expect(message).toMatch(/must differ/);
     expect(message).not.toContain('otherpw');
+  });
+
+  it.each([
+    ['localhost vs 127.0.0.1', 'postgresql://u:p@127.0.0.1:5433/gadget_dev'],
+    ['localhost vs [::1]', 'postgresql://u:p@[::1]:5433/gadget_dev'],
+    ['trailing slash', 'postgresql://u:p@localhost:5433/gadget_dev/'],
+    ['path case', 'postgresql://u:p@localhost:5433/Gadget_Dev'],
+  ])('rejects a shadowUrl that is the same database spelled differently (%s)', (_name, shadow) => {
+    expect(messageOf({ databaseUrl: LOCAL, shadowUrl: shadow })).toMatch(/must differ/);
+  });
+
+  it('treats an omitted port and :5432 as the same database', () => {
+    expect(
+      messageOf({
+        databaseUrl: 'postgresql://u:p@localhost/gadget_dev',
+        shadowUrl: 'postgresql://u:p@localhost:5432/gadget_dev',
+      }),
+    ).toMatch(/must differ/);
+    expect(
+      messageOf({
+        databaseUrl: 'postgresql://u:p@127.0.0.1:5432/gadget_dev',
+        shadowUrl: 'postgresql://u:p@localhost/gadget_dev',
+      }),
+    ).toMatch(/must differ/);
+  });
+
+  it('accepts a shadowUrl with a different database name on the same host and port', () => {
+    expect(() =>
+      assertLocalDatabase({
+        databaseUrl: LOCAL,
+        shadowUrl: 'postgresql://u:p@127.0.0.1:5433/gadget_shadow',
+      }),
+    ).not.toThrow();
+  });
+
+  it('accepts a shadowUrl with the same database name on a different port', () => {
+    expect(() =>
+      assertLocalDatabase({
+        databaseUrl: LOCAL,
+        shadowUrl: 'postgresql://u:p@localhost:5434/gadget_dev',
+      }),
+    ).not.toThrow();
   });
 
   it('rejects a remote shadowUrl', () => {
@@ -147,6 +193,80 @@ describe('db-target: assertLocalDatabase shadow database', () => {
     expect(message).toContain('db.prisma.io');
     expect(message).not.toContain('secretpw');
     expectNoCredentialLeak(message);
+  });
+});
+
+describe('db-target: assertLocalDatabase requireShadow', () => {
+  const SHADOW = 'postgresql://u:p@localhost:5433/gadget_shadow';
+
+  it('throws when requireShadow is true and shadowUrl is undefined', () => {
+    expect(messageOf({ databaseUrl: LOCAL, requireShadow: true })).toContain(
+      'SHADOW_DATABASE_URL is not set',
+    );
+  });
+
+  it('throws when requireShadow is true and shadowUrl is empty', () => {
+    expect(messageOf({ databaseUrl: LOCAL, shadowUrl: '', requireShadow: true })).toContain(
+      'SHADOW_DATABASE_URL is not set',
+    );
+  });
+
+  it('accepts a valid distinct shadowUrl when requireShadow is true', () => {
+    expect(() =>
+      assertLocalDatabase({ databaseUrl: LOCAL, shadowUrl: SHADOW, requireShadow: true }),
+    ).not.toThrow();
+  });
+
+  it('still allows a missing shadowUrl when requireShadow is false or omitted', () => {
+    expect(() => assertLocalDatabase({ databaseUrl: LOCAL, requireShadow: false })).not.toThrow();
+    expect(() => assertLocalDatabase({ databaseUrl: LOCAL })).not.toThrow();
+  });
+
+  it('reports a missing DATABASE_URL before a missing shadow', () => {
+    expect(messageOf({ requireShadow: true })).toContain('DATABASE_URL is not set');
+  });
+});
+
+describe('db-target: credential fragments in the path', () => {
+  // Unescaped "/" in a password: host becomes "u", path becomes "/ss@h".
+  const LEAKY = 'postgresql://u:1/ss@h';
+
+  it('does not echo a credential fragment for a remote database URL', () => {
+    const message = messageOf({ databaseUrl: LEAKY });
+    expect(message).toContain('/(redacted)');
+    expect(message).not.toContain('ss@h');
+  });
+
+  it('does not echo a credential fragment for a remote shadow URL', () => {
+    const message = messageOf({ databaseUrl: LOCAL, shadowUrl: LEAKY });
+    expect(message).toContain('/(redacted)');
+    expect(message).not.toContain('ss@h');
+  });
+
+  it('redacts a path containing ":" on an otherwise local URL', () => {
+    const message = messageOf({
+      databaseUrl: 'postgresql://u:p@localhost:5433/db:secret?host=x',
+    });
+    expect(message).toContain('/(redacted)');
+    expect(message).not.toContain('secret');
+  });
+
+  it('prints only the first path segment', () => {
+    const message = messageOf({
+      databaseUrl: 'postgresql://u:p@db.prisma.io:5432/postgres/extra/more',
+    });
+    expect(message).toContain('db.prisma.io/postgres');
+    expect(message).not.toContain('extra');
+  });
+
+  it('describeTarget redacts a suspicious path and drops the port', () => {
+    expect(describeTarget(LEAKY)).toBe('u/(redacted)');
+  });
+
+  it('describeTarget prints only the first path segment', () => {
+    expect(describeTarget('postgresql://u:p@localhost:5433/gadget_dev/extra')).toBe(
+      'localhost:5433/gadget_dev',
+    );
   });
 });
 
