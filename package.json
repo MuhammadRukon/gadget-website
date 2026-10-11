@@ -2,6 +2,9 @@
   "name": "gadget-website-next-ts",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": "24.x"
+  },
   "scripts": {
     "db:guard": "dotenv -e .env.dev -- tsx scripts/assert-db-target.ts",
     "predev": "npm run db:guard",
@@ -20,6 +23,8 @@
     "db:studio": "dotenv -e .env.dev -- prisma studio",
     "predb:migrate": "npm run db:guard",
     "db:migrate": "dotenv -e .env.dev -- prisma migrate dev",
+    "predb:deploy": "npm run db:guard",
+    "db:deploy": "dotenv -e .env.dev -- prisma migrate deploy",
     "db:status": "dotenv -e .env.dev -- prisma migrate status",
     "predb:backfill-email": "npm run db:guard",
     "db:backfill-email": "dotenv -e .env.dev -- tsx prisma/backfill-email-verified.ts",
