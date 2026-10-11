@@ -215,16 +215,52 @@ Execution is a separate step: run this plan with `execute-with-me` (or subagent-
 
 ## Execution Progress
 
-**Status: in progress**
+**Status: Code COMPLETE, ready for PR; Phase 4 manual dashboard steps pending user**
 
-_Last updated: 2026-10-11 — Branch: chore/local-dev-environment — Workspace: worktree at C:\Users\muhammad\Desktop\gadget-website-local-dev_
+_Last updated: 2026-10-12 — Branch: chore/local-dev-environment — Workspace: worktree at C:\Users\muhammad\Desktop\gadget-website-local-dev_
 
-Final commit list: `178012a` (cherry-picked draft plan), `ac52ec6` (revised plan), `ce78b21` (progress tracking), `aa34d52` (dotenv-cli scripts), `365f608` (db guard), `263f1f4` (shadowDatabaseUrl), `15bf156` (.env.example), `5d4286d` (node pin, db:deploy), `f16a0ad` (docs)
+Final commit list: `178012a` (cherry-picked draft plan), `ac52ec6` (revised plan), `ce78b21` (progress tracking), `aa34d52` (dotenv-cli scripts), `365f608` (db guard), `263f1f4` (shadowDatabaseUrl), `15bf156` (.env.example), `5d4286d` (node pin, db:deploy), `f16a0ad` (docs), `57cbcba` (PR template), `4e61c7a` (plan record phase 3), `70b80d0` (guard: require shadow, normalized compare, redaction, predb:status), `a6689f4` (vitest globalSetup guard), `7d7d250` (docs aligned with guard changes)
+
+Base: main. PR target: dev.
 
 | Phase | Status | Commit | Review | Notes |
 | --- | --- | --- | --- | --- |
 | 1. Local env loading | done (3 items open) | `aa34d52` | deferred | Code by general-purpose agent (needs shell). At user's instruction the orchestrator built worktree `.env`/`.env.dev` from main `.env` (DB URLs blanked in `.env`, dev DB URLs + fresh NEXTAUTH_SECRET in `.env.dev`; user will replace `.env.dev` values later). Verified: targets, db:status, precedence proof, fail-closed, 95 tests pass, dev boot 200s, seed idempotent, mail skipped, typecheck, wrapped build exit 0. Plain `npm run build` fails by design (ZodError DATABASE_URL). Open: `gadget_shadow` DB missing on :5433 (needed Phase 2); AC "Postgres stopped -> Can't reach localhost:5433" not run (would stop user's DB service); AC Cloudinary upload to gadget-website-dev deferred to Cross-Validation e2e. |
 | 2. Safety (DB-target guard, shadowDatabaseUrl) | done | `365f608`, `263f1f4` | deferred | general-purpose agent (security-sensitive URL parsing), TDD red then green; one fix-retry (describeTarget omitted port). Verified: 21 unit tests, db:guard prints `DB target OK: localhost:5433/gadget_dev`, dev/test/db:seed/db:migrate/db:studio all blocked at guard with dummy remote URL (no leaks), shadow==main blocked, `prisma generate` ok with vars unset, schema diff = 1 added line, typecheck 0, full suite 16 files / 116 tests pass. `gadget_shadow` was created on local :5433 by the orchestrator at the user's request (CREATE DATABASE via Prisma, local host only). Shadow AC: nonexistent shadow DB (real credentials) fails with Prisma P1003 "Database `does_not_exist` does not exist" (proves shadow URL is read); with the real shadow, `migrate dev` replays into gadget_shadow and reports drift (gadget_dev has 4 COD-fee migrations not on this branch: 20261007120000_payment_settings_cod_fee, 20261008100000_drop_order_cod_fee_cents, 20261008100100_add_payment_bankref_lower_index, 20261008100200_payment_settings_enabled_methods), so the `--create-only --name noop_check` success run cannot pass here. DEVIATION accepted by user: alternate evidence recorded; re-run noop_check once the COD-fee migrations are in this branch's base. gadget_dev verified unchanged afterwards. |
 | 3. Cleanups and docs | done (lint dropped) | `15bf156`, `5d4286d`, `f16a0ad` | deferred | general-purpose agents (docs wording; Node pin needed web doc checks). Node 24.x pin: user confirmed Vercel setting 24.x; verified Next 16 needs Node >=20.9 (nextjs.org installation + version-16 upgrade guide), Node 24 Active LTS until 2026-10-20 (nodejs/Release schedule.json), Vercel offers 24.x and reads engines.node (vercel.com Node.js versions doc); engine-strict=false so Node 26 only warns EBADENGINE. `.env.example` un-ignored and refreshed (placeholders only, no UPSTASH, SEED_*/AUTH_TRUST_HOST added), only env file tracked. `db:deploy` exits 0 "No pending migrations" on gadget_dev, blocked by guard for remote URL. Docs: NEXT_PUBLIC_BASE_URL only in a src comment (src/lib/fetcher.ts:5) so renamed in overview. DEVIATION accepted by user: lint fix DROPPED (see Out of scope). Secret scan of diff: only dummy fixtures (secretpw@db.prisma.io, invalid.example) in guard tests and this plan. Not in scope, left alone: 06-conventions still says Vitest uses jsdom; 01-overview lists NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET (unused). |
-| 4. Remote dev DB and Vercel scoping | pending | — | deferred | — |
-| Cross-Validation | pending | — | pending | — |
+| 4. Remote dev DB and Vercel scoping | partial | `57cbcba` | deferred | Code part done (.github/pull_request_template.md with "Migration applied to production" checkbox, no AI attribution, no hosts/URLs). Steps 1-5 and 7 and all Phase 4 acceptance criteria except the PR-template one are [USER] dashboard work (Prisma Console remote gadget-dev DB, migrate deploy + seed with strong SEED_* in a one-off shell, Vercel Preview/Production variable scoping incl. AUTH_TRUST_HOST=true on Preview, Preview Deployment Protection check, optional read-only prod migrate status) and are NOT done. No Production setting was touched. |
+| Cross-Validation | done | `70b80d0`, `a6689f4`, `7d7d250` | 1 pass, 2 major + 5 minor/nit findings fixed, 1 finding refuted | See Cross-Validation below. |
+
+### Cross-Validation
+
+- Full suite and build after final code commit: `npm run typecheck` exit 0; `npm test` (guard hook + vitest globalSetup active) 16 files / 134 tests pass; `npx dotenv -e .env.dev -- next build` exit 0; no credential-looking strings in outputs. Verified by orchestrator with real command output.
+- E2E agent (flows on localhost:5433/gadget_dev, 7/7 passed): guard line printed; /, /products, /login 200 and all 4 seeded product names present; admin sign-in 302 + session cookie, /dashboard 200, no-session /dashboard 307, /api/admin/orders 401, wrong password creates no session; COD order via real API (checkout 201, status CONFIRMED, admin orders 21 -> 22); admin image upload 201 into folder `gadget-website-dev/products/` (publicId gadget-website-dev/products/sfaef8a5oujcllegrwbr, no bare gadget-website/ path); two `mailer.skipped` (reason "not configured"), zero api.resend.com mentions; guard demo with dummy remote URL exit 1 and `npm run dev` never started; port 3000 freed afterwards. Test leftovers for the user: Cloudinary test asset above and local order T-MV45KTJ2-7E705C (CONFIRMED) with cart left holding its item.
+- Review (read-only reviewer, gap analysis + code review in one pass) findings and resolution:
+  - MAJOR M1: predb:migrate skipped the shadow check when SHADOW_DATABASE_URL was absent, so Prisma could fall back to `.env`'s value (a prod shadow URL in the main checkout would be reset by migrate dev). FIXED in `70b80d0`: `--require-shadow` flag, predb:migrate uses it.
+  - MAJOR M2: `npx vitest` skips the pretest hook, so live-DB suites could hit a prod URL in any checkout whose `.env` still has it. FIXED in `a6689f4`: vitest `globalSetup` (vitest.global-setup.ts) aborts unless a local DATABASE_URL is in the environment; single-file runs now use `npm test -- <file>` (docs updated).
+  - MAJOR M3 (evidence): reviewer suspected the Phase 1 "db:status up to date" claim conflicts with gadget_dev holding 4 extra migrations. REFUTED by re-running: `npm run db:status` prints "2 migrations found in prisma/migrations" and "Database schema is up to date!"; Prisma `migrate status` does not flag applied-but-missing migrations (only `migrate dev` drift detection does). Claim stands.
+  - minor: shadow==main compare missed equivalent spellings. FIXED (localhost/127.0.0.1/[::1] equivalent, default port 5432, case/trailing slash).
+  - minor: db:status had no guard hook while docs said all db:* guarded. FIXED (`predb:status`).
+  - minor: docs presented blank `.env` as a repo fact. FIXED (local convention, not enforced).
+  - nits fixed: duplicate word in shadow message; credential fragment could leak into echoed path, now `/(redacted)`.
+  - nits NOT acted on (advisory): no scheme check in guard (only local hosts pass anyway); `db:studio -- --url <remote>` is an argument-level bypass; dotenv-cli `$` expansion mangles `$` in secrets (use quoting or --no-expand).
+- Gaps vs requirements / accepted or open items:
+  1. Lint fix dropped by user decision (see Out of scope).
+  2. `migrate dev --create-only --name noop_check` success not demonstrable: gadget_dev has 4 COD-fee migrations not on this branch; alternate evidence accepted by user (P1003 on nonexistent shadow DB; drift replay into gadget_shadow).
+  3. AC "stop Postgres -> Can't reach localhost:5433" not run (would stop the user's DB service).
+  4. AC "follow README verbatim" not run verbatim (copying .env.example over .env.dev would destroy the real .env.dev); each README command (npm ci, db:deploy, db:seed, dev) was executed individually with passing results.
+  5. Phase 1 `.env`/`.env.dev` key-name check was recorded as key names with EMPTY/set status only (values never printed).
+  6. Orchestrator built the worktree .env/.env.dev at the user's instruction and created `gadget_shadow` on local :5433 at the user's request.
+  7. Phase 4 manual steps pending.
+- Production non-regression: build, start, postinstall, typecheck scripts have 0 changed lines vs main; the only build-path change is `shadowDatabaseUrl` in prisma/schema.prisma (`prisma generate` passes with DATABASE_URL and SHADOW_DATABASE_URL unset); `engines.node` 24.x equals the Vercel dashboard value the user stated (checked vs Next 16 >=20.9, Node 24 Active LTS until 2026-10-20, Vercel supports 24.x); no env file tracked except .env.example (placeholders only); secret scan of diff: only dummy fixtures (`u:secretpw@db.prisma.io`, `u:p@invalid.example`, `postgres:postgres@localhost`).
+
+## Final Status
+
+What shipped: .env.dev actually loaded for dev/test/db:* through dotenv-cli; localhost-only DB guard (npm pre-hooks incl. db:status, db:migrate requires a shadow URL, vitest globalSetup); shadowDatabaseUrl wired; Node 24 pin; .env.example tracked with dev defaults; docs updated; PR template. Verified: see Cross-Validation.
+
+NEXT: user must
+- (a) blank DATABASE_URL and SHADOW_DATABASE_URL in the MAIN checkout's `.env` and apply the `.env.dev` values there BEFORE running any unwrapped `npx prisma`/`npx vitest` there, and run `npm run db:status` after merge;
+- (b) do the Phase 4 dashboard steps;
+- (c) delete the Cloudinary test asset;
+- (d) beware `npm run db:migrate` against gadget_dev offers a reset because of the 4 COD-fee migrations; do not accept it;
+- (e) open the PR into `dev` by hand (agents never push).
