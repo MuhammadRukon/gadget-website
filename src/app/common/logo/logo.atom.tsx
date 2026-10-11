@@ -1,17 +1,31 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import { LogoProps } from './logo.types';
+
+export type LogoProps = {
+  src?: string;
+  alt?: string;
+  width?: number;
+  height?: number;
+  className?: string;
+};
 
 export function Logo({
-  alt = 'logo',
+  alt = 'Cryptech Logo',
   width = 100,
   height = 100,
   className,
   src = '/logo.png',
-}: LogoProps) {
+}: Readonly<LogoProps>) {
   return (
     <Link href="/">
-      <Image src={src} alt={alt} width={width} height={height} className={className} />
+      <Image
+        src={src}
+        alt={alt}
+        width={width}
+        height={height}
+        className={className}
+        quality={100}
+      />
     </Link>
   );
 }

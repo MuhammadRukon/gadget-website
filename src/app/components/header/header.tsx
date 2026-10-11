@@ -1,112 +1,54 @@
-'use client';
+import { JSX } from 'react';
 
-import { Handshake, Percent, User } from 'lucide-react';
-import { JSX, useEffect, useState } from 'react';
-
-import { HeaderButtonsProps, HeaderSearchProps } from './header.types';
-import { IHeaderButton } from '@/interfaces';
-
-import { HeaderButton } from '@/app/common/button/header-button';
 import { Container } from '@/app/components/container/container';
 import { Menu } from '@/app/components/menu/menu';
-import { menu } from '@/app/utils/dummy-data';
-import { removeOccur } from '@/app/utils/helper';
+import { HeaderAccount } from '@/app/components/header/header-account';
+import { HeaderLogo } from '@/app/components/header/header-logo';
+import { HeaderSearch } from '@/app/components/header/header-search';
+import { MobileSearchToggle } from '@/app/components/header/mobile-search-toggle';
+import { CartPanel } from '@/app/components/cart-panel/cart-panel';
+import { CategorySidebar } from '@/components/category-sidebar';
+import type { MenuCategory } from '@/app/components/menu/menu.types';
 
-import { Input } from '@/components/ui/input';
-import { Switch } from '@/components/ui/switch';
-import { getSavedTheme, toggleTheme } from '@/app/utils/theme';
-
-import { applyTheme } from '@/app/utils/theme';
-import { Logo } from '@/app/common/logo/logo.atom';
-
-export function Header(): JSX.Element {
-  return (
-    <>
-      <Header.TopBar />
-      <Header.Menu />
-    </>
-  );
+export interface HeaderProps {
+  menu: MenuCategory[];
 }
 
-Header.TopBar = function TopBar(): JSX.Element {
-  const [search, setSearch] = useState('');
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
-
-  useEffect(() => {
-    applyTheme(getSavedTheme());
-    setTheme(getSavedTheme());
-  }, []);
-
-  const headerButtons: IHeaderButton[] = [
-    {
-      href: '/deals',
-      title: 'PC Deals',
-      icon: <Handshake size={14} />,
-    },
-    {
-      href: '/offers',
-      title: 'Offers',
-
-      icon: <Percent size={14} />,
-    },
-    {
-      href: '/login',
-      title: 'Login',
-      icon: <User size={14} />,
-    },
-  ];
-
+/**
+ * Server-rendered storefront header shell. The static layout (logo, menu,
+ * grid) renders on the server; only the interactive leaves ship client JS:
+ * HeaderSearch, MobileSearchToggle, CartPanel, HeaderAccount, CategorySidebar
+ * and the Menu flyout.
+ */
+export function Header({ menu }: Readonly<HeaderProps>): JSX.Element {
   return (
-    <Container WrapperClassName="bg-[#f9fafc] dark:bg-background border-b border-gray-200 dark:border-[#222223]">
-      <div className="flex flex-col gap-y-2 sm:flex-row items-center justify-between sm:h-10">
-        <Header.Logo />
+    <header className="sticky top-0 z-50">
+      <div className="bg-[#f9fafc] dark:bg-background border-b border-gray-200 dark:border-[#222223]">
+        <Container>
+          <div className="grid grid-cols-2 sm:grid-cols-3 items-center justify-between">
+            <div className="flex items-center gap-4 order-1 sm:order-none">
+              <div className="md:hidden">
+                <CategorySidebar items={menu} />
+              </div>
+              <HeaderLogo />
+            </div>
 
-        <Header.Search search={search} setSearch={setSearch} />
+            <HeaderSearch />
 
-        <Header.Buttons headerButtons={headerButtons} />
-
-        <Switch checked={theme === 'dark'} onCheckedChange={() => setTheme(toggleTheme())} />
+            <div className="flex h-full items-center gap-6 justify-end order-2 sm:order-none">
+              <CartPanel />
+              <MobileSearchToggle />
+              <HeaderAccount />
+            </div>
+          </div>
+        </Container>
       </div>
-    </Container>
-  );
-};
 
-Header.Logo = function HeaderLogo(): JSX.Element {
-  return (
-    <div className="sm:w-24">
-      <Logo src="/logo.png" alt="logo" className="w-10 h-10" />
-    </div>
+      <div className="border-b max-md:hidden border-gray-200 dark:border-[#222223] bg-white dark:bg-background">
+        <Container>
+          <Menu menu={menu} />
+        </Container>
+      </div>
+    </header>
   );
-};
-
-Header.Search = function HeaderSearch({ search, setSearch }: HeaderSearchProps): JSX.Element {
-  return (
-    <div className="flex-1 sm:mr-4 md:mr-10">
-      <Input
-        type="text"
-        placeholder="Search"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        className="dark:placeholder:text-white w-full h-7 placeholder:text-sm text-sm max-w-sm "
-      />
-    </div>
-  );
-};
-
-Header.Buttons = function HeaderButtons({ headerButtons }: HeaderButtonsProps): JSX.Element {
-  return (
-    <div className="flex items-center flex-1 h-full mr-4">
-      {headerButtons.map((button) => (
-        <HeaderButton key={`${removeOccur(button.href, '/')}-button`} button={button} />
-      ))}
-    </div>
-  );
-};
-
-Header.Menu = function HeaderMenu(): JSX.Element {
-  return (
-    <Container WrapperClassName="border-b border-gray-200 dark:border-[#222223]">
-      <Menu menu={menu} />
-    </Container>
-  );
-};
+}

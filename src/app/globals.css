@@ -1,10 +1,9 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
-
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --font-sans: var(--font-geist-sans, Arial, Helvetica, sans-serif);
+  --font-sans: var(--font-google-sans, Arial, Helvetica, sans-serif);
   --font-mono: var(--font-geist-mono, monospace);
   --radius: 0.625rem;
   --background: oklch(1 0 0);
@@ -81,11 +80,14 @@
 
 body {
   background-color: var(--background);
-  font-family: var(--font-sans);
-  transition: background 0.3s, color 0.3s;
+  font-family: var(--font-google-sans);
+  transition:
+    background 0.3s,
+    color 0.3s;
 }
 
 @theme inline {
+  --breakpoint-xs: 480px;
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -130,4 +132,30 @@ body {
   body {
     @apply bg-background text-foreground;
   }
+}
+
+@keyframes accordion-down {
+  from {
+    height: 0;
+  }
+  to {
+    height: var(--radix-collapsible-content-height);
+  }
+}
+
+@keyframes accordion-up {
+  from {
+    height: var(--radix-collapsible-content-height);
+  }
+  to {
+    height: 0;
+  }
+}
+
+.animate-accordion-down {
+  animation: accordion-down 0.2s ease-out;
+}
+
+.animate-accordion-up {
+  animation: accordion-up 0.2s ease-out;
 }

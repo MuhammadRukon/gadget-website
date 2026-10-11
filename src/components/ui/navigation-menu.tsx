@@ -18,7 +18,7 @@ function NavigationMenu({
       data-slot="navigation-menu"
       data-viewport={viewport}
       className={cn(
-        'group/navigation-menu relative flex max-w-max flex-1 items-center justify-center',
+        'group/navigation-menu flex-wrap relative flex max-w-max flex-1 items-center justify-center',
         className,
       )}
       {...props}
@@ -36,7 +36,7 @@ function NavigationMenuList({
   return (
     <NavigationMenuPrimitive.List
       data-slot="navigation-menu-list"
-      className={cn('group flex flex-1 list-none items-center justify-center gap-1', className)}
+      className={cn('group flex flex-1 list-none items-center flex-wrap', className)}
       {...props}
     />
   );
@@ -64,13 +64,26 @@ function NavigationMenuTrigger({
   children,
   ...props
 }: React.ComponentProps<typeof NavigationMenuPrimitive.Trigger>) {
+  const isAsChild = Boolean((props as { asChild?: boolean }).asChild);
+  if (isAsChild) {
+    return (
+      <NavigationMenuPrimitive.Trigger
+        data-slot="navigation-menu-trigger"
+        className={cn(navigationMenuTriggerStyle(), 'group', className)}
+        {...props}
+      >
+        {children}
+      </NavigationMenuPrimitive.Trigger>
+    );
+  }
+
   return (
     <NavigationMenuPrimitive.Trigger
       data-slot="navigation-menu-trigger"
       className={cn(navigationMenuTriggerStyle(), 'group', className)}
       {...props}
     >
-      {children}{' '}
+      {children}
       <ChevronDownIcon
         className="relative top-[1px] ml-1 size-3 transition duration-300 group-data-[state=open]:rotate-180"
         aria-hidden="true"

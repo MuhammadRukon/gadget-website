@@ -1,2 +1,20 @@
-export const brandQueryKey = ['brand'] as const;
-export const categoryQueryKey = ['category'] as const;
+import type { GuestCartLine } from '@/contracts/cart';
+
+/**
+ * Centralized React Query keys. Keeping them in one place avoids
+ * subtle cache misses caused by tuple/string drift between hooks.
+ */
+export const queryKeys = {
+  brand: ['brand'] as const,
+  category: ['category'] as const,
+  product: ['product'] as const,
+  productList: (params?: Record<string, unknown>) => ['product', 'list', params ?? {}] as const,
+  productBySlug: (slug: string) => ['product', 'slug', slug] as const,
+  cart: ['cart'] as const,
+  cartSummary: ['cart', 'summary'] as const,
+  cartGuest: (lines: GuestCartLine[]) => ['cart', 'guest', lines] as const,
+  orders: ['orders'] as const,
+  orderById: (id: string) => ['orders', id] as const,
+  user: ['user'] as const,
+  userById: (id: string) => ['user', id] as const,
+};
