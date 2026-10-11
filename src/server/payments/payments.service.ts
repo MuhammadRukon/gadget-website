@@ -1,4 +1,4 @@
-import { OrderStatus, PaymentMethod, PaymentStatus, Prisma } from '@prisma/client';
+import { CodFeeStatus, OrderStatus, PaymentMethod, PaymentStatus, Prisma } from '@prisma/client';
 
 import { prisma } from '@/lib/prisma';
 import {
@@ -7,21 +7,40 @@ import {
   ForbiddenError,
   NotFoundError,
 } from '@/server/common/errors';
+import { canFee } from '@/lib/cod-fee/policy';
 import { log } from '@/server/common/logger';
 import { paymentResultEmail, sendMail } from '@/server/common/mailer';
-import { restockOrderItems } from '@/server/orders/orders.service';
+import {
+  confirmOrderInTx,
+  customerPaymentSelect,
+  restockOrderItems,
+} from '@/server/orders/orders.service';
 import type { InitiatedPayment } from '@/contracts/payments';
 
 import type { CallbackOutcome, PaymentInitInput } from './gateway.interface';
 import { getGateway } from './registry';
 
 /**
- * `payments.service` is the *only* module in the system that:
- *   - calls a `PaymentGateway` strategy
- *   - mutates a `Payment` row
- *   - flips an `Order` between PENDING/CONFIRMED/CANCELLED on payment
+ * `payments.service` owns the payment-gateway lifecycle and manual
+ * verification:
+ *   - it is the only module that calls a `PaymentGateway` strategy
+ *     (`kickoff`, `applyCallback`)
+ *   - manual verification (`submitBankReference`, `verify`,
+ *     `listPendingForVerification`)
+ *   - it confirms an `Order` (PENDING -> CONFIRMED) on payment, always via the
+ *     `confirmOrderInTx` compare-and-set so a confirm cannot overwrite a
+ *     concurrent cancel
  *
- * Everything is idempotent. Callbacks can fire twice (and they do, in
+ * The COD confirmation-fee and transaction-id lifecycle lives in
+ * `cod-fee.service.ts`. Other modules also write payment state:
+ * `checkout.service` creates the `Payment` row with its orders, and
+ * `orders.service` waives the fee when an admin confirms the order.
+ *
+ * Lock order for every path that confirms an order: order row first (the
+ * `confirmOrderInTx` claim), then the payment row, matching
+ * `ordersService.transition` and `codFeeService.verifyFee`.
+ *
+ * Gateway callbacks and verification are idempotent. Callbacks can fire twice (and they do, in
  * practice) so we no-op when the payment is already terminal and we
  * use `providerRef` as the natural dedupe key.
  */
@@ -29,6 +48,14 @@ import { getGateway } from './registry';
 interface KickoffArgs {
   /** Absolute origin used to build success / fail / IPN URLs. */
   origin: string;
+}
+
+/** Thrown inside the callback transaction to roll it back when the payment CAS loses. */
+class CallbackRaceLost extends Error {}
+
+function nullOnRaceLost(err: unknown): null {
+  if (err instanceof CallbackRaceLost) return null;
+  throw err;
 }
 
 function buildUrls(origin: string, method: PaymentMethod, paymentId: string, orderId: string) {
@@ -59,8 +86,9 @@ export const paymentsService = {
     }
 
     if (payment.method === PaymentMethod.COD) {
-      // COD never has a gateway hop. The order was already auto-confirmed
-      // in checkoutService; nothing to redirect to.
+      // COD never has a gateway hop. checkoutService already auto-confirmed
+      // the order, or left it PENDING awaiting its confirmation fee
+      // (codFeeService.verifyFee); nothing to redirect to either way.
       return { paymentId: payment.id, redirectUrl: null };
     }
 
@@ -102,11 +130,28 @@ export const paymentsService = {
    * Apply a normalised gateway callback to the database. Idempotent:
    * once a payment is terminal it's never overwritten, and the order
    * status only advances on the first SUCCEEDED.
+   *
+   * A SUCCEEDED callback claims the order row (PENDING -> CONFIRMED) before
+   * the payment write. If the order is no longer PENDING (cancelled, or
+   * confirmed by someone else) the claim is skipped: the payment is still
+   * recorded, the order is left alone (no status change, no email),
+   * `payments.callback.order_not_pending` is logged and an audit OrderEvent
+   * ("Payment received ... review or refund") is written. The callback never
+   * errors on that, so the gateway does not retry in a loop.
+   *
+   * The payment write is a compare-and-set from PENDING. If a concurrent
+   * callback won, the whole transaction (order claim, restock, events) rolls
+   * back and the current payment is returned, like the terminal no-op above.
    */
   async applyCallback(method: PaymentMethod, outcome: CallbackOutcome) {
     // The customer notification is collected inside the transaction but
     // sent only after it commits (never email about a rolled-back state).
-    let notify: { email: string | null; orderNumber: string; totalCents: number; succeeded: boolean } | null = null;
+    let notify: {
+      email: string | null;
+      orderNumber: string;
+      totalCents: number;
+      succeeded: boolean;
+    } | null = null;
 
     const result = await prisma.$transaction(async (tx) => {
       const payment = await tx.payment.findUnique({
@@ -149,35 +194,72 @@ export const paymentsService = {
         });
       }
 
-      const updated = await tx.payment.update({
-        where: { id: payment.id },
+      // Claim the order row before writing the payment (lock order).
+      if (effectiveStatus === PaymentStatus.SUCCEEDED) {
+        const order = await tx.order.findUnique({
+          where: { id: payment.orderId },
+          select: {
+            id: true,
+            status: true,
+            orderNumber: true,
+            totalCents: true,
+            user: { select: { email: true } },
+          },
+        });
+        if (!order) throw new NotFoundError('Order');
+        const confirmed = await confirmOrderInTx(tx, order, {
+          from: order.status,
+          note: `Payment received via ${method}`,
+        });
+        if (confirmed) {
+          notify = {
+            email: order.user.email,
+            orderNumber: order.orderNumber,
+            totalCents: order.totalCents,
+            succeeded: true,
+          };
+        } else {
+          // Money arrived for an order that can no longer be confirmed. Leave
+          // the order alone but put an audit note on its timeline (no actor,
+          // no email) so an admin can review or refund. Re-read the status:
+          // the claim may have lost to a concurrent writer after our first read.
+          const now = await tx.order.findUnique({
+            where: { id: order.id },
+            select: { status: true },
+          });
+          const currentStatus = now?.status ?? order.status;
+          log.warn('payments.callback.order_not_pending', {
+            paymentId: payment.id,
+            orderId: order.id,
+            orderStatusRead: order.status,
+            orderStatusNow: currentStatus,
+            method,
+          });
+          await tx.orderEvent.create({
+            data: {
+              orderId: order.id,
+              status: currentStatus,
+              note: `Payment received via ${method} after the order was ${currentStatus.toLowerCase()}; review or refund`,
+            },
+          });
+        }
+      }
+
+      // Compare-and-set: only the call that moves the payment out of PENDING
+      // wins. A concurrent callback that got there first makes this a no-op
+      // that rolls the whole transaction back (order claim, audit event).
+      const claimedPayment = await tx.payment.updateMany({
+        where: { id: payment.id, status: PaymentStatus.PENDING },
         data: {
           status: effectiveStatus,
           providerRef: outcome.providerRef,
           rawPayload: (outcome.rawPayload as Prisma.InputJsonValue) ?? Prisma.JsonNull,
         },
       });
+      if (claimedPayment.count !== 1) throw new CallbackRaceLost();
+      const updated = await tx.payment.findUniqueOrThrow({ where: { id: payment.id } });
 
-      if (effectiveStatus === PaymentStatus.SUCCEEDED) {
-        const order = await tx.order.update({
-          where: { id: payment.orderId },
-          data: { status: OrderStatus.CONFIRMED },
-          select: { orderNumber: true, totalCents: true, user: { select: { email: true } } },
-        });
-        await tx.orderEvent.create({
-          data: {
-            orderId: payment.orderId,
-            status: OrderStatus.CONFIRMED,
-            note: `Payment received via ${method}`,
-          },
-        });
-        notify = {
-          email: order.user.email,
-          orderNumber: order.orderNumber,
-          totalCents: order.totalCents,
-          succeeded: true,
-        };
-      } else if (
+      if (
         effectiveStatus === PaymentStatus.FAILED ||
         effectiveStatus === PaymentStatus.CANCELLED
       ) {
@@ -213,7 +295,15 @@ export const paymentsService = {
         method,
       });
       return updated;
-    });
+    }).catch(nullOnRaceLost);
+
+    if (result === null) {
+      // A concurrent callback moved the payment out of PENDING first. This
+      // call's transaction rolled back (no restock, no order claim, no event),
+      // so send nothing and answer with the payment as it now stands.
+      log.info('payments.callback.lost_race', { paymentId: outcome.paymentId, method });
+      return prisma.payment.findUniqueOrThrow({ where: { id: outcome.paymentId } });
+    }
 
     if (notify) {
       const { email, orderNumber, totalCents, succeeded } = notify;
@@ -239,13 +329,22 @@ export const paymentsService = {
     if (payment.status !== PaymentStatus.PENDING) {
       throw new ConflictError('Payment already processed');
     }
-    return prisma.payment.update({ where: { id: paymentId }, data: { bankRef } });
+    return prisma.payment.update({
+      where: { id: paymentId },
+      data: { bankRef },
+      select: customerPaymentSelect,
+    });
   },
 
   /**
    * Admin verification path. Used for COD on delivery and for
    * manual bank-transfer payments. Outcome SUCCEEDED transitions the
    * order to CONFIRMED (if it isn't already) and emits an audit event.
+   *
+   * Confirming claims the order row first (`confirmOrderInTx`), then the
+   * payment row is compare-and-set from PENDING, so a concurrent cancel or a
+   * second verify makes exactly one caller win; the loser gets a
+   * ConflictError and the whole transaction (including the claim) rolls back.
    */
   async verify(adminId: string, paymentId: string, outcome: 'SUCCEEDED' | 'FAILED', note?: string) {
     return prisma.$transaction(async (tx) => {
@@ -257,37 +356,56 @@ export const paymentsService = {
       if (payment.status !== PaymentStatus.PENDING) {
         throw new ConflictError('Payment already processed');
       }
+      // A COD order whose confirmation fee is still unverified must go through
+      // codFeeService.verifyFee first (or be confirmed/waived via ordersService.transition).
+      // A rejected fee is a decision already made: the admin either waives it
+      // by confirming the order or reopens it by verifying the fee.
+      if (payment.method === PaymentMethod.COD && canFee('verify', payment.feeStatus)) {
+        throw new ConflictError(
+          payment.feeStatus === CodFeeStatus.REJECTED
+            ? 'The confirmation fee was rejected. Verify the fee, or waive it by changing the order status to Confirmed.'
+            : 'Verify the confirmation fee first',
+        );
+      }
 
-      const updated = await tx.payment.update({
-        where: { id: paymentId },
+      const noteText =
+        note ??
+        `Payment ${outcome === 'SUCCEEDED' ? 'verified' : 'rejected'} by admin (${payment.method})`;
+
+      // Claim the order row before the payment row (lock order). The claim
+      // writes the CONFIRMED event itself.
+      const confirming = outcome === 'SUCCEEDED' && payment.order.status === OrderStatus.PENDING;
+      if (confirming) {
+        const confirmed = await confirmOrderInTx(tx, payment.order, {
+          from: payment.order.status,
+          note: noteText,
+          actorId: adminId,
+        });
+        if (!confirmed) throw new ConflictError('Order is no longer pending');
+      }
+
+      const claimedPayment = await tx.payment.updateMany({
+        where: { id: paymentId, status: PaymentStatus.PENDING },
         data: {
           status: outcome === 'SUCCEEDED' ? PaymentStatus.SUCCEEDED : PaymentStatus.FAILED,
           verifiedById: adminId,
           verifiedAt: new Date(),
         },
       });
+      if (claimedPayment.count !== 1) throw new ConflictError('Payment already processed');
 
-      const noteText =
-        note ??
-        `Payment ${outcome === 'SUCCEEDED' ? 'verified' : 'rejected'} by admin (${payment.method})`;
-
-      if (outcome === 'SUCCEEDED' && payment.order.status === OrderStatus.PENDING) {
-        await tx.order.update({
-          where: { id: payment.orderId },
-          data: { status: OrderStatus.CONFIRMED },
+      if (!confirming) {
+        await tx.orderEvent.create({
+          data: {
+            orderId: payment.orderId,
+            status: outcome === 'SUCCEEDED' ? OrderStatus.CONFIRMED : payment.order.status,
+            note: noteText,
+            actorId: adminId,
+          },
         });
       }
 
-      await tx.orderEvent.create({
-        data: {
-          orderId: payment.orderId,
-          status: outcome === 'SUCCEEDED' ? OrderStatus.CONFIRMED : payment.order.status,
-          note: noteText,
-          actorId: adminId,
-        },
-      });
-
-      return updated;
+      return tx.payment.findUniqueOrThrow({ where: { id: paymentId } });
     });
   },
 
@@ -300,6 +418,8 @@ export const paymentsService = {
       where: {
         status: PaymentStatus.PENDING,
         method: { in: [PaymentMethod.COD, PaymentMethod.BANK_TRANSFER] },
+        // A cancelled order has nothing left to verify.
+        order: { status: { not: OrderStatus.CANCELLED } },
       },
       orderBy: { createdAt: 'desc' },
       include: {

@@ -1,4 +1,12 @@
-import type { PaymentMethod, PaymentStatus } from '@prisma/client';
+import type {
+  OrderStatus,
+  PaymentMethod,
+  PaymentSettings,
+  PaymentStatus,
+  Prisma,
+} from '@prisma/client';
+
+import type { ResolvedCodFee } from '@/lib/cod-fee/compute';
 
 /**
  * Strategy interface for payment providers. Adding a new gateway
@@ -54,8 +62,49 @@ export interface CallbackOutcome {
   verifiedAmountCents?: number;
 }
 
+/** What `placeOrder` tells a provider about the order being placed. */
+export interface PlacementContext {
+  settings: Pick<PaymentSettings, 'codFeeEnabled' | 'codFeeType' | 'codFeeValue'>;
+  totalCents: number;
+  /** Raw customer-supplied transaction id; a provider keeps it only if it takes a fee. */
+  customerTxnId?: string | null;
+}
+
+/** An audit entry written with the order, attributed to the customer. */
+export interface PlacementEvent {
+  status: OrderStatus;
+  note: string;
+}
+
+/** `Payment` columns a provider fills in at placement (beyond method/status/amount). */
+export type PlacementPaymentFields = Pick<
+  Prisma.PaymentUncheckedCreateWithoutOrderInput,
+  'feeCents' | 'feeType' | 'feeValue' | 'feeStatus' | 'customerTxnId' | 'txnSubmittedAt'
+>;
+
+/**
+ * How an order is created for a payment method. Pure data computed from
+ * the settings and the total; `placeOrder` persists it in one nested create.
+ */
+export interface PlacementPlan {
+  paymentFields: PlacementPaymentFields;
+  /** Order status at creation. */
+  initialStatus: OrderStatus;
+  /** Audit trail in chronological order. */
+  events: PlacementEvent[];
+  /** A confirmation fee applies, so the customer must still pay it. */
+  feeRequired: boolean;
+  /** The fee that applies (also snapshotted in `paymentFields`), or null. */
+  fee: ResolvedCodFee | null;
+}
+
 export interface PaymentGateway {
   readonly method: PaymentMethod;
+  /**
+   * Pure, DB-free: how an order paid with this method is created. Optional;
+   * methods without one use `defaultPlacementPlan`.
+   */
+  planPlacement?(ctx: PlacementContext): PlacementPlan;
   init(input: PaymentInitInput): Promise<PaymentInitResult>;
   /**
    * Resolve a callback/IPN payload into a normalised outcome.
