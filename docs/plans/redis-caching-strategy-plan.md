@@ -311,3 +311,104 @@ Runtime kill switch: remove `UPSTASH_REDIS_REST_*` in Vercel and redeploy; code 
 
 ## Execution results
 (empty, filled by `supercharged-executor`)
+
+## Execution Progress
+
+**Status: code complete, deploy-only checks pending (see Final Status)**
+
+_Last updated: 2026-10-12 — Branch: `feature/redis-implementation` (owner chose to keep the old name; rename step skipped) — Workspace: worktree at `.claude/worktrees/redis-isr`_
+
+Setup notes: main checkout switched to `main` so the worktree could hold the branch; `.claude/worktrees/` excluded via `.git/info/exclude`; `.env*` copied into the worktree (gitignored, not committed); `npm ci` done. No push, no remote branch change. Plan doc committed as `8d62df3`.
+
+| Phase | Status | Commit | Review | Notes |
+| --- | --- | --- | --- | --- |
+| 0. Baseline and measurement | partial (code side done, owner measurements pending) | `8d62df3` (plan) | deferred | owner TODO: Prisma ops delta per view, log invocation count, DB region, Vercel plan |
+| 1. App fixes, no Redis | done | `5b19334` | deferred | agent: general-purpose (judgment-heavy, multi-file). Lint cannot run (pre-existing, see below). Deploy-only ACs carried to Cross-Validation |
+| 2. ISR for listing pages (rewrite split) | done | `bd67a76` | deferred | agent: general-purpose. Deploy-only ACs carried to Cross-Validation |
+| 3. Redis foundation | done | `d599009` | deferred | agent: general-purpose. `.env.example` is gitignored/untracked in this repo, so the new optional vars are documented in `src/env.ts` and CLAUDE.md only |
+| 4. Rate-limit backend + hot limiters | done | `76f73af` | deferred | agent: general-purpose, ran in parallel with 5 and 6 (disjoint files). Warranty POST limiter lives in `src/app/api/orders/[id]/warranty/route.ts` (plan named a non-existent `api/warranty` POST) |
+| 5. Dynamic listing cache | done | `fdc979e` | deferred | agent: general-purpose. Shell built now (not trigger-gated) |
+| 6. Guest cart hydrate cache | done | `f782f7b` | deferred | agent: general-purpose |
+| 7. Cross-Validation | done (code side); deploy-only checks open | `a89ee42` | 1 review pass, 3 Must + 4 Should fixed | see Cross-Validation section |
+
+### Phase 0 — Baseline and measurement
+
+- [x] AC1: route table from fresh build (`npm run build` in worktree, 2026-10-12). ISR (`initialRevalidateSeconds`): `/` 120, `/api/catalog/brands` 60, `/api/catalog/categories` 60, `/sitemap.xml` 3600. Static: `/about`, `/cart`, `/contact`, `/forgot-password`, `/login`, `/privacy-policy`, `/refund-policy`, `/reset-password`, `/robots.txt`, `/signup`, `/terms`, `/verify-email`, `/account/*`. Dynamic (ƒ): `/products`, `/products/[slug]`, `/category/[slug]`, `/brand/[slug]`, `/checkout`, `/orders/[id]`, `/dashboard/*`, `/api/catalog/products`, `/api/catalog/products/[slug]`, all other API routes; `prerender-manifest.dynamicRoutes` is `[]`. Matches the 2026-10-12 production log.
+- [ ] AC2-AC6: owner-supplied measurements (home/PDP/category Prisma ops delta and invocation counts, "21% used" label, DB region, Vercel plan). Pending; Phases 1-2 are not blocked. Measurements are re-taken in Cross-Validation.
+- Deviations: Phase 0 measurement ACs deferred by owner decision; baseline = production log 2026-10-12.
+
+### Phase 1 — App fixes, no Redis
+
+- [x] AC1: `next build` lists `/products/[slug]` as `● (SSG)`. Literal manifest wording not met: `dynamicRoutes['/products/[slug]']` exists (`fallback: null`) but has no `initialRevalidateSeconds` because no params are prerendered. ISR is real: local `next start`, first GET `x-nextjs-cache: MISS`, second `HIT`, `Cache-Control: s-maxage=120, stale-while-revalidate=31535880`.
+- [ ] AC2 (`x-vercel-cache` HIT/STALE on a preview), AC3 (admin PUT then GET shows new name/price), AC5 (`/about` shows a new brand): deploy-only, NOT run; carried to Cross-Validation.
+- [x] AC4 (slug a->b): unit test asserts helper called with `productSlug: bb, previousSlug: aa` (`src/app/api/__tests__/admin-revalidate.test.ts`). Real 404/200 check is deploy-only.
+- [x] AC6: 409 from the service gives 0 helper calls (PUT, POST, DELETE) — same test file.
+- [x] AC7: `/api/catalog/products?limit=1`, `/api/catalog/brands`, `/api/reviews` return the specified `Cache-Control` locally; header test in `cache-headers.test.ts`; `/api/cart` unauthenticated returns 401 with no Cache-Control; no other route handler sets Cache-Control (grep).
+- [x] AC8: GET `/api/reviews` no longer calls `summaryForProduct`; SSR summary passed down as a `summary` prop.
+- [x] AC9: `getCartSummary` with no cart returns zeros and never calls `upsert`; first `addItem` calls `upsert` once (`src/server/cart/__tests__/cart.service.test.ts`, mocked Prisma; concurrent first-add race not exercised).
+- [x] AC10: signup 6th, forgot 6th, reset 11th call refused with no user/email; other IP unaffected (`src/modules/auth/__tests__/actions-rate-limit.test.ts`).
+- [x] AC11: `q` 100 ok / 101 fails; hydrate 50 ok / 51 fails (`src/contracts/__tests__/input-caps.test.ts`); local POST `/api/cart/hydrate` with 51 lines returned 422.
+- [x] AC12: `grep next/cache src` only `src/app/api/_lib/revalidate.ts`; `src/server` 0 matches. `npm run typecheck` clean; `npx vitest run` 20 files / 111 tests pass (baseline 15 / 95). `npm run lint` NOT run: pre-existing circular-config error in the ESLint setup (`next lint` removed in Next 16); not touched.
+- Deviations (trivial, accepted): product PUT/DELETE do one extra `getProduct` lookup before writing (DELETE of a missing id now 404s from the lookup); review summary on the PDP now only refreshes with the 120s ISR window or an admin revalidate (a newly submitted review does not trigger revalidation); action limiters run before input validation, matching the REST routes.
+- Carried to Cross-Validation: deploy-only ACs above, real `revalidatePath` effect, cart concurrent-first-add, lint tooling.
+
+### Phase 2 — ISR for listing pages via a rewrite split
+
+- [x] AC1: `npm run build` lists `/products` as `○` (revalidate 1m), `/category/[slug]` and `/brand/[slug]` as `●` (prerendered laptops, phones, accessories, apple, hoco, jisulife + others); `/live/products`, `/live/category/[slug]`, `/live/brand/[slug]` are `ƒ`. `prerender-manifest`: routes `/category/{phones,laptops,accessories}`, `/brand/{...}`, `/products` with `initialRevalidateSeconds` 60; `dynamicRoutes` has `/category/[slug]`, `/brand/[slug]` (`fallback: null`).
+- [ ] AC2 (`x-vercel-cache` HIT, no function run in Vercel log), AC3-on-Vercel, home-load invocation count (<= 3), Prisma ops delta (<= 3): deploy-only, NOT run; carried to Cross-Validation. Local `next start` equivalent: repeated GET `/category/phones`, `/brand/apple`, `/products` return `x-nextjs-cache: HIT`.
+- [x] AC3: `/category/phones?utm_source=fb&fbclid=1` returns 200 and HIT locally.
+- [x] AC4: `/category/phones?brandSlug=apple` returns 200 (no redirect), 1 product link (`brandSlug=hoco` 0), canonical `http://localhost:3000/category/phones`. Note the UI's real URL keys are the schema names (`brandSlug`, `categorySlug`, ...), not `brand`/`category`; rules use the schema names. Vercel log function name `/live/category/[slug]` is deploy-only.
+- [x] AC5: `?limit=1` shows `galaxy-s24-ultra`, `?limit=1&page=2` shows `iphone-15-pro` (only 2 products in the category, so paging proven with `limit=1`); `/products?q=iph` HTML has `<meta name="robots" content="noindex"`.
+- [x] AC6: unit test `src/lib/__tests__/listing-rewrites.test.ts`: 27 rules (3 routes x 9 keys), `has` type query, live destinations; fails if a `productListQuerySchema` key is missing from `LISTING_FILTER_QUERY_KEYS` (ignore list empty and documented).
+- [x] AC7: by code reading, `product-filters.tsx` pushes `?brandSlug=...` style URLs covered by the rules; pagination pushes `?page=N`; Suspense added around `ProductFilters`/`StorefrontPagination` (without it `useSearchParams` bails the static render). Real browser click-through NOT run.
+- [x] AC8 (`revalidatePath`): helper extended to `/products`, `/category/[slug]`, `/brand/[slug]`; `revalidate-helper.test.ts` asserts the calls. Real effect deploy-only.
+- [x] AC11: `/sitemap.xml` code untouched; `npm run typecheck` clean; `npx vitest run` 22 files / 116 tests pass; `npm run build` succeeds. `npm run lint` still broken (pre-existing).
+- Deviations (accepted, to surface to owner): live twins are ALWAYS `noindex` (plan said only `?q=` pages); filtered/paged views therefore never indexed (they already canonicalize to the base path, products stay discoverable via sitemap). Live twins emit 4 JSON-LD scripts vs 3 on base (not investigated; check in Cross-Validation). Pre-existing: `CommonListPage` is passed `brand={category}` on category pages, hiding the Brand filter (left as is).
+- Carried to Cross-Validation: deploy-only ACs, real browser filter click-through, JSON-LD 3 vs 4, sitemap/robots not listing `/live`.
+
+### Phase 3 — Redis foundation
+
+- [x] All unit ACs pass (`src/server/common/__tests__/cache.test.ts`, 15 tests, written first): no store -> loader once per call and no throw; memoryStore dedupe + TTL expiry; failing `get` fails open, 6th call skips the store until 30s later (breaker); 10 concurrent cold calls run the loader once; 100KB+1 payload returned without `set`; `stableHash` key-order-insensitive; `buildKey` prefixes `gw:production:` / `gw:preview:`; `memoryStore.incrWindow` counts 1,2,3 then resets; 400ms timeout on a hung `upstashStore.get`; `upstashStore.incrWindow` is a single `eval`.
+- [x] `@upstash/redis` 1.39.0 added (only new dependency); `eval(script, keys[], args)` signature confirmed from installed types. `npm run typecheck` clean, `npx vitest run` 23 files / 131 tests, `npm run build` succeeds with the Upstash vars unset.
+- [x] CLAUDE.md updated (two lines): Redis is an optional fail-open layer; rate limiter keeps the Postgres fallback.
+- Deviation: `.env.example` is gitignored (`.env*`) and untracked, so its new optional entries are not committed. Not run: real Upstash, lint (broken).
+
+### Phase 4 — Rate-limit backend on Redis + limiters
+
+- [x] `rateLimit` uses `withStore(s => s.incrWindow(buildKey('rl', sha256(key)[0:32]), windowMs))`; store absent/failing -> existing Postgres path (default) or fail-open (`fallback: 'none'`). Tests (`rate-limit.redis.test.ts`, 7; `route-rate-limits.test.ts`, 6): 4 calls max 3 -> true,true,true,false, remaining 2,1,0,0, window refill after 30001 ms; no `@` or raw IP in the Redis key; `clearRateLimit` resets both paths; rejecting store falls back to Postgres and still blocks the 4th call; `'none'` never throws or blocks.
+- [x] Routes: 61st hydrate/min/IP, 121st `?q=` catalog/min/IP, 31st quote/min/user, 11th review/h/user, 6th warranty/h/user return 429 with numeric `Retry-After` where applicable; `?limit=8` without `q` never touches the limiter; other IP/user unaffected. No diff in `api/auth/*`, `api/checkout/route.ts`, `authOptions.ts`, `modules/auth/actions.ts`; existing `rate-limit.test.ts` passes unchanged.
+- Deviations (accepted): (1) hydrate and catalog `?q=` limiters fail open when Redis is absent/failing (`fallback: 'none'`) so the Postgres limiter does not add 2-3 DB ops to the hottest public paths; their cost stays bounded by the Phase 1 caps. This relaxes the plan's "never disables protection" rule for those two endpoints only. (2) the warranty POST is `src/app/api/orders/[id]/warranty/route.ts`; the plan's `api/warranty` has only GET. Note: the existing REST limiter call sites also use Redis when configured (same `rateLimit` function).
+- Not run: real Vercel `x-forwarded-for` behavior (Vercel sets it at the edge), real Upstash, lint.
+
+### Phase 5 — Dynamic listing cache
+
+- [x] `listPublicProducts` cached by canonical-query hash (`gw:<env>:cat:(list|search):v1:<sha1>`), TTL 60s, 120s with `q`, 30s for empty results; stores the ranked page DTO only (<= 12 items from a 500-row candidate set); invalid query is not cached. Tests (`catalog-cache.test.ts`) assert: identical queries run `findMany` once; hit = 1 GET + 0 Prisma, miss = 1 GET + 1 SET; page 1 vs 2 separate; `q` key-order/case/whitespace share one entry; PUBLISHED-only `where` on both branches; key shapes; shell second call = 0 Prisma calls.
+- [x] `getCatalogShell()` (`gw:<env>:cat:shell:v1`, 300s) feeds the layout menu and listing sidebars; the six brand/category mutations `cacheDel` it after success, a P2002 conflict does not.
+- [x] No store configured: loader runs directly (existing catalog tests pass). Full suite after the phase: 27 files / 169 tests pass; `npm run typecheck` clean.
+- Deviations (accepted): shell built now rather than trigger-gated (no-op with Redis unset; needed for the 2-GET/0-Prisma hit criterion, so a filtered live-page hit is 2 GETs + 0 Prisma, not the plan's 1 GET); `cached()` gained an additive optional `ttlFor`; whitespace-only `q` is now treated as no query (previously searched for whitespace). Shell is invalidated only by brand/category mutations (<=300s stale otherwise).
+- Not run (deploy-only): Upstash commands per filtered view <= 2 and Prisma ops per view on a preview.
+
+### Phase 6 — Guest cart hydrate cache
+
+- [x] `hydrateGuestCart` MGETs `gw:<env>:var:v1:<id>`, runs one `findMany` for missing ids only, stores each variant display DTO (11 keys, no `quantity`, TTL 30s); no store or any store failure runs the previous single query. Tests (`cart-hydrate-cache.test.ts`, 7): 3 variants twice -> one `findMany`, second response differs only by request quantities; [A,B] then [B,C] -> second `where.id.in` is `['C']`; unknown id omitted; store failure falls back; inactive/unpublished variants return `isActive: false`, also on the cached call. `src/server/checkout` diff empty.
+- Note: a formatter run by an editor hook reformatted unrelated lines in `cart.service.ts` and its test after the phase commit; that churn was stashed (`stash@{0}: exec-cart-format-churn`) and not committed.
+
+### Phase 7 — Cross-Validation
+
+- Evidence (final tree, `a89ee42`): `npx tsc --noEmit` clean; `npx vitest run` 29 files / 185 tests pass (baseline before the branch: 15 / 95); `npm run build` succeeds, `/products` `○` 1m, `/category/[slug]` and `/brand/[slug]` `●` 1m, `/products/[slug]` `●`, `/live/*` `ƒ`; build no longer logs Redis timeouts or the dynamic-server-usage error; `next/cache` imported only by `src/app/api/_lib/revalidate.ts`; `src/server/checkout` has zero diff.
+- Local production run against the real Upstash instance (read-only requests, prefix `gw:local:` via `VERCEL_ENV=local`): `/category/phones?brandSlug=apple` 0.93 s then 0.18 s, `/products?q=iph` 0.61 s then 0.11 s (Redis hits), `?utm_source=fb&fbclid=1` 0.25 s (ISR route); live twins carry `noindex` + base-path canonical; search limiter returned the first 429 on the 121st `?q=` request from one IP with `Retry-After`, requests without `q` never limited; hydrate with 51 lines returned 422. Redis SCAN of `gw:*`: 8 keys, all with TTLs, key shapes as designed, no `@`, IP, or `passwordHash` in any key or value.
+- Review (one read-only pass over `git diff 65bce8b..HEAD`) findings, all fixed in `a89ee42`:
+  - Must: (1) `buildKey` env prefix shared `gw:production:` between a local build/start and Vercel production -> now `gw:local:` unless `VERCEL_ENV`, and the store is skipped during `next build`; (2) review POST left the PDP and reviews list stale (new `s-maxage=60`) -> PDP revalidated best-effort after a successful submit, `GET /api/reviews` `s-maxage=10`; (3) a 101+ char `q` or `page=abc` threw a 500 on the live pages -> `safeParse` fallback to the default list, header input `maxLength=100`.
+  - Should: (4) every product edit purged the whole layout -> `menu: true` only for brand/category writes; (5) hydrate limit raised to 120/min/IP (CGNAT) and shortcut comments completed; (6) live twins are now `noindex` only for search or direct `/live` access (plan wording restored); (7) `variantId` capped at 64 chars.
+  - Nice: `publishedSlugs` logs a warning, `v1` bump comments added, `/api/catalog/products` uses `force-dynamic` (build error log gone), exact `UPSTASH_REDIS_REST_*` names documented in CLAUDE.md.
+- Gaps vs requirements: none open in code. Documented shortcuts missing from section 9 are recorded here: hot public limiters (hydrate, catalog `q`) fail open when Redis is absent/failing; catalog shell built now, not trigger-gated, invalidated only by brand/category writes (<=300 s stale otherwise); cache/breaker state is per instance; `RateLimitBucket` still not swept.
+- Deploy-only acceptance criteria NOT run (need a Vercel preview/production): `x-vercel-cache` HIT/STALE for PDP, `/category/*`, `/brand/*`, `/products`; Vercel log function name `/live/category/[slug]` for filtered URLs; at-most-3 function invocations for a second home load and at-most-6 for a home -> category -> PDP session; Prisma ops deltas (Phase 0 owner measurements also still pending); admin price edit shows immediately; `/about` shows a new brand; 85% hit-ratio and Upstash commands per filtered view <= 2; Redis-removed flow on a preview; real browser filter click-through; Vercel `rewrites()` `has` query matching; `x-forwarded-for` overwrite (Vercel does this at its edge).
+- Other not-run: `npm run lint` (pre-existing broken ESLint config under Next 16, untouched); concurrent first add-to-cart race (mocked Prisma only).
+
+## Final Status
+
+**Status: code complete on `feature/redis-implementation` (HEAD `a89ee42`), ready for PR into `dev` after the deploy-only checks above.** Not pushed. Phases 1-2 (no Redis) deliver the main saving; Phases 3-6 add the optional fail-open Redis layer, which stays off until `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` are set in Vercel.
+
+Commits: `5b19334` (pdp isr, revalidation, caps, auth limiters), `bd67a76` (isr listing pages via live rewrite split), `d599009` (redis foundation), `f782f7b` (guest hydrate cache), `76f73af` (redis rate limiter + limiters), `fdc979e` (listing cache + shell), `a89ee42` (cross-validation fixes).
+
+Owner follow-ups: (1) deploy a Vercel preview and run the deploy-only checks, then do the Phase 0 measurements (Prisma ops per home/category/PDP view, invocation count from the log); (2) set the Upstash env vars in Vercel production/preview only after (1), with a budget cap and 80% alert; (3) decide on PR target `dev`; (4) `stash@{0}: exec-cart-format-churn` is a formatter-only stash created by this run (safe to drop; the executor does not run `stash drop`); (5) Vercel Hobby non-commercial / 1M invocation cap remains your decision.
