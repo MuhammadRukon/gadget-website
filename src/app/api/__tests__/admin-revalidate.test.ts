@@ -88,7 +88,7 @@ describe('admin catalog routes revalidate', () => {
     expect(revalidateCatalog).toHaveBeenCalledWith({ productSlug: 'aa' });
   });
 
-  it('brand and category writes revalidate without a slug', async () => {
+  it('brand and category writes revalidate the menu layout', async () => {
     svc.createBrand.mockResolvedValue({});
     svc.deleteBrand.mockResolvedValue(undefined);
     svc.createCategory.mockResolvedValue({});
@@ -98,7 +98,7 @@ describe('admin catalog routes revalidate', () => {
     await postCategory(req({ name: 'Phones', slug: 'phones' }));
     await putCategory(req({ name: 'Phones', slug: 'phones' }), ctx);
     expect(revalidateCatalog).toHaveBeenCalledTimes(4);
-    expect(revalidateCatalog).toHaveBeenCalledWith();
+    expect(revalidateCatalog).toHaveBeenCalledWith({ menu: true });
   });
 
   it('failing writes (409) never revalidate', async () => {

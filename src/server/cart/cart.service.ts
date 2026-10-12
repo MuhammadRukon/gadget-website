@@ -226,6 +226,7 @@ export const cartService = {
     if (guestLines.length === 0) return { lines: [], subtotalCents: 0, itemCount: 0 };
     // shortcut: 30s display staleness, checkout re-validates; upgrade if price changes must show instantly
     const ids = [...new Set(guestLines.map((l) => l.variantId))];
+    // bump v1 when the cached DTO shape changes (entries live 60-300s)
     const keyOf = (id: string) => buildKey('var', 'v1', id);
     const byVariantId = new Map<string, VariantDisplay>();
     const hits = await withStore((s) => s.mget<VariantDisplay>(ids.map(keyOf)));

@@ -94,6 +94,7 @@ export function setStoreForTests(store: CacheStore | null | undefined): void {
 
 export function getStore(): CacheStore | null {
   if (override !== undefined) return override;
+  if (process.env.NEXT_PHASE === 'phase-production-build') return null; // next build must not touch Redis
   const redis = getRedis();
   if (!redis) return null;
   return (singleton ??= upstashStore(redis));
@@ -173,7 +174,7 @@ export async function cached<T>(
 }
 
 export function buildKey(...parts: (string | number)[]): string {
-  const env = process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? 'development';
+  const env = process.env.VERCEL_ENV ?? (process.env.NODE_ENV === 'test' ? 'test' : 'local');
   return `gw:${env}:${parts.join(':')}`;
 }
 

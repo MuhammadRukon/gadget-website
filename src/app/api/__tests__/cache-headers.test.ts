@@ -59,9 +59,9 @@ describe('public GET cache headers', () => {
     expect(res.headers.get('Cache-Control') ?? '').not.toContain('public');
   });
 
-  it('GET /api/reviews is cacheable for 60s and does not compute the summary', async () => {
+  it('GET /api/reviews is cacheable for 10s and does not compute the summary', async () => {
     const res = await reviewList(new Request('http://x/api/reviews?productId=p'));
-    expect(res.headers.get('Cache-Control')).toBe('public, s-maxage=60');
+    expect(res.headers.get('Cache-Control')).toBe('public, s-maxage=10');
     expect(reviews.summaryForProduct).not.toHaveBeenCalled();
   });
 });

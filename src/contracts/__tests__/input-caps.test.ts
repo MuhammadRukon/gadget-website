@@ -9,6 +9,12 @@ describe('input caps', () => {
     expect(productListQuerySchema.safeParse({ q: 'a'.repeat(101) }).success).toBe(false);
   });
 
+  it('bounds guest cart variantId at 64 chars', () => {
+    const line = (id: string) => ({ variantId: id, quantity: 1 });
+    expect(hydrateBodySchema.safeParse({ lines: [line('c'.repeat(25))] }).success).toBe(true);
+    expect(hydrateBodySchema.safeParse({ lines: [line('c'.repeat(65))] }).success).toBe(false);
+  });
+
   it('accepts 50 hydrate lines and rejects 51', () => {
     const lines = (n: number) =>
       Array.from({ length: n }, (_, i) => ({ variantId: `v${i}`, quantity: 1 }));

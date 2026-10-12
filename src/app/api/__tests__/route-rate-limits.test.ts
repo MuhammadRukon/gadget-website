@@ -62,9 +62,9 @@ beforeEach(() => {
 });
 
 describe('hot public endpoints', () => {
-  it('hydrate: 61st call/min per IP is 429 with Retry-After; other IP fine', async () => {
+  it('hydrate: 121st call/min per IP is 429 with Retry-After; other IP fine', async () => {
     const body = { lines: [] };
-    for (let i = 0; i < 60; i++) expect((await hydrate(post('/api/cart/hydrate', body))).status).toBe(200);
+    for (let i = 0; i < 120; i++) expect((await hydrate(post('/api/cart/hydrate', body))).status).toBe(200);
     const res = await hydrate(post('/api/cart/hydrate', body));
     expect(res.status).toBe(429);
     expect(Number(res.headers.get('Retry-After'))).toBeGreaterThan(0);
@@ -85,7 +85,7 @@ describe('hot public endpoints', () => {
   it('hot endpoints fail open without Postgres when Redis is absent', async () => {
     setStoreForTests(null);
     for (let i = 0; i < 130; i++) expect((await products(get('/api/catalog/products?q=abc'))).status).toBe(200);
-    for (let i = 0; i < 70; i++) expect((await hydrate(post('/api/cart/hydrate', { lines: [] }))).status).toBe(200);
+    for (let i = 0; i < 130; i++) expect((await hydrate(post('/api/cart/hydrate', { lines: [] }))).status).toBe(200);
   });
 });
 

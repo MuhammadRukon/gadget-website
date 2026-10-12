@@ -7,7 +7,8 @@ import { revalidatePath } from 'next/cache';
 export function revalidateCatalog({
   productSlug,
   previousSlug,
-}: { productSlug?: string; previousSlug?: string } = {}): void {
+  menu = false,
+}: { productSlug?: string; previousSlug?: string; menu?: boolean } = {}): void {
   for (const slug of new Set([productSlug, previousSlug])) {
     if (slug) revalidatePath(`/products/${slug}`);
   }
@@ -15,6 +16,10 @@ export function revalidateCatalog({
   revalidatePath('/products');
   revalidatePath('/category/[slug]', 'page');
   revalidatePath('/brand/[slug]', 'page');
-  revalidatePath('/', 'layout');
+  if (menu) revalidatePath('/', 'layout'); // brand/category names live in the shared layout menu
   revalidatePath('/sitemap.xml');
+}
+
+export function revalidateProductPage(slug: string): void {
+  revalidatePath(`/products/${slug}`);
 }

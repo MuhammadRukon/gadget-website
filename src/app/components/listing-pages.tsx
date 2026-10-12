@@ -3,17 +3,16 @@ import { notFound } from 'next/navigation';
 import { cache } from 'react';
 
 import CommonListPage from '@/app/components/common-listpage';
+import { liveRobots, type ListingSearchParams } from '@/app/components/listing-query';
 import type { ProductListQuery } from '@/contracts/catalog';
 import { prisma } from '@/lib/prisma';
 import { catalogService } from '@/server/catalog/catalog.service';
+import { log } from '@/server/common/logger';
 
 /**
  * Shared bodies for the default (ISR) listing routes and their dynamic `/live/*` twins.
  * The ISR routes pass an empty query; the twins pass the parsed searchParams.
  */
-
-// Live twins serve filtered views at the public URL: canonical stays the base path and the view is never indexed.
-const LIVE_ROBOTS = { robots: { index: false } } as const;
 
 const getCategoryBySlug = cache((slug: string) =>
   prisma.category.findUnique({
@@ -29,34 +28,34 @@ const getBrandBySlug = cache((slug: string) =>
   }),
 );
 
-export function productsMetadata(live = false): Metadata {
+export function productsMetadata(live?: ListingSearchParams): Metadata {
   return {
     title: 'All products',
     description: 'Browse all gadgets and electronics in the catalog.',
     alternates: { canonical: '/products' },
-    ...(live && LIVE_ROBOTS),
+    ...(live && liveRobots(live)),
   };
 }
 
-export async function categoryMetadata(slug: string, live = false): Promise<Metadata> {
+export async function categoryMetadata(slug: string, live?: ListingSearchParams): Promise<Metadata> {
   const cat = await getCategoryBySlug(slug);
   if (!cat) return { title: 'Category not found' };
   return {
     title: cat.name ?? '',
     description: `Browse all ${cat.name ?? ''} products in our catalog.`,
     alternates: { canonical: `/category/${cat.slug}` },
-    ...(live && LIVE_ROBOTS),
+    ...(live && liveRobots(live)),
   };
 }
 
-export async function brandMetadata(slug: string, live = false): Promise<Metadata> {
+export async function brandMetadata(slug: string, live?: ListingSearchParams): Promise<Metadata> {
   const brand = await getBrandBySlug(slug);
   if (!brand) return { title: 'Brand not found' };
   return {
     title: brand.name ?? '',
     description: `Browse all ${brand.name} products.`,
     alternates: { canonical: `/brand/${brand.slug}` },
-    ...(live && LIVE_ROBOTS),
+    ...(live && liveRobots(live)),
   };
 }
 
@@ -68,7 +67,8 @@ export async function publishedSlugs(kind: 'category' | 'brand'): Promise<{ slug
         ? await catalogService.listPublicCategories()
         : await catalogService.listPublicBrands();
     return rows.map(({ slug }) => ({ slug }));
-  } catch {
+  } catch (err) {
+    log.warn('publishedSlugs failed', { kind, error: err instanceof Error ? err.message : String(err) });
     return [];
   }
 }

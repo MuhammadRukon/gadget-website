@@ -36,7 +36,7 @@ export interface CartSummary {
 }
 
 export const guestCartLineSchema = z.object({
-  variantId: z.string(),
+  variantId: z.string().max(64),
   quantity: z.number().int().min(1).max(99),
 });
 export type GuestCartLine = z.infer<typeof guestCartLineSchema>;

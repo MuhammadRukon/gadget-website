@@ -545,6 +545,7 @@ export const catalogService = {
       sort: rest.sort ?? 'newest',
     };
     // shortcut: TTL-only invalidation, <=60-120s stale, upgrade to a version key if admins need instant search updates
+    // bump v1 when the cached DTO shape changes (entries live 60-300s)
     return cached(
       {
         key: buildKey('cat', q ? 'search' : 'list', 'v1', stableHash(canonical)),

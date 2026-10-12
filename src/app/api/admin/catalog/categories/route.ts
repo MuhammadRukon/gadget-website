@@ -20,7 +20,7 @@ export async function POST(request: Request) {
     await requireAdminSession();
     const input = categoryInputSchema.parse(await request.json());
     const category = await catalogService.createCategory(input);
-    revalidateCatalog();
+    revalidateCatalog({ menu: true });
     return NextResponse.json({ category }, { status: 201 });
   } catch (err) {
     return jsonError(err);

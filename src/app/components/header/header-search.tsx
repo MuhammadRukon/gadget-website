@@ -74,6 +74,7 @@ export function HeaderSearch() {
           onChange={(e) => setSearch(e.target.value)}
           onFocus={() => setSearchFocused(true)}
           autoComplete="off"
+          maxLength={100}
           className="dark:placeholder:text-white w-full h-full placeholder:text-sm text-sm"
         />
       </form>

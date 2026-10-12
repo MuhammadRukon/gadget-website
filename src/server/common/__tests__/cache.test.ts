@@ -37,6 +37,19 @@ describe('no store (env unset)', () => {
   });
 });
 
+describe('next build phase', () => {
+  it('getStore is null during the production build unless a test store is injected', () => {
+    vi.stubEnv('UPSTASH_REDIS_REST_URL', 'https://x.upstash.io');
+    vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', 't');
+    vi.stubEnv('NEXT_PHASE', 'phase-production-build');
+    setStoreForTests(undefined);
+    expect(getStore()).toBeNull();
+    const injected = memoryStore();
+    setStoreForTests(injected);
+    expect(getStore()).toBe(injected);
+  });
+});
+
 describe('cached with memoryStore', () => {
   beforeEach(() => setStoreForTests(memoryStore()));
 
@@ -206,5 +219,14 @@ describe('helpers', () => {
     expect(buildKey('cat', 'list')).toBe('gw:production:cat:list');
     vi.stubEnv('VERCEL_ENV', 'preview');
     expect(buildKey('cat', 1)).toBe('gw:preview:cat:1');
+  });
+
+  it('buildKey never shares the production namespace with a local build', () => {
+    vi.stubEnv('VERCEL_ENV', '');
+    vi.stubEnv('NODE_ENV', 'production');
+    delete process.env.VERCEL_ENV;
+    expect(buildKey('a')).toBe('gw:local:a');
+    vi.stubEnv('NODE_ENV', 'test');
+    expect(buildKey('a')).toBe('gw:test:a');
   });
 });

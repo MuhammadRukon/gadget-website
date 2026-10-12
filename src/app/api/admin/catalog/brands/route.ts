@@ -20,7 +20,7 @@ export async function POST(request: Request) {
     await requireAdminSession();
     const input = brandInputSchema.parse(await request.json());
     const brand = await catalogService.createBrand(input);
-    revalidateCatalog();
+    revalidateCatalog({ menu: true });
     return NextResponse.json({ brand }, { status: 201 });
   } catch (err) {
     return jsonError(err);

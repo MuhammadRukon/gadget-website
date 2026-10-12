@@ -15,7 +15,7 @@ export async function PUT(request: Request, ctx: Ctx) {
     const { id } = await ctx.params;
     const input = categoryInputSchema.parse(await request.json());
     const category = await catalogService.updateCategory(id, input);
-    revalidateCatalog();
+    revalidateCatalog({ menu: true });
     return NextResponse.json({ category });
   } catch (err) {
     return jsonError(err);
@@ -27,7 +27,7 @@ export async function DELETE(_: Request, ctx: Ctx) {
     await requireAdminSession();
     const { id } = await ctx.params;
     await catalogService.deleteCategory(id);
-    revalidateCatalog();
+    revalidateCatalog({ menu: true });
     return new NextResponse(null, { status: 204 });
   } catch (err) {
     return jsonError(err);
