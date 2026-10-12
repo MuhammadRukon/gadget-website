@@ -98,9 +98,11 @@ export async function CategoryListing({
   slug,
   query = {},
 }: Readonly<{ slug: string; query?: ProductListQuery }>) {
-  const category = await getCategoryBySlug(slug);
+  const [category, [page, brands, categories]] = await Promise.all([
+    getCategoryBySlug(slug),
+    loadLists({ ...query, categorySlug: slug }),
+  ]);
   if (category?.status !== 'PUBLISHED') notFound();
-  const [page, brands, categories] = await loadLists({ ...query, categorySlug: slug });
   return (
     <CommonListPage
       brands={brands}
@@ -117,9 +119,11 @@ export async function BrandListing({
   slug,
   query = {},
 }: Readonly<{ slug: string; query?: ProductListQuery }>) {
-  const brand = await getBrandBySlug(slug);
+  const [brand, [page, brands, categories]] = await Promise.all([
+    getBrandBySlug(slug),
+    loadLists({ ...query, brandSlug: slug }),
+  ]);
   if (brand?.status !== 'PUBLISHED') notFound();
-  const [page, brands, categories] = await loadLists({ ...query, brandSlug: slug });
   return (
     <CommonListPage
       brands={brands}

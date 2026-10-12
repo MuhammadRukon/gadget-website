@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { CATALOG_CACHE_CONTROL, REVIEWS_CACHE_CONTROL } from '@/app/api/_lib/cache-control';
 import { NotFoundError } from '@/server/common/errors';
 
 const { svc, reviews } = vi.hoisted(() => ({
@@ -29,7 +30,6 @@ import { GET as products } from '@/app/api/catalog/products/route';
 import { GET as product } from '@/app/api/catalog/products/[slug]/route';
 import { GET as reviewList } from '@/app/api/reviews/route';
 
-const CATALOG = 'public, s-maxage=30, stale-while-revalidate=60';
 const slugCtx = { params: Promise.resolve({ slug: 's' }) };
 
 beforeEach(() => {
@@ -44,12 +44,12 @@ beforeEach(() => {
 describe('public GET cache headers', () => {
   it('catalog 200s are cacheable at the CDN', async () => {
     const res = await products(new Request('http://x/api/catalog/products?limit=8'));
-    expect(res.headers.get('Cache-Control')).toBe(CATALOG);
+    expect(res.headers.get('Cache-Control')).toBe(CATALOG_CACHE_CONTROL);
     expect((await product(new Request('http://x'), slugCtx)).headers.get('Cache-Control')).toBe(
-      CATALOG,
+      CATALOG_CACHE_CONTROL,
     );
-    expect((await brands()).headers.get('Cache-Control')).toBe(CATALOG);
-    expect((await categories()).headers.get('Cache-Control')).toBe(CATALOG);
+    expect((await brands()).headers.get('Cache-Control')).toBe(CATALOG_CACHE_CONTROL);
+    expect((await categories()).headers.get('Cache-Control')).toBe(CATALOG_CACHE_CONTROL);
   });
 
   it('catalog errors are not cacheable', async () => {
@@ -61,7 +61,7 @@ describe('public GET cache headers', () => {
 
   it('GET /api/reviews is cacheable for 10s and does not compute the summary', async () => {
     const res = await reviewList(new Request('http://x/api/reviews?productId=p'));
-    expect(res.headers.get('Cache-Control')).toBe('public, s-maxage=10');
+    expect(res.headers.get('Cache-Control')).toBe(REVIEWS_CACHE_CONTROL);
     expect(reviews.summaryForProduct).not.toHaveBeenCalled();
   });
 });

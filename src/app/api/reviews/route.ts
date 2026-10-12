@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 
+import { REVIEWS_CACHE_CONTROL } from '@/app/api/_lib/cache-control';
 import { revalidateProductPage } from '@/app/api/_lib/revalidate';
 import { reviewInputSchema } from '@/contracts/reviews';
 import { reviewsService } from '@/server/reviews/reviews.service';
@@ -16,7 +17,7 @@ export async function GET(request: Request) {
     }
     // Summary is rendered server-side on the PDP; the list is all the client needs.
     const items = await reviewsService.listForProduct(productId);
-    return NextResponse.json({ items }, { headers: { 'Cache-Control': 'public, s-maxage=10' } });
+    return NextResponse.json({ items }, { headers: { 'Cache-Control': REVIEWS_CACHE_CONTROL } });
   } catch (err) {
     return jsonError(err);
   }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { productListQuerySchema, LISTING_FILTER_QUERY_KEYS } from '@/contracts/catalog';
-import { buildListingRewrites, LISTING_ROUTES } from '@/lib/listing-rewrites';
+import { productListQuerySchema } from '@/contracts/catalog';
+import { buildListingRewrites, LISTING_FILTER_QUERY_KEYS, LISTING_ROUTES } from '@/lib/listing-rewrites';
 
 // Keys intentionally NOT routed to the dynamic twin. Empty: even `limit` changes results.
 const IGNORED_SCHEMA_KEYS: string[] = [];

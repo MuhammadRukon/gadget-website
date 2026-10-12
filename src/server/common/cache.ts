@@ -144,7 +144,6 @@ export async function cached<T>(
     ttlSec: number;
     ttlFor?: (value: T) => number;
     jitter?: number;
-    random?: () => number;
   },
   loader: () => Promise<T>,
 ): Promise<T> {
@@ -160,7 +159,7 @@ export async function cached<T>(
     const json = JSON.stringify(value);
     if (json !== undefined && Buffer.byteLength(json) <= MAX_PAYLOAD_BYTES) {
       const jitter = opts.jitter ?? 0.1;
-      const rnd = (opts.random ?? Math.random)();
+      const rnd = Math.random();
       const ttl = Math.max(
         1,
         Math.round((opts.ttlFor?.(value) ?? opts.ttlSec) * (1 + (rnd * 2 - 1) * jitter)),

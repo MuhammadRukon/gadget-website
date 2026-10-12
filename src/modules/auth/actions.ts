@@ -16,7 +16,7 @@ import {
 import { AppError, toJsonError } from '@/server/common/errors';
 import { requireSession } from '@/server/common/http';
 import { log } from '@/server/common/logger';
-import { RateLimitedError, clearRateLimit, enforceRateLimit } from '@/server/common/rate-limit';
+import { RateLimitedError, clearRateLimit, enforceRateLimit, ipFromHeaders } from '@/server/common/rate-limit';
 
 export interface ActionResult {
   ok: boolean;
@@ -38,17 +38,9 @@ function fieldErrorsFromZod(err: ZodError): Record<string, string> {
   return out;
 }
 
-// Same IP logic as clientIp() in rate-limit.ts, which needs a Request.
-async function actionClientIp(): Promise<string> {
-  const h = await headers();
-  const xff = h.get('x-forwarded-for');
-  if (xff) return xff.split(',')[0].trim();
-  return h.get('x-real-ip') ?? 'unknown';
-}
-
 export async function signupAction(input: unknown): Promise<ActionResult> {
   try {
-    await enforceRateLimit(`signup:${await actionClientIp()}`, { max: 5, windowMs: 15 * 60 * 1000 });
+    await enforceRateLimit(`signup:${ipFromHeaders(await headers())}`, { max: 5, windowMs: 15 * 60 * 1000 });
     const data = signupSchema.parse(input);
     const user = await authService.signup(data);
     return {
@@ -76,7 +68,7 @@ export async function signupAction(input: unknown): Promise<ActionResult> {
 
 export async function forgotPasswordAction(input: unknown): Promise<ActionResult> {
   try {
-    await enforceRateLimit(`forgot:${await actionClientIp()}`, { max: 5, windowMs: 60 * 60 * 1000 });
+    await enforceRateLimit(`forgot:${ipFromHeaders(await headers())}`, { max: 5, windowMs: 60 * 60 * 1000 });
     const data = forgotPasswordSchema.parse(input);
     const result = await authService.issuePasswordReset(data);
     const devLink =
@@ -104,7 +96,7 @@ export async function forgotPasswordAction(input: unknown): Promise<ActionResult
 
 export async function resetPasswordAction(input: unknown): Promise<ActionResult> {
   try {
-    await enforceRateLimit(`reset:${await actionClientIp()}`, { max: 10, windowMs: 60 * 60 * 1000 });
+    await enforceRateLimit(`reset:${ipFromHeaders(await headers())}`, { max: 10, windowMs: 60 * 60 * 1000 });
     const data = resetPasswordSchema.parse(input);
     await authService.resetPassword(data);
     return { ok: true, message: 'Password updated. You can now sign in.' };

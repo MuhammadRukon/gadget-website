@@ -74,7 +74,8 @@ describe('cached with memoryStore', () => {
     const store = memoryStore();
     const set = vi.spyOn(store, 'set');
     setStoreForTests(store);
-    await cached({ key: 'j', ttlSec: 100, jitter: 0.1, random: () => 1 }, async () => 1);
+    vi.spyOn(Math, 'random').mockReturnValue(1);
+    await cached({ key: 'j', ttlSec: 100, jitter: 0.1 }, async () => 1);
     expect(set).toHaveBeenCalledWith('j', 1, 110);
   });
 

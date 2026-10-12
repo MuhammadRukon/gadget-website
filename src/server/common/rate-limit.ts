@@ -87,9 +87,13 @@ export async function rateLimit(
  * so abusers can't bypass simply by stripping headers.
  */
 export function clientIp(request: Request): string {
-  const xff = request.headers.get('x-forwarded-for');
+  return ipFromHeaders(request.headers);
+}
+
+export function ipFromHeaders(h: Pick<Headers, 'get'>): string {
+  const xff = h.get('x-forwarded-for');
   if (xff) return xff.split(',')[0].trim();
-  return request.headers.get('x-real-ip') ?? 'unknown';
+  return h.get('x-real-ip') ?? 'unknown';
 }
 
 export class RateLimitedError extends Error {
@@ -112,6 +116,15 @@ export async function enforceRateLimit(
 ): Promise<void> {
   const result = await rateLimit(key, policy, opts);
   if (!result.ok) throw new RateLimitedError(result.resetAt);
+}
+
+// shortcut: fails open when Redis is absent/failing; cost is bounded by input caps (q max 100, hydrate lines max 50); upgrade to a per-instance in-memory fixed window when Redis is always on
+export function enforceIpLimit(
+  request: Request,
+  name: string,
+  policy: RateLimitPolicy = { max: 120, windowMs: 60_000 },
+) {
+  return enforceRateLimit(`${name}:${ipFromHeaders(request.headers)}`, policy, { fallback: 'none' });
 }
 
 /**

@@ -27,6 +27,12 @@ const MAX_SEARCH_CANDIDATES = 500;
 
 const SHELL_KEY = () => buildKey('cat', 'shell', 'v1');
 
+const invalidatingShell = async <T>(p: Promise<T>): Promise<T> => {
+  const r = await p;
+  await cacheDel(SHELL_KEY());
+  return r;
+};
+
 /**
  * Terms used to widen the candidate `where` clause for a search query: the
  * full query plus every 3-char sliding-window substring ("trigram") of each
@@ -146,15 +152,13 @@ export const catalogService = {
   async createBrand(input: BrandInput) {
     const slug = slugify(input.slug || input.name);
     try {
-      const saved = await catalogRepo.createBrand({
+      return await invalidatingShell(catalogRepo.createBrand({
         name: input.name,
         slug,
         logoUrl: input.logoUrl ?? null,
         isPopular: input.isPopular ?? false,
         status: brandStatusOrDefault(input),
-      });
-      await cacheDel(SHELL_KEY());
-      return saved;
+      }));
     } catch (err) {
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
         throw new ConflictError(`A brand with this ${uniqueConstraintField(err)} already exists`);
@@ -166,15 +170,13 @@ export const catalogService = {
   async updateBrand(id: string, input: BrandInput) {
     const slug = slugify(input.slug || input.name);
     try {
-      const saved = await catalogRepo.updateBrand(id, {
+      return await invalidatingShell(catalogRepo.updateBrand(id, {
         name: input.name,
         slug,
         logoUrl: input.logoUrl ?? null,
         isPopular: input.isPopular ?? false,
         status: brandStatusOrDefault(input),
-      });
-      await cacheDel(SHELL_KEY());
-      return saved;
+      }));
     } catch (err) {
       if (err instanceof Prisma.PrismaClientKnownRequestError) {
         if (err.code === 'P2002') {
@@ -188,8 +190,7 @@ export const catalogService = {
 
   async deleteBrand(id: string) {
     try {
-      await catalogRepo.deleteBrand(id);
-      await cacheDel(SHELL_KEY());
+      await invalidatingShell(catalogRepo.deleteBrand(id));
     } catch (err) {
       if (err instanceof Prisma.PrismaClientKnownRequestError) {
         if (err.code === 'P2025') throw new NotFoundError('Brand');
@@ -212,16 +213,14 @@ export const catalogService = {
   async createCategory(input: CategoryInput) {
     const slug = slugify(input.slug || input.name);
     try {
-      const saved = await catalogRepo.createCategory({
+      return await invalidatingShell(catalogRepo.createCategory({
         name: input.name,
         slug,
         iconUrl: input.iconUrl ?? null,
         isPopular: input.isPopular ?? false,
         status: categoryStatusOrDefault(input),
         parent: input.parentId ? { connect: { id: input.parentId } } : undefined,
-      });
-      await cacheDel(SHELL_KEY());
-      return saved;
+      }));
     } catch (err) {
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
         throw new ConflictError(
@@ -235,16 +234,14 @@ export const catalogService = {
   async updateCategory(id: string, input: CategoryInput) {
     const slug = slugify(input.slug || input.name);
     try {
-      const saved = await catalogRepo.updateCategory(id, {
+      return await invalidatingShell(catalogRepo.updateCategory(id, {
         name: input.name,
         slug,
         iconUrl: input.iconUrl ?? null,
         isPopular: input.isPopular ?? false,
         status: categoryStatusOrDefault(input),
         parent: input.parentId ? { connect: { id: input.parentId } } : { disconnect: true },
-      });
-      await cacheDel(SHELL_KEY());
-      return saved;
+      }));
     } catch (err) {
       if (err instanceof Prisma.PrismaClientKnownRequestError) {
         if (err.code === 'P2002') {
@@ -260,8 +257,7 @@ export const catalogService = {
 
   async deleteCategory(id: string) {
     try {
-      await catalogRepo.deleteCategory(id);
-      await cacheDel(SHELL_KEY());
+      await invalidatingShell(catalogRepo.deleteCategory(id));
     } catch (err) {
       if (err instanceof Prisma.PrismaClientKnownRequestError) {
         if (err.code === 'P2025') throw new NotFoundError('Category');
@@ -468,10 +464,10 @@ export const catalogService = {
 
   /** Categories + brands for the storefront menu/sidebars, one cache entry. */
   async getCatalogShell() {
-    return cached({ key: SHELL_KEY(), ttlSec: 300 }, async () => ({
-      categories: await this.listPublicCategories(),
-      brands: await this.listPublicBrands(),
-    }));
+    return cached({ key: SHELL_KEY(), ttlSec: 300 }, async () => {
+      const [categories, brands] = await Promise.all([this.listPublicCategories(), this.listPublicBrands()]);
+      return { categories, brands };
+    });
   },
 
   async listPublicCategories() {

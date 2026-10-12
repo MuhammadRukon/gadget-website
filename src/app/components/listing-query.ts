@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 
-import { LISTING_FILTER_QUERY_KEYS, productListQuerySchema } from '@/contracts/catalog';
+import { productListQuerySchema } from '@/contracts/catalog';
+import { LISTING_FILTER_QUERY_KEYS } from '@/lib/listing-rewrites';
 import type { ProductListQuery } from '@/contracts/catalog';
 
 export type ListingSearchParams = Record<string, string | string[] | undefined>;
