@@ -31,10 +31,10 @@ export function StorefrontPagination({ page, pageSize, total }: Props) {
       </p>
       <div className="flex gap-2">
         <Button asChild variant="outline" size="sm" disabled={page <= 1}>
-          {page <= 1 ? <span>Previous</span> : <Link href={withPage(page - 1)}>Previous</Link>}
+          {page <= 1 ? <span>Previous</span> : <Link href={withPage(page - 1)} prefetch={false}>Previous</Link>}
         </Button>
         <Button asChild variant="outline" size="sm" disabled={page >= totalPages}>
-          {page >= totalPages ? <span>Next</span> : <Link href={withPage(page + 1)}>Next</Link>}
+          {page >= totalPages ? <span>Next</span> : <Link href={withPage(page + 1)} prefetch={false}>Next</Link>}
         </Button>
       </div>
     </div>

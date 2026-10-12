@@ -143,6 +143,7 @@ export function HeaderSearch() {
           {!previewLoading && preview && preview.total > preview.items.length && (
             <Link
               href={`/products?q=${encodeURIComponent(trimmed)}`}
+              prefetch={false}
               onClick={closePreview}
               className="
                   block

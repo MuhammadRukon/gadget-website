@@ -12,6 +12,9 @@ export function revalidateCatalog({
     if (slug) revalidatePath(`/products/${slug}`);
   }
   revalidatePath('/');
+  revalidatePath('/products');
+  revalidatePath('/category/[slug]', 'page');
+  revalidatePath('/brand/[slug]', 'page');
   revalidatePath('/', 'layout');
   revalidatePath('/sitemap.xml');
 }

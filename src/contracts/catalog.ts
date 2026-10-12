@@ -114,6 +114,7 @@ export const productListQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(60).optional(),
 });
 export type ProductListQuery = z.infer<typeof productListQuerySchema>;
+export { LISTING_FILTER_QUERY_KEYS } from '@/lib/listing-rewrites';
 
 // --- Public DTOs --------------------------------------------------------------
 
