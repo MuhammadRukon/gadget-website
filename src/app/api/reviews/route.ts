@@ -11,11 +11,9 @@ export async function GET(request: Request) {
     if (!productId) {
       return NextResponse.json({ items: [] });
     }
-    const [items, summary] = await Promise.all([
-      reviewsService.listForProduct(productId),
-      reviewsService.summaryForProduct(productId),
-    ]);
-    return NextResponse.json({ items, summary });
+    // Summary is rendered server-side on the PDP; the list is all the client needs.
+    const items = await reviewsService.listForProduct(productId);
+    return NextResponse.json({ items }, { headers: { 'Cache-Control': 'public, s-maxage=60' } });
   } catch (err) {
     return jsonError(err);
   }

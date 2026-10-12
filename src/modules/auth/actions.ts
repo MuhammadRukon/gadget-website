@@ -1,5 +1,6 @@
 'use server';
 
+import { headers } from 'next/headers';
 import { ZodError } from 'zod';
 
 import { authService } from '@/server/auth/auth.service';
@@ -37,8 +38,17 @@ function fieldErrorsFromZod(err: ZodError): Record<string, string> {
   return out;
 }
 
+// Same IP logic as clientIp() in rate-limit.ts, which needs a Request.
+async function actionClientIp(): Promise<string> {
+  const h = await headers();
+  const xff = h.get('x-forwarded-for');
+  if (xff) return xff.split(',')[0].trim();
+  return h.get('x-real-ip') ?? 'unknown';
+}
+
 export async function signupAction(input: unknown): Promise<ActionResult> {
   try {
+    await enforceRateLimit(`signup:${await actionClientIp()}`, { max: 5, windowMs: 15 * 60 * 1000 });
     const data = signupSchema.parse(input);
     const user = await authService.signup(data);
     return {
@@ -50,6 +60,9 @@ export async function signupAction(input: unknown): Promise<ActionResult> {
   } catch (err) {
     if (err instanceof ZodError) {
       return { ok: false, message: 'Invalid signup details', fieldErrors: fieldErrorsFromZod(err) };
+    }
+    if (err instanceof RateLimitedError) {
+      return { ok: false, message: 'Too many attempts. Try again in a few minutes.' };
     }
     if (err instanceof AppError) {
       return { ok: false, message: err.message };
@@ -63,6 +76,7 @@ export async function signupAction(input: unknown): Promise<ActionResult> {
 
 export async function forgotPasswordAction(input: unknown): Promise<ActionResult> {
   try {
+    await enforceRateLimit(`forgot:${await actionClientIp()}`, { max: 5, windowMs: 60 * 60 * 1000 });
     const data = forgotPasswordSchema.parse(input);
     const result = await authService.issuePasswordReset(data);
     const devLink =
@@ -78,6 +92,9 @@ export async function forgotPasswordAction(input: unknown): Promise<ActionResult
     if (err instanceof ZodError) {
       return { ok: false, message: 'Invalid email', fieldErrors: fieldErrorsFromZod(err) };
     }
+    if (err instanceof RateLimitedError) {
+      return { ok: false, message: 'Too many requests. Try again in a few minutes.' };
+    }
     log.error('auth.forgot.action.failed', {
       error: err instanceof Error ? err.message : String(err),
     });
@@ -87,12 +104,16 @@ export async function forgotPasswordAction(input: unknown): Promise<ActionResult
 
 export async function resetPasswordAction(input: unknown): Promise<ActionResult> {
   try {
+    await enforceRateLimit(`reset:${await actionClientIp()}`, { max: 10, windowMs: 60 * 60 * 1000 });
     const data = resetPasswordSchema.parse(input);
     await authService.resetPassword(data);
     return { ok: true, message: 'Password updated. You can now sign in.' };
   } catch (err) {
     if (err instanceof ZodError) {
       return { ok: false, message: 'Invalid reset payload', fieldErrors: fieldErrorsFromZod(err) };
+    }
+    if (err instanceof RateLimitedError) {
+      return { ok: false, message: 'Too many attempts. Try again in a few minutes.' };
     }
     if (err instanceof AppError) {
       return { ok: false, message: err.message };

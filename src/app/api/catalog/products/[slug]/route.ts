@@ -13,7 +13,7 @@ export async function GET(_: Request, ctx: Ctx) {
   try {
     const { slug } = await ctx.params;
     const product = await catalogService.getPublicProductBySlug(slug);
-    return NextResponse.json(product);
+    return NextResponse.json(product, { headers: { 'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60' } });
   } catch (err) {
     return jsonError(err);
   }

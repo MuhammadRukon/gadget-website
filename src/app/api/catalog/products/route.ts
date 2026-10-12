@@ -11,7 +11,7 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const query = productListQuerySchema.parse(Object.fromEntries(url.searchParams));
     const data = await catalogService.listPublicProducts(query);
-    return NextResponse.json(data);
+    return NextResponse.json(data, { headers: { 'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60' } });
   } catch (err) {
     return jsonError(err);
   }

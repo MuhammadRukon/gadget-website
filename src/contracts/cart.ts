@@ -40,3 +40,5 @@ export const guestCartLineSchema = z.object({
   quantity: z.number().int().min(1).max(99),
 });
 export type GuestCartLine = z.infer<typeof guestCartLineSchema>;
+
+export const hydrateBodySchema = z.object({ lines: z.array(guestCartLineSchema).max(50) });

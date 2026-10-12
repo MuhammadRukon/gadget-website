@@ -51,7 +51,9 @@ async function ensureCart(userId: string) {
 }
 
 async function loadCart(userId: string): Promise<CartSnapshot> {
-  const cart = await ensureCart(userId);
+  // Reads must not write: a user with no cart yet just has an empty one.
+  const cart = await prisma.cart.findUnique({ where: { userId } });
+  if (!cart) return { lines: [], subtotalCents: 0, itemCount: 0 };
   const rows = await prisma.$queryRaw<FlatCartRow[]>(Prisma.sql`
     SELECT
       ci.id AS "itemId",
@@ -107,7 +109,8 @@ export const cartService = {
     itemCount: number;
     hasIssues: boolean;
   }> {
-    await ensureCart(userId);
+    const cart = await prisma.cart.findUnique({ where: { userId } });
+    if (!cart) return { subtotalCents: 0, itemCount: 0, hasIssues: false };
     const lines = await prisma.cartItem.findMany({
       where: { cart: { userId } },
       select: {
