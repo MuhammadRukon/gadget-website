@@ -8,7 +8,9 @@
  * from memory to the database, so both are now async.
  */
 
+import { createHash } from 'node:crypto';
 import { prisma } from '@/lib/prisma';
+import { buildKey, cacheDel, withStore } from './cache';
 import { AppError } from './errors';
 
 export interface RateLimitPolicy {
@@ -24,7 +26,31 @@ export interface RateLimitResult {
   resetAt: number;
 }
 
-export async function rateLimit(key: string, policy: RateLimitPolicy): Promise<RateLimitResult> {
+export interface RateLimitOptions {
+  /** What to do when Redis is unconfigured or down. 'none' fails open without touching Postgres. */
+  fallback?: 'postgres' | 'none';
+}
+
+// Hashed so raw emails/IPs never reach Redis.
+const redisKey = (key: string) => buildKey('rl', createHash('sha256').update(key).digest('hex').slice(0, 32));
+
+export async function rateLimit(
+  key: string,
+  policy: RateLimitPolicy,
+  opts: RateLimitOptions = {},
+): Promise<RateLimitResult> {
+  const hit = await withStore((s) => s.incrWindow(redisKey(key), policy.windowMs));
+  if (hit.ok) {
+    return {
+      ok: hit.value.count <= policy.max,
+      remaining: Math.max(0, policy.max - hit.value.count),
+      resetAt: Date.now() + hit.value.pttlMs,
+    };
+  }
+  if (opts.fallback === 'none') {
+    return { ok: true, remaining: policy.max, resetAt: Date.now() + policy.windowMs };
+  }
+
   const now = new Date();
   const resetAt = new Date(now.getTime() + policy.windowMs);
 
@@ -62,9 +88,13 @@ export async function rateLimit(key: string, policy: RateLimitPolicy): Promise<R
  * so abusers can't bypass simply by stripping headers.
  */
 export function clientIp(request: Request): string {
-  const xff = request.headers.get('x-forwarded-for');
+  return ipFromHeaders(request.headers);
+}
+
+export function ipFromHeaders(h: Pick<Headers, 'get'>): string {
+  const xff = h.get('x-forwarded-for');
   if (xff) return xff.split(',')[0].trim();
-  return request.headers.get('x-real-ip') ?? 'unknown';
+  return h.get('x-real-ip') ?? 'unknown';
 }
 
 export class RateLimitedError extends AppError {
@@ -80,9 +110,22 @@ export class RateLimitedError extends AppError {
  * Convenience helper: throws if the rate-limit policy is exceeded.
  * Routes catch RateLimitedError to set Retry-After + 429.
  */
-export async function enforceRateLimit(key: string, policy: RateLimitPolicy): Promise<void> {
-  const result = await rateLimit(key, policy);
+export async function enforceRateLimit(
+  key: string,
+  policy: RateLimitPolicy,
+  opts?: RateLimitOptions,
+): Promise<void> {
+  const result = await rateLimit(key, policy, opts);
   if (!result.ok) throw new RateLimitedError(result.resetAt);
+}
+
+// shortcut: fails open when Redis is absent/failing; cost is bounded by input caps (q max 100, hydrate lines max 50); upgrade to a per-instance in-memory fixed window when Redis is always on
+export function enforceIpLimit(
+  request: Request,
+  name: string,
+  policy: RateLimitPolicy = { max: 120, windowMs: 60_000 },
+) {
+  return enforceRateLimit(`${name}:${ipFromHeaders(request.headers)}`, policy, { fallback: 'none' });
 }
 
 const USER_RATE_WINDOW_MS = 10 * 60 * 1000;
@@ -115,5 +158,6 @@ export async function enforceUserRateLimits(
  * once they succeed.
  */
 export async function clearRateLimit(key: string): Promise<void> {
+  await cacheDel(redisKey(key));
   await prisma.rateLimitBucket.deleteMany({ where: { key } });
 }

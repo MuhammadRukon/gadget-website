@@ -1,15 +1,18 @@
 'use client';
 
 import { Loader } from '@/app/common/loader/loader';
+import type { ReviewSummary } from '@/contracts/reviews';
 import { useProductReviews } from '@/modules/reviews/hooks';
 
 import { RatingStars } from './rating-stars';
 
 interface ReviewsSectionProps {
   productId: string;
+  /** Server-rendered summary from the PDP; avoids a second summary query. */
+  summary: ReviewSummary;
 }
 
-export function ReviewsSection({ productId }: ReviewsSectionProps) {
+export function ReviewsSection({ productId, summary }: ReviewsSectionProps) {
   const reviews = useProductReviews(productId);
 
   if (reviews.isLoading) {
@@ -21,7 +24,6 @@ export function ReviewsSection({ productId }: ReviewsSectionProps) {
   }
 
   const items = reviews.data?.items ?? [];
-  const summary = reviews.data?.summary ?? { count: 0, average: 0 };
 
   return (
     <section className="space-y-4">

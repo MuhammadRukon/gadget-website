@@ -103,7 +103,7 @@ const inStockSchema = z
   .transform((v) => (typeof v === 'string' ? v === 'true' : v));
 
 export const productListQuerySchema = z.object({
-  q: z.string().optional(),
+  q: z.string().max(100).optional(),
   brandSlug: z.string().optional(),
   categorySlug: z.string().optional(),
   minPrice: z.coerce.number().int().min(0).optional(),

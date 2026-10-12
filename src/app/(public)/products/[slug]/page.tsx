@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
+import { cache } from 'react';
 
 import { catalogService } from '@/server/catalog/catalog.service';
 import { reviewsService } from '@/server/reviews/reviews.service';
@@ -11,9 +12,12 @@ interface PageProps {
 }
 export const revalidate = 120;
 
-import { cache } from 'react';
+// Empty list opts the route into on-demand ISR: pages are built on first hit, then cached.
+export async function generateStaticParams() {
+  return [];
+}
 
-export const getProductBySlugCached = cache(async (slug: string) => {
+const getProductBySlugCached = cache(async (slug: string) => {
   return catalogService.getPublicProductBySlug(slug);
 });
 

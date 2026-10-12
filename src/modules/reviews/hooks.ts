@@ -7,7 +7,6 @@ import { apiFetch } from '@/lib/fetcher';
 import type {
   PublicReview,
   ReviewInput,
-  ReviewSummary,
   ReviewableItem,
 } from '@/contracts/reviews';
 
@@ -15,7 +14,7 @@ export function useProductReviews(productId: string | null) {
   return useQuery({
     queryKey: ['reviews', 'product', productId],
     queryFn: () =>
-      apiFetch<{ items: PublicReview[]; summary: ReviewSummary }>(
+      apiFetch<{ items: PublicReview[] }>(
         `/api/reviews?productId=${productId}`,
       ),
     enabled: !!productId,

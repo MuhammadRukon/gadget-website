@@ -29,6 +29,10 @@ const schema = z.object({
   // skips instead of sending (dev/test mode) — see src/server/common/mailer.ts.
   RESEND_API_KEY: z.string().optional(),
   EMAIL_FROM: z.string().optional(),
+  // Upstash Redis (REST). Optional: absence = cache/limiter layer disabled and
+  // the app falls back to DB-backed behavior; see src/server/common/cache.ts.
+  UPSTASH_REDIS_REST_URL: z.string().optional(),
+  UPSTASH_REDIS_REST_TOKEN: z.string().optional(),
 });
 
 export const env = schema.parse(process.env);

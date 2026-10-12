@@ -86,7 +86,7 @@ export function ProductDetail({ product, reviewSummary }: Readonly<ProductDetail
       </section>
 
       <section className="md:col-span-2 mt-6">
-        <DeferredReviewsSection productId={product.id} />
+        <DeferredReviewsSection productId={product.id} summary={reviewSummary} />
       </section>
     </article>
   );
