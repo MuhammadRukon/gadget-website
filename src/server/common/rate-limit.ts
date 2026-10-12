@@ -8,7 +8,9 @@
  * from memory to the database, so both are now async.
  */
 
+import { createHash } from 'node:crypto';
 import { prisma } from '@/lib/prisma';
+import { buildKey, cacheDel, withStore } from './cache';
 
 export interface RateLimitPolicy {
   /** How many requests are allowed in the window. */
@@ -23,7 +25,31 @@ export interface RateLimitResult {
   resetAt: number;
 }
 
-export async function rateLimit(key: string, policy: RateLimitPolicy): Promise<RateLimitResult> {
+export interface RateLimitOptions {
+  /** What to do when Redis is unconfigured or down. 'none' fails open without touching Postgres. */
+  fallback?: 'postgres' | 'none';
+}
+
+// Hashed so raw emails/IPs never reach Redis.
+const redisKey = (key: string) => buildKey('rl', createHash('sha256').update(key).digest('hex').slice(0, 32));
+
+export async function rateLimit(
+  key: string,
+  policy: RateLimitPolicy,
+  opts: RateLimitOptions = {},
+): Promise<RateLimitResult> {
+  const hit = await withStore((s) => s.incrWindow(redisKey(key), policy.windowMs));
+  if (hit.ok) {
+    return {
+      ok: hit.value.count <= policy.max,
+      remaining: Math.max(0, policy.max - hit.value.count),
+      resetAt: Date.now() + hit.value.pttlMs,
+    };
+  }
+  if (opts.fallback === 'none') {
+    return { ok: true, remaining: policy.max, resetAt: Date.now() + policy.windowMs };
+  }
+
   const now = new Date();
   const resetAt = new Date(now.getTime() + policy.windowMs);
 
@@ -79,8 +105,12 @@ export class RateLimitedError extends Error {
  * Convenience helper: throws if the rate-limit policy is exceeded.
  * Routes catch RateLimitedError to set Retry-After + 429.
  */
-export async function enforceRateLimit(key: string, policy: RateLimitPolicy): Promise<void> {
-  const result = await rateLimit(key, policy);
+export async function enforceRateLimit(
+  key: string,
+  policy: RateLimitPolicy,
+  opts?: RateLimitOptions,
+): Promise<void> {
+  const result = await rateLimit(key, policy, opts);
   if (!result.ok) throw new RateLimitedError(result.resetAt);
 }
 
@@ -90,5 +120,6 @@ export async function enforceRateLimit(key: string, policy: RateLimitPolicy): Pr
  * once they succeed.
  */
 export async function clearRateLimit(key: string): Promise<void> {
+  await cacheDel(redisKey(key));
   await prisma.rateLimitBucket.deleteMany({ where: { key } });
 }
