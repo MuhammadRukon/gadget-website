@@ -1,3 +1,5 @@
+import { Suspense } from 'react';
+
 import { ProductGrid } from '@/modules/storefront/components/product-grid';
 import { StorefrontPagination } from '@/modules/storefront/components/storefront-pagination';
 
@@ -49,7 +51,11 @@ export default function CommonListPage({
   return (
     <ProductFilterWrapper
       filters={
-        <ProductFilters brands={brands} categories={categories} lockedBrandSlug={brand?.slug} />
+        // useSearchParams in these two needs a narrow Suspense boundary on static routes,
+        // otherwise the whole page bails out to client rendering and the HTML ships empty.
+        <Suspense>
+          <ProductFilters brands={brands} categories={categories} lockedBrandSlug={brand?.slug} />
+        </Suspense>
       }
     >
       <section>
@@ -63,7 +69,9 @@ export default function CommonListPage({
 
         <ProductGrid products={page.items} />
 
-        <StorefrontPagination page={page.page} pageSize={page.pageSize} total={page.total} />
+        <Suspense>
+          <StorefrontPagination page={page.page} pageSize={page.pageSize} total={page.total} />
+        </Suspense>
       </section>
     </ProductFilterWrapper>
   );

@@ -4,6 +4,22 @@ import { prisma } from '@/lib/prisma';
 import type { CartLine, CartSnapshot, GuestCartLine } from '@/contracts/cart';
 import { applyDiscount } from '@/server/common/money';
 import { NotFoundError, ValidationError } from '@/server/common/errors';
+import { buildKey, withStore } from '@/server/common/cache';
+
+/** Cached per variant: display data only, no quantity, nothing user-specific. */
+type VariantDisplay = {
+  variantId: string;
+  productId: string;
+  productSlug: string;
+  productName: string;
+  variantName: string | null;
+  sku: string;
+  imageUrl: string | null;
+  sellingPriceCents: number;
+  discountCents: number;
+  stock: number;
+  isActive: boolean;
+};
 
 type FlatCartRow = {
   itemId: string;
@@ -51,7 +67,9 @@ async function ensureCart(userId: string) {
 }
 
 async function loadCart(userId: string): Promise<CartSnapshot> {
-  const cart = await ensureCart(userId);
+  // Reads must not write: a user with no cart yet just has an empty one.
+  const cart = await prisma.cart.findUnique({ where: { userId } });
+  if (!cart) return { lines: [], subtotalCents: 0, itemCount: 0 };
   const rows = await prisma.$queryRaw<FlatCartRow[]>(Prisma.sql`
     SELECT
       ci.id AS "itemId",
@@ -107,7 +125,8 @@ export const cartService = {
     itemCount: number;
     hasIssues: boolean;
   }> {
-    await ensureCart(userId);
+    const cart = await prisma.cart.findUnique({ where: { userId } });
+    if (!cart) return { subtotalCents: 0, itemCount: 0, hasIssues: false };
     const lines = await prisma.cartItem.findMany({
       where: { cart: { userId } },
       select: {
@@ -205,40 +224,71 @@ export const cartService = {
    */
   async hydrateGuestCart(guestLines: GuestCartLine[]): Promise<CartSnapshot> {
     if (guestLines.length === 0) return { lines: [], subtotalCents: 0, itemCount: 0 };
-    const variants = await prisma.productVariant.findMany({
-      where: { id: { in: guestLines.map((l) => l.variantId) } },
-      include: {
-        product: {
-          select: {
-            id: true,
-            slug: true,
-            name: true,
-            status: true,
-            images: { orderBy: { sortOrder: 'asc' as const }, take: 1 },
+    // shortcut: 30s display staleness, checkout re-validates; upgrade if price changes must show instantly
+    const ids = [...new Set(guestLines.map((l) => l.variantId))];
+    // bump v1 when the cached DTO shape changes (entries live 60-300s)
+    const keyOf = (id: string) => buildKey('var', 'v1', id);
+    const byVariantId = new Map<string, VariantDisplay>();
+    const hits = await withStore((s) => s.mget<VariantDisplay>(ids.map(keyOf)));
+    if (hits.ok) hits.value.forEach((d, i) => d && byVariantId.set(ids[i], d));
+
+    const missing = ids.filter((id) => !byVariantId.has(id));
+    if (missing.length > 0) {
+      const variants = await prisma.productVariant.findMany({
+        where: { id: { in: missing } },
+        include: {
+          product: {
+            select: {
+              id: true,
+              slug: true,
+              name: true,
+              status: true,
+              images: { orderBy: { sortOrder: 'asc' as const }, take: 1 },
+            },
           },
         },
-      },
-    });
-    const byVariantId = new Map(variants.map((v) => [v.id, v]));
+      });
+      const writes: Promise<unknown>[] = [];
+      for (const v of variants) {
+        const p = v.product;
+        const dto: VariantDisplay = {
+          variantId: v.id,
+          productId: p.id,
+          productSlug: p.slug,
+          productName: p.name,
+          variantName: v.name,
+          sku: v.sku,
+          imageUrl: p.images[0]?.url ?? null,
+          sellingPriceCents: v.sellingPriceCents,
+          discountCents: v.discountCents,
+          stock: v.stock,
+          isActive: v.isActive && p.status === 'PUBLISHED',
+        };
+        byVariantId.set(v.id, dto);
+        // Skip writes if the read already failed (store down/breaker open).
+        if (hits.ok) writes.push(withStore((s) => s.set(keyOf(v.id), dto, 30)));
+      }
+      await Promise.all(writes);
+    }
+
     const lines: CartLine[] = [];
     for (const guest of guestLines) {
-      const v = byVariantId.get(guest.variantId);
-      if (!v) continue;
-      const p = v.product;
+      const d = byVariantId.get(guest.variantId);
+      if (!d) continue;
       lines.push({
         itemId: guest.variantId,
-        variantId: v.id,
-        productId: p.id,
-        productSlug: p.slug,
-        productName: p.name,
-        variantName: v.name,
-        sku: v.sku,
-        imageUrl: p.images[0]?.url ?? null,
-        unitPriceCents: applyDiscount(v.sellingPriceCents, v.discountCents),
-        originalUnitPriceCents: v.sellingPriceCents,
+        variantId: d.variantId,
+        productId: d.productId,
+        productSlug: d.productSlug,
+        productName: d.productName,
+        variantName: d.variantName,
+        sku: d.sku,
+        imageUrl: d.imageUrl,
+        unitPriceCents: applyDiscount(d.sellingPriceCents, d.discountCents),
+        originalUnitPriceCents: d.sellingPriceCents,
         quantity: guest.quantity,
-        stock: v.stock,
-        isActive: v.isActive && p.status === 'PUBLISHED',
+        stock: d.stock,
+        isActive: d.isActive,
       });
     }
     const subtotalCents = lines.reduce((sum, l) => sum + l.unitPriceCents * l.quantity, 0);

@@ -95,6 +95,11 @@ export const reviewsService = {
       }));
   },
 
+  async productSlug(productId: string): Promise<string | null> {
+    const p = await prisma.product.findUnique({ where: { id: productId }, select: { slug: true } });
+    return p?.slug ?? null;
+  },
+
   /**
    * Submit a review. Guards:
    *   - The order item belongs to the user.

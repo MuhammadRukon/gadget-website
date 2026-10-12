@@ -74,6 +74,7 @@ export function HeaderSearch() {
           onChange={(e) => setSearch(e.target.value)}
           onFocus={() => setSearchFocused(true)}
           autoComplete="off"
+          maxLength={100}
           className="dark:placeholder:text-white w-full h-full placeholder:text-sm text-sm"
         />
       </form>
@@ -143,6 +144,7 @@ export function HeaderSearch() {
           {!previewLoading && preview && preview.total > preview.items.length && (
             <Link
               href={`/products?q=${encodeURIComponent(trimmed)}`}
+              prefetch={false}
               onClick={closePreview}
               className="
                   block

@@ -12,10 +12,7 @@ import { catalogService } from '@/server/catalog/catalog.service';
  * page render.
  */
 async function loadMenu(): Promise<MenuCategory[]> {
-  const [categories, brands] = await Promise.all([
-    catalogService.listPublicCategories(),
-    catalogService.listPublicBrands(),
-  ]);
+  const { categories, brands } = await catalogService.getCatalogShell();
 
   // For Phase 4 we keep the menu flat: top-level categories with all
   // brands shown as a flyout. Future phases can refine this with
