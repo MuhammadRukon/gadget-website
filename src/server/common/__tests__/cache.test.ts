@@ -65,6 +65,17 @@ describe('cached with memoryStore', () => {
     expect(set).toHaveBeenCalledWith('j', 1, 110);
   });
 
+  it('ttlFor overrides ttlSec using the loaded value', async () => {
+    const store = memoryStore();
+    const set = vi.spyOn(store, 'set');
+    setStoreForTests(store);
+    await cached(
+      { key: 't', ttlSec: 100, jitter: 0, ttlFor: (v: number[]) => (v.length ? 60 : 30) },
+      async () => [] as number[],
+    );
+    expect(set).toHaveBeenCalledWith('t', [], 30);
+  });
+
   it('skips set for payloads over 100KB but still returns them', async () => {
     const store = memoryStore();
     const set = vi.spyOn(store, 'set');

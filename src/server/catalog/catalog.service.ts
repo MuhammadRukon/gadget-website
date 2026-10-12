@@ -11,8 +11,10 @@ import {
   PublicProductPage,
   PublicProductSummary,
   PublicProductVariant,
+  productListQuerySchema,
   VariantInput,
 } from '@/contracts/catalog';
+import { buildKey, cacheDel, cached, stableHash } from '@/server/common/cache';
 import { ConflictError, NotFoundError, ValidationError } from '@/server/common/errors';
 import { applyDiscount } from '@/server/common/money';
 import { slugify } from '@/server/common/slug';
@@ -22,6 +24,8 @@ import { compareScored, scoreProduct } from './search-score';
 
 /** Hard cap on rows fetched for in-memory relevance scoring (see `listPublicProducts`). */
 const MAX_SEARCH_CANDIDATES = 500;
+
+const SHELL_KEY = () => buildKey('cat', 'shell', 'v1');
 
 /**
  * Terms used to widen the candidate `where` clause for a search query: the
@@ -142,13 +146,15 @@ export const catalogService = {
   async createBrand(input: BrandInput) {
     const slug = slugify(input.slug || input.name);
     try {
-      return await catalogRepo.createBrand({
+      const saved = await catalogRepo.createBrand({
         name: input.name,
         slug,
         logoUrl: input.logoUrl ?? null,
         isPopular: input.isPopular ?? false,
         status: brandStatusOrDefault(input),
       });
+      await cacheDel(SHELL_KEY());
+      return saved;
     } catch (err) {
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
         throw new ConflictError(`A brand with this ${uniqueConstraintField(err)} already exists`);
@@ -160,13 +166,15 @@ export const catalogService = {
   async updateBrand(id: string, input: BrandInput) {
     const slug = slugify(input.slug || input.name);
     try {
-      return await catalogRepo.updateBrand(id, {
+      const saved = await catalogRepo.updateBrand(id, {
         name: input.name,
         slug,
         logoUrl: input.logoUrl ?? null,
         isPopular: input.isPopular ?? false,
         status: brandStatusOrDefault(input),
       });
+      await cacheDel(SHELL_KEY());
+      return saved;
     } catch (err) {
       if (err instanceof Prisma.PrismaClientKnownRequestError) {
         if (err.code === 'P2002') {
@@ -181,6 +189,7 @@ export const catalogService = {
   async deleteBrand(id: string) {
     try {
       await catalogRepo.deleteBrand(id);
+      await cacheDel(SHELL_KEY());
     } catch (err) {
       if (err instanceof Prisma.PrismaClientKnownRequestError) {
         if (err.code === 'P2025') throw new NotFoundError('Brand');
@@ -203,7 +212,7 @@ export const catalogService = {
   async createCategory(input: CategoryInput) {
     const slug = slugify(input.slug || input.name);
     try {
-      return await catalogRepo.createCategory({
+      const saved = await catalogRepo.createCategory({
         name: input.name,
         slug,
         iconUrl: input.iconUrl ?? null,
@@ -211,6 +220,8 @@ export const catalogService = {
         status: categoryStatusOrDefault(input),
         parent: input.parentId ? { connect: { id: input.parentId } } : undefined,
       });
+      await cacheDel(SHELL_KEY());
+      return saved;
     } catch (err) {
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
         throw new ConflictError(
@@ -224,7 +235,7 @@ export const catalogService = {
   async updateCategory(id: string, input: CategoryInput) {
     const slug = slugify(input.slug || input.name);
     try {
-      return await catalogRepo.updateCategory(id, {
+      const saved = await catalogRepo.updateCategory(id, {
         name: input.name,
         slug,
         iconUrl: input.iconUrl ?? null,
@@ -232,6 +243,8 @@ export const catalogService = {
         status: categoryStatusOrDefault(input),
         parent: input.parentId ? { connect: { id: input.parentId } } : { disconnect: true },
       });
+      await cacheDel(SHELL_KEY());
+      return saved;
     } catch (err) {
       if (err instanceof Prisma.PrismaClientKnownRequestError) {
         if (err.code === 'P2002') {
@@ -248,6 +261,7 @@ export const catalogService = {
   async deleteCategory(id: string) {
     try {
       await catalogRepo.deleteCategory(id);
+      await cacheDel(SHELL_KEY());
     } catch (err) {
       if (err instanceof Prisma.PrismaClientKnownRequestError) {
         if (err.code === 'P2025') throw new NotFoundError('Category');
@@ -452,6 +466,14 @@ export const catalogService = {
 
   // --- Public storefront ---------------------------------------------------
 
+  /** Categories + brands for the storefront menu/sidebars, one cache entry. */
+  async getCatalogShell() {
+    return cached({ key: SHELL_KEY(), ttlSec: 300 }, async () => ({
+      categories: await this.listPublicCategories(),
+      brands: await this.listPublicBrands(),
+    }));
+  },
+
   async listPublicCategories() {
     return prisma.category.findMany({
       where: { status: PublishStatus.PUBLISHED },
@@ -511,6 +533,29 @@ export const catalogService = {
    * or pg_trgm similarity, both of which need a migration + raw SQL.
    */
   async listPublicProducts(query: ProductListQuery): Promise<PublicProductPage> {
+    const parsed = productListQuerySchema.safeParse(query);
+    if (!parsed.success) return this.loadPublicProducts(query);
+    const { q: rawQ, ...rest } = parsed.data;
+    const q = rawQ?.trim().toLowerCase().replace(/\s+/g, ' ');
+    const canonical: ProductListQuery = {
+      ...rest,
+      ...(q ? { q } : {}),
+      page: rest.page ?? 1,
+      limit: rest.limit ?? 12,
+      sort: rest.sort ?? 'newest',
+    };
+    // shortcut: TTL-only invalidation, <=60-120s stale, upgrade to a version key if admins need instant search updates
+    return cached(
+      {
+        key: buildKey('cat', q ? 'search' : 'list', 'v1', stableHash(canonical)),
+        ttlSec: q ? 120 : 60,
+        ttlFor: (page) => (page.items.length === 0 ? 30 : q ? 120 : 60),
+      },
+      () => this.loadPublicProducts(canonical),
+    );
+  },
+
+  async loadPublicProducts(query: ProductListQuery): Promise<PublicProductPage> {
     const pageSize = Math.min(60, Math.max(1, query.limit ?? 12));
     const page = Math.max(1, query.page ?? 1);
     const skip = (page - 1) * pageSize;

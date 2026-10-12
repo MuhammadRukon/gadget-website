@@ -74,11 +74,11 @@ export async function publishedSlugs(kind: 'category' | 'brand'): Promise<{ slug
 }
 
 async function loadLists(query: ProductListQuery) {
-  return Promise.all([
+  const [page, { brands, categories }] = await Promise.all([
     catalogService.listPublicProducts(query),
-    catalogService.listPublicBrands(),
-    catalogService.listPublicCategories(),
+    catalogService.getCatalogShell(),
   ]);
+  return [page, brands, categories] as const;
 }
 
 export async function ProductsListing({ query = {} }: Readonly<{ query?: ProductListQuery }>) {

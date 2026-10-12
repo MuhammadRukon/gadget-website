@@ -38,9 +38,12 @@ export function upstashStore(redis: Redis): CacheStore {
     del: async (...keys) => {
       if (keys.length) await withTimeout(redis.del(...keys));
     },
-    mget: <T>(keys: string[]) => (keys.length ? withTimeout(redis.mget<(T | null)[]>(...keys)) : Promise.resolve([])),
+    mget: <T>(keys: string[]) =>
+      keys.length ? withTimeout(redis.mget<(T | null)[]>(...keys)) : Promise.resolve([]),
     incrWindow: async (key, windowMs) => {
-      const [count, pttl] = await withTimeout(redis.eval<[number], [number, number]>(INCR_WINDOW_LUA, [key], [windowMs]));
+      const [count, pttl] = await withTimeout(
+        redis.eval<[number], [number, number]>(INCR_WINDOW_LUA, [key], [windowMs]),
+      );
       return { count, pttlMs: pttl };
     },
   };
@@ -111,7 +114,9 @@ export function __resetCacheStateForTests(): void {
  * Run one store op fail-open: returns `{ ok: false }` on no store, open breaker, error or timeout.
  * After 5 consecutive failures the store is skipped for 30s, then retried (half-open).
  */
-export async function withStore<T>(op: (s: CacheStore) => Promise<T>): Promise<{ ok: true; value: T } | { ok: false }> {
+export async function withStore<T>(
+  op: (s: CacheStore) => Promise<T>,
+): Promise<{ ok: true; value: T } | { ok: false }> {
   const store = getStore();
   if (!store || Date.now() < openUntil) return { ok: false };
   try {
@@ -120,7 +125,10 @@ export async function withStore<T>(op: (s: CacheStore) => Promise<T>): Promise<{
     return { ok: true, value };
   } catch (err) {
     if (++failures >= BREAKER_THRESHOLD) openUntil = Date.now() + BREAKER_OPEN_MS;
-    log.warn('cache store failure', { error: err instanceof Error ? err.message : String(err), failures });
+    log.warn('cache store failure', {
+      error: err instanceof Error ? err.message : String(err),
+      failures,
+    });
     return { ok: false };
   }
 }
@@ -130,7 +138,13 @@ export async function cacheDel(...keys: string[]): Promise<void> {
 }
 
 export async function cached<T>(
-  opts: { key: string; ttlSec: number; jitter?: number; random?: () => number },
+  opts: {
+    key: string;
+    ttlSec: number;
+    ttlFor?: (value: T) => number;
+    jitter?: number;
+    random?: () => number;
+  },
   loader: () => Promise<T>,
 ): Promise<T> {
   if (!getStore()) return loader();
@@ -146,7 +160,10 @@ export async function cached<T>(
     if (json !== undefined && Buffer.byteLength(json) <= MAX_PAYLOAD_BYTES) {
       const jitter = opts.jitter ?? 0.1;
       const rnd = (opts.random ?? Math.random)();
-      const ttl = Math.max(1, Math.round(opts.ttlSec * (1 + (rnd * 2 - 1) * jitter)));
+      const ttl = Math.max(
+        1,
+        Math.round((opts.ttlFor?.(value) ?? opts.ttlSec) * (1 + (rnd * 2 - 1) * jitter)),
+      );
       await withStore((s) => s.set(opts.key, value, ttl));
     }
     return value;
@@ -173,5 +190,7 @@ function sortKeys(v: unknown): unknown {
 }
 
 export function stableHash(obj: unknown): string {
-  return createHash('sha1').update(JSON.stringify(sortKeys(obj)) ?? 'undefined').digest('hex');
+  return createHash('sha1')
+    .update(JSON.stringify(sortKeys(obj)) ?? 'undefined')
+    .digest('hex');
 }
