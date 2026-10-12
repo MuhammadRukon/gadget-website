@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 "Cryptech" — gadget/electronics e-commerce MVP for the Bangladesh market. Next.js 16 App Router + React 19 + TypeScript, Prisma + PostgreSQL, Auth.js v5 (JWT sessions), TanStack Query + Zustand, Tailwind 4 + shadcn/ui, Cloudinary media, Vitest.
 
-Hosted on Vercel free tier + Prisma-hosted Postgres. Cost-sensitive: prefer DB-backed or free-tier solutions over paid infra (this is why rate limiting is a Postgres table, not Redis).
+Hosted on Vercel free tier + Prisma-hosted Postgres. Cost-sensitive: free tier first, prefer DB-backed solutions over paid infra. Upstash Redis (REST) is an **optional, fail-open** cache/limiter layer (`src/server/common/cache.ts`); with `UPSTASH_REDIS_REST_*` unset or Redis failing, the app falls back to the DB (rate limiting uses the Postgres `RateLimitBucket`).
 
 ## Commands
 
@@ -99,7 +99,7 @@ Logged-in carts are `Cart`/`CartItem` rows (unique per `userId`; `getCart` uses 
 
 - Path alias `@/*` maps to `src/*`.
 - Slugs via `src/server/common/slug.ts`; pagination via `src/server/common/pagination.ts`.
-- Rate limiting (`src/server/common/rate-limit.ts`) is Postgres-backed via the `RateLimitBucket` model so it works across serverless instances. Currently applied to signup, forgot, reset, and checkout only.
+- Rate limiting (`src/server/common/rate-limit.ts`) is Postgres-backed via the `RateLimitBucket` model so it works across serverless instances; Redis is an optional layer on top and any Redis failure falls back to Postgres. Currently applied to signup, forgot, reset, and checkout only.
 - Mailer (`src/server/common/mailer.ts`) uses Resend; with `RESEND_API_KEY` unset it logs and skips instead of sending.
 - Component trees: `src/components/ui/*` are generated shadcn primitives (edit sparingly), `src/components/*` are shared app components. `src/app/components/*` and `src/app/common/*` are legacy storefront-specific duplicates — **prefer `src/components` for new shared work.**
 - Tests cover pure logic plus some services; there are no API/integration or E2E tests. Pure functions in `src/server/common` are the easiest targets.
