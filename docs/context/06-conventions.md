@@ -22,9 +22,10 @@ Rules of thumb:
 
 ## Testing
 
-- Vitest (`npm run test`), config in `vitest.config.ts` (jsdom + vite-tsconfig-paths).
-- Existing tests cover pure logic: `src/server/common/__tests__/*`, `src/server/checkout/__tests__/shipping.test.ts`, `src/lib/__tests__/fetcher.test.ts`.
-- Pattern: pure functions in `src/server/common` are the easiest test targets; services need a mocked prisma (none exist yet).
+- Vitest (`npm run test`), config in `vitest.config.ts` (**node** environment, not jsdom; two projects: `parallel` and `settings-serial` for singleton-mutating tests).
+- **Test DB must be local** (`localhost:5433` or configured in `.env.dev`); `vitest.global-setup.ts` aborts on a non-local `DATABASE_URL`/`SHADOW_DATABASE_URL` or a missing `DATABASE_URL`, with no opt-out. Run tests via `npm test` (dotenv-cli loads `.env.dev`, i.e. the local dev DB). Test env blanks `RESEND_API_KEY` and `EMAIL_FROM` to prevent mailer calls.
+- Tests cover pure logic and some services (live Prisma, not mocked). Pattern: pure functions in `src/server/common` are easiest; checkout/payments/orders services use real DB fixtures. Any test touching `placeOrder`, `quote`, `PaymentSettings`, or COD fee logic must be named `*.serial.test.ts` to run serialized (one forked worker); fixture helpers throw if called from non-serial files.
+- Single test file: `npm test -- src/server/common/__tests__/money.test.ts`; single test by name: `npm test -- -t "free shipping"`.
 
 ## Git flow
 
@@ -33,8 +34,11 @@ Rules of thumb:
 
 ## Prisma
 
-- Schema changes: edit `prisma/schema.prisma` → `npx prisma migrate dev` (uses `SHADOW_DATABASE_URL`).
-- `npm run db:seed` seeds admin + demo catalog (`prisma/seed.ts`). Never run against production (default admin credentials — see issues).
+- Schema changes: edit `prisma/schema.prisma` → `npm run db:migrate` (`prisma migrate dev`). The shadow DB is wired (`shadowDatabaseUrl = env("SHADOW_DATABASE_URL")`, local `gadget_shadow`) and is needed only by `migrate dev`.
+- `migrate dev`, `migrate reset` and `npm run db:seed` are local-only. `db:seed` seeds admin + demo catalog (`prisma/seed.ts`); never run it against production (default admin credentials — see issues). Never run `migrate dev` against shared or production databases.
+- Hand-written SQL migrations are applied with `npm run db:deploy` locally (`prisma migrate deploy`); production deploys are manual, see README.
+- After a migration or schema change, run `npx prisma generate` to update the client.
+- Guard, shell-variable precedence, production migrations and `NODE_ENV=production` caveats: see README "Local vs production notes".
 
 ## UI components
 

@@ -1,41 +1,30 @@
-import { OrderStatus, PaymentMethod, PaymentStatus } from '@prisma/client';
+import { OrderStatus, PaymentStatus, type PaymentMethod } from '@prisma/client';
 import { randomBytes } from 'crypto';
 
 import { prisma } from '@/lib/prisma';
 import type { CheckoutInput, CheckoutQuote, StockConflictMeta } from '@/contracts/checkout';
-import { applyDiscount } from '@/server/common/money';
-import {
-  BadRequestError,
-  ConflictError,
-  NotFoundError,
-} from '@/server/common/errors';
-import { couponsService } from '@/server/coupons/coupons.service';
+import { ConflictError, NotFoundError } from '@/server/common/errors';
 import { cancelOrderInTx } from '@/server/orders/orders.service';
+import { assertTxnIdFree, mapTxnIdViolation } from '@/server/payments/txn-id';
+import {
+  assertMethodAvailable,
+  paymentSettingsService,
+} from '@/server/settings/payment-settings.service';
 
-import { computeShippingCents } from './shipping';
+import { loadCart, type ResolvedCartLine } from './cart-lines';
+import { priceOrder } from './pricing';
 
 interface QuoteInput {
   userId: string;
   addressId: string;
   couponCode?: string;
+  paymentMethod?: PaymentMethod;
 }
 
 function generateOrderNumber(): string {
   const ts = Date.now().toString(36).toUpperCase();
   const rnd = randomBytes(3).toString('hex').toUpperCase();
   return `T-${ts}-${rnd}`;
-}
-
-interface ResolvedCartLine {
-  variantId: string;
-  variantName: string | null;
-  productId: string;
-  productName: string;
-  sku: string;
-  imageUrl: string | null;
-  unitPriceCents: number;
-  buyingPriceCents: number;
-  quantity: number;
 }
 
 /** Total quantity per variant (a variant may appear on several lines). */
@@ -91,90 +80,62 @@ async function loadAddressOrThrow(userId: string, addressId: string) {
 }
 
 async function loadCartLines(userId: string): Promise<ResolvedCartLine[]> {
-  const items = await prisma.cartItem.findMany({
-    where: { cart: { userId } },
-    include: {
-      variant: {
-        include: {
-          product: {
-            select: {
-              id: true,
-              name: true,
-              status: true,
-              images: { orderBy: { sortOrder: 'asc' as const }, take: 1 },
-            },
-          },
-        },
-      },
-    },
-  });
-  if (items.length === 0) {
-    throw new BadRequestError('Cart is empty');
-  }
-
-  return items.map((item) => {
-    const v = item.variant;
-    const p = v.product;
-    assertLineAvailable(item);
-    return {
-      variantId: v.id,
-      variantName: v.name,
-      productId: p.id,
-      productName: p.name,
-      sku: v.sku,
-      imageUrl: p.images[0]?.url ?? null,
-      unitPriceCents: applyDiscount(v.sellingPriceCents, v.discountCents),
-      buyingPriceCents: v.buyingPriceCents,
-      quantity: item.quantity,
-    };
-  });
+  const { items, lines } = await loadCart(prisma, userId);
+  for (const item of items) assertLineAvailable(item);
+  return lines;
 }
 
 export const checkoutService = {
   async quote(input: QuoteInput): Promise<CheckoutQuote> {
-    const address = await loadAddressOrThrow(input.userId, input.addressId);
-    const lines = await loadCartLines(input.userId);
-    const subtotalCents = lines.reduce((sum, l) => sum + l.unitPriceCents * l.quantity, 0);
+    const { userId, addressId, couponCode, paymentMethod } = input;
+    // Independent reads run concurrently. Settings are only needed (and only
+    // read) when the caller asks about a payment method.
+    const [address, lines, settings] = await Promise.all([
+      loadAddressOrThrow(userId, addressId),
+      loadCartLines(userId),
+      paymentMethod ? paymentSettingsService.get() : undefined,
+    ]);
+    const payment = paymentMethod && settings ? { method: paymentMethod, settings } : undefined;
 
-    let discountCents = 0;
-    let couponCode: string | null = null;
-    if (input.couponCode) {
-      const validated = await couponsService.validate({
-        code: input.couponCode,
-        userId: input.userId,
-        subtotalCents,
-      });
-      discountCents = validated.discountCents;
-      couponCode = validated.code;
-    }
+    const priced = await priceOrder(prisma, { userId, address, lines, couponCode, payment });
+    if (payment) assertMethodAvailable(payment.settings, payment.method);
 
-    const itemCount = lines.reduce((sum, l) => sum + l.quantity, 0);
-    const shippingCents = computeShippingCents({
-      city: address.city,
-      subtotalCents: subtotalCents - discountCents,
-      itemCount,
-    });
-
-    const totalCents = Math.max(0, subtotalCents - discountCents) + shippingCents;
-    return { subtotalCents, discountCents, shippingCents, totalCents, couponCode };
+    const codFee = priced.plan?.fee ?? null;
+    const codFeeCents = codFee?.feeCents ?? 0;
+    return {
+      subtotalCents: priced.subtotalCents,
+      discountCents: priced.discountCents,
+      shippingCents: priced.shippingCents,
+      totalCents: priced.totalCents,
+      couponCode: priced.couponCode,
+      codFeeCents,
+      dueOnDeliveryCents: priced.totalCents - codFeeCents,
+      codFeeRule: codFee?.rule ?? null,
+    };
   },
 
   /**
    * Place an order. Single Prisma transaction does:
    *   1. Consume the cart first (count-checked delete) to serialize
-   *      duplicate submits for the same user.
+   *      duplicate submits for the same user. Right after that, and before
+   *      any stock mutation, the chosen payment method is checked against
+   *      the admin's effective settings (a throw rolls back the consume).
    *   2. Re-validate every line against current availability/stock to
    *      avoid overselling between quote and confirm.
-   *   3. Re-validate the coupon and compute totals + shipping.
-   *   4. Create the `Order`, snapshotting every line into `OrderItem`
-   *      (price, name, sku, image, buying price) so future catalog
-   *      changes never alter past orders.
-   *   5. Decrement variant stock atomically (in sorted variantId order);
+   *   3. `priceOrder`: re-validate the coupon, compute totals + shipping and
+   *      ask the payment method how to place the order (`planPlacement`:
+   *      initial status, payment fee fields, audit events; for COD this
+   *      resolves the confirmation fee).
+   *   4. Decrement variant stock atomically (in sorted variantId order);
    *      the conditional update is the real oversell guard.
-   *   6. Bump coupon `usedCount` if applied.
-   *   7. Create the `Payment` row in PENDING (COD is auto-confirmed at the
-   *      order level; payment itself stays PENDING until cash is collected).
-   *   8. Append an `OrderEvent` for audit.
+   *   5. Bump coupon `usedCount` if applied.
+   *   6. Create the `Order` with its `OrderItem` snapshots (price, name,
+   *      sku, image, buying price, so future catalog changes never alter
+   *      past orders), its `Payment` (PENDING, with the fee snapshot) and
+   *      its `OrderEvent` audit trail in one nested write. COD is
+   *      auto-confirmed unless a confirmation fee applies, in which case the
+   *      order stays PENDING until an admin verifies the fee; the payment
+   *      itself stays PENDING until cash is collected.
    * Anything failing rolls the whole thing back atomically.
    */
   async placeOrder(userId: string, input: CheckoutInput) {
@@ -182,115 +143,50 @@ export const checkoutService = {
 
     return prisma.$transaction(async (tx) => {
       // 1. Read and consume the cart inside the transaction.
-      const cartItems = await tx.cartItem.findMany({
-        where: { cart: { userId } },
-        include: {
-          variant: {
-            include: {
-              product: {
-                select: {
-                  id: true,
-                  name: true,
-                  status: true,
-                  images: { orderBy: { sortOrder: 'asc' as const }, take: 1 },
-                },
-              },
-            },
-          },
-        },
-      });
-      if (cartItems.length === 0) {
-        throw new BadRequestError('Cart is empty');
-      }
+      const { items: cartItems, lines } = await loadCart(tx, userId);
       // Consume the cart first. A concurrent placeOrder for the same user
       // blocks on these row deletes (READ COMMITTED row locks) and then
       // finds 0 rows, so a double submit can only succeed once.
       const consumed = await tx.cartItem.deleteMany({
-        where: { id: { in: cartItems.map((i) => i.id) } },
+        where: { id: { in: lines.map((l) => l.cartItemId) } },
       });
-      if (consumed.count !== cartItems.length) {
+      if (consumed.count !== lines.length) {
         throw new ConflictError('Your cart changed, please review and try again');
       }
+
+      // Enforce the admin's payment-method settings with a single settings
+      // read via tx (`effectiveMethods` also drops gateways without
+      // credentials). Before any stock mutation: a throw rolls back,
+      // including the cart consume above.
+      const settings = await paymentSettingsService.get(tx);
+      assertMethodAvailable(settings, input.paymentMethod);
 
       // 2. Re-validate availability and per-line stock.
       for (const item of cartItems) {
         assertLineAvailable(item);
       }
 
-      const lines: ResolvedCartLine[] = cartItems.map((item) => ({
-        variantId: item.variant.id,
-        variantName: item.variant.name,
-        productId: item.variant.product.id,
-        productName: item.variant.product.name,
-        sku: item.variant.sku,
-        imageUrl: item.variant.product.images[0]?.url ?? null,
-        unitPriceCents: applyDiscount(item.variant.sellingPriceCents, item.variant.discountCents),
-        buyingPriceCents: item.variant.buyingPriceCents,
-        quantity: item.quantity,
-      }));
-      const subtotalCents = lines.reduce((sum, l) => sum + l.unitPriceCents * l.quantity, 0);
-
-      // 3. Validate coupon (we re-run inside tx to lock in usedCount).
-      let discountCents = 0;
-      let couponId: string | null = null;
-      let couponCode: string | null = null;
-      if (input.couponCode) {
-        const validated = await couponsService.validate(
-          { code: input.couponCode, userId, subtotalCents },
-          tx,
-        );
-        discountCents = validated.discountCents;
-        couponId = validated.id;
-        couponCode = validated.code;
-      }
-
-      const itemCount = lines.reduce((sum, l) => sum + l.quantity, 0);
-      const shippingCents = computeShippingCents({
-        city: address.city,
-        subtotalCents: subtotalCents - discountCents,
-        itemCount,
+      // 3. Price the order; the coupon is re-validated inside the tx to lock in usedCount.
+      const priced = await priceOrder(tx, {
+        userId,
+        address,
+        lines,
+        couponCode: input.couponCode,
+        payment: { method: input.paymentMethod, settings, customerTxnId: input.customerTxnId },
       });
-      const totalCents = Math.max(0, subtotalCents - discountCents) + shippingCents;
+      const {
+        subtotalCents,
+        discountCents,
+        couponId,
+        couponCode,
+        shippingCents,
+        totalCents,
+        plan,
+      } = priced;
+      const customerTxnId = plan.paymentFields.customerTxnId ?? null;
+      if (customerTxnId) await assertTxnIdFree(tx, customerTxnId);
 
-      // 4. Create order with snapshotted address + items.
-      const order = await tx.order.create({
-        data: {
-          orderNumber: generateOrderNumber(),
-          userId,
-          addressId: address.id,
-          status: OrderStatus.PENDING,
-          shipRecipient: address.recipientName,
-          shipPhone: address.recipientPhone,
-          shipLine1: address.line1,
-          shipLine2: address.line2,
-          shipCity: address.city,
-          shipDistrict: address.district,
-          shipPostal: address.postalCode,
-          shipCountry: address.country,
-          subtotalCents,
-          discountCents,
-          shippingCents,
-          totalCents,
-          couponId,
-          couponCode,
-          notes: input.notes ?? null,
-          items: {
-            create: lines.map((l) => ({
-              variantId: l.variantId,
-              productId: l.productId,
-              productName: l.productName,
-              variantName: l.variantName,
-              sku: l.sku,
-              imageUrl: l.imageUrl,
-              buyingPriceCents: l.buyingPriceCents,
-              unitPriceCents: l.unitPriceCents,
-              quantity: l.quantity,
-            })),
-          },
-        },
-      });
-
-      // 5. Decrement stock per variant (grouped, fewer writes). Conditional
+      // 4. Decrement stock per variant (grouped, fewer writes). Conditional
       // on stock still being sufficient — under concurrent checkouts for
       // the same variant, only one transaction's decrement can win; the
       // other sees `count !== 1` and fails cleanly instead of overselling.
@@ -307,7 +203,7 @@ export const checkoutService = {
         }
       }
 
-      // 6. Increment coupon usage atomically. Re-read the limit inside this
+      // 5. Increment coupon usage atomically. Re-read the limit inside this
       // transaction and only increment if still under it — closes the race
       // where concurrent checkouts could both pass validate()'s read-only
       // check and both increment past usageLimit.
@@ -325,49 +221,71 @@ export const checkoutService = {
         }
       }
 
-      // 7. Create payment record.
-      const isCod = input.paymentMethod === PaymentMethod.COD;
-      const payment = await tx.payment.create({
-        data: {
-          orderId: order.id,
-          method: input.paymentMethod,
-          status: PaymentStatus.PENDING,
-          amountCents: totalCents,
-        },
-      });
-
-      // 8. Audit (cart was consumed at the top of the transaction).
-      await tx.orderEvent.create({
-        data: {
-          orderId: order.id,
-          status: OrderStatus.PENDING,
-          note: 'Order placed',
-          actorId: userId,
-        },
-      });
-
-      // Auto-confirm COD orders so the admin sees them in CONFIRMED state.
-      if (isCod) {
-        await tx.order.update({
-          where: { id: order.id },
-          data: { status: OrderStatus.CONFIRMED },
-        });
-        await tx.orderEvent.create({
+      // 6. Create the order with its snapshotted address + items, the
+      // payment and the audit events in one nested write, as the payment
+      // method's placement plan says. Events get explicit increasing
+      // timestamps: one nested create would otherwise stamp them all alike
+      // and the order trail is sorted by `createdAt`.
+      const eventsStart = Date.now();
+      try {
+        const placed = await tx.order.create({
           data: {
-            orderId: order.id,
-            status: OrderStatus.CONFIRMED,
-            note: 'COD order auto-confirmed; awaiting fulfilment',
-            actorId: userId,
+            orderNumber: generateOrderNumber(),
+            userId,
+            addressId: address.id,
+            status: plan.initialStatus,
+            shipRecipient: address.recipientName,
+            shipPhone: address.recipientPhone,
+            shipLine1: address.line1,
+            shipLine2: address.line2,
+            shipCity: address.city,
+            shipDistrict: address.district,
+            shipPostal: address.postalCode,
+            shipCountry: address.country,
+            subtotalCents,
+            discountCents,
+            shippingCents,
+            totalCents,
+            couponId,
+            couponCode,
+            notes: input.notes ?? null,
+            items: {
+              create: lines.map((l) => ({
+                variantId: l.variantId,
+                productId: l.productId,
+                productName: l.productName,
+                variantName: l.variantName,
+                sku: l.sku,
+                imageUrl: l.imageUrl,
+                buyingPriceCents: l.buyingPriceCents,
+                unitPriceCents: l.unitPriceCents,
+                quantity: l.quantity,
+              })),
+            },
+            payments: {
+              create: {
+                method: input.paymentMethod,
+                status: PaymentStatus.PENDING,
+                amountCents: totalCents,
+                ...plan.paymentFields,
+              },
+            },
+            events: {
+              create: plan.events.map((event, i) => ({
+                status: event.status,
+                note: event.note,
+                actorId: userId,
+                createdAt: new Date(eventsStart + i),
+              })),
+            },
           },
+          include: { items: true, payments: true },
         });
+        return { order: placed, paymentId: placed.payments[0].id, feeRequired: plan.feeRequired };
+      } catch (err) {
+        // Lost a race on the unique index despite the pre-check above.
+        throw customerTxnId ? await mapTxnIdViolation(err, customerTxnId) : err;
       }
-
-      const placed = await tx.order.findUnique({
-        where: { id: order.id },
-        include: { items: true, payments: true },
-      });
-      if (!placed) throw new Error('Order disappeared after creation');
-      return { order: placed, paymentId: payment.id };
     });
   },
 
