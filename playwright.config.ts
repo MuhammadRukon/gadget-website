@@ -12,7 +12,14 @@ export default defineConfig({
   use: { baseURL: BASE_URL, trace: 'retain-on-failure' },
   projects: [
     { name: 'infra', testMatch: 'infra.spec.ts' },
-    { name: 'chromium-desktop', testIgnore: 'infra.spec.ts', use: { ...devices['Desktop Chrome'] } },
+    // Not dependent on 'setup': infra stays dependency-free.
+    { name: 'setup', testMatch: 'auth.setup.ts', use: { ...devices['Desktop Chrome'] } },
+    {
+      name: 'chromium-desktop',
+      testIgnore: ['infra.spec.ts', 'auth.setup.ts'],
+      dependencies: ['setup'],
+      use: { ...devices['Desktop Chrome'] },
+    },
   ],
   webServer: {
     // shortcut: next dev server, upgrade to build+start if compile time makes tests flaky.
