@@ -177,7 +177,7 @@ Execution order: 1, 2, 3, 4, 6, 5, Cross-Validation (phases share one DB and por
 
 | Phase | Status | Commit | Review | Notes |
 | --- | --- | --- | --- | --- |
-| 1. Foundation | pending | - | deferred | - |
+| 1. Foundation | done | `3738bca` | deferred | general-purpose (Prisma/Node unknowns). Verified by orchestrator: `npm run test:e2e` 2 passed twice back to back; non-local URL refused (exit 1, `refusing`); gadget_e2e has exactly the 2 seeded users, both verified; port 3100 free after; typecheck clean (e2e included). Deviations: (a) webServer readiness probe is `/api/auth/csrf` (Playwright starts webServer before globalSetup, `/` 500s until seeded); (b) missing DB tolerated in the pre-reset `current_database()` check (Prisma errorCode undefined, matched by message); (c) `prisma migrate reset` is gated by Prisma's AI-safety check: owner consented (2026-10-13) to reset of local gadget_e2e only, passed as inline env `PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION` on agent/orchestrator commands, never committed; a manual `npm run test:e2e` is not gated. Not run: fresh-DB-from-nonexistent re-check (DB was created during the failed first run; agent log showed `migrate reset` creates it). Known: reset prints a non-fatal EPERM on `prisma generate` because the dev server holds the engine DLL |
 | 2. Guest browse and cart | pending | - | deferred | - |
 | 3. Auth and guards | pending | - | deferred | - |
 | 4. Orders and admin | pending | - | deferred | - |
