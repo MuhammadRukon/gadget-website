@@ -1,12 +1,12 @@
 import { prisma } from '@/lib/prisma';
 
 export const reviewsRepo = {
-  listByProduct(productId: string) {
+  listByProduct(productId: string, take = 50) {
     return prisma.review.findMany({
       where: { productId },
       include: { user: { select: { id: true, name: true } } },
       orderBy: { createdAt: 'desc' },
-      take: 50,
+      take,
     });
   },
 
