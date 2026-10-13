@@ -1,12 +1,12 @@
 'use client';
 
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useState, type ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from 'next-themes';
 import { SessionProvider, useSession } from 'next-auth/react';
 import { Toaster } from '@/components/ui/sonner';
-import { clearAuthHint, readAuthHint, setAuthHint } from '@/lib/auth-hint';
+import { readAuthHint, setAuthHint } from '@/lib/auth-hint';
 import { makeQueryClient } from '@/lib/queryClient';
 import { useGuestCartMerge } from '@/modules/cart/hooks';
 
@@ -33,7 +33,6 @@ const SESSION_PATHS = /^\/(login|account|orders|checkout)(\/|$)/;
  */
 export function AuthHintSync(): null {
   const { status, update } = useSession();
-  const sawLoading = useRef(false);
 
   useLayoutEffect(() => {
     const url = new URL(window.location.href);
@@ -46,11 +45,10 @@ export function AuthHintSync(): null {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on mount
   }, []);
 
-  // Sync the hint only from a real fetch result (session={null} also reads "unauthenticated").
+  // Set only: a null session also means a transient network/5xx error (next-auth swallows it).
+  // A forged hint is cleared by the 401 of the cart summary query; logout clears it too.
   useEffect(() => {
-    if (status === 'loading') sawLoading.current = true;
-    else if (status === 'authenticated') setAuthHint();
-    else if (sawLoading.current) clearAuthHint();
+    if (status === 'authenticated') setAuthHint();
   }, [status]);
 
   return null;

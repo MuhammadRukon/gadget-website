@@ -67,12 +67,12 @@ describe('AuthHintSync', () => {
     expect(readAuthHint()).toBe(true);
   });
 
-  it('a fetch that ends unauthenticated (forged hint) clears the hint', () => {
+  it('a fetch that ends unauthenticated (transient error also reads null) keeps the hint', () => {
     setAuthHint();
     session.status = 'loading';
     const { rerender } = render(<AuthHintSync />);
     session.status = 'unauthenticated';
     rerender(<AuthHintSync />);
-    expect(readAuthHint()).toBe(false);
+    expect(readAuthHint()).toBe(true);
   });
 });
