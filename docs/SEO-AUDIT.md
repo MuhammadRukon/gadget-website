@@ -1,25 +1,26 @@
 # SEO Audit
 
-Audit date: 2026-07-11, re-verified 2026-09-30. Verdict: **solid foundation, several high-impact gaps.** Catalog content is server-rendered and crawlable, sitemap/robots exist, PDP has OpenGraph + Product JSON-LD. Missing: `metadataBase`/canonicals, review/rating structured data (reviews are invisible to crawlers), breadcrumbs, Organization/WebSite schema, and a correct heading hierarchy.
+Audit date: 2026-07-11, re-verified 2026-10-13. Verdict: **solid foundation; a few low-impact gaps remain.** Catalog content is server-rendered and crawlable (including the first 10 PDP reviews), the sitemap and robots exist, the PDP has OpenGraph + Product JSON-LD with `aggregateRating`, canonicals and breadcrumbs are in place, and search results are `noindex`.
 
-**2026-09-30 re-verification**: all HIGH/MEDIUM/LOW items below re-checked against current source. No regressions, no fixes had landed since July. Items 1–5 (HIGH + Organization/WebSite) fixed in this pass — see checkmarks below. Also added, outside this list: `X-Content-Type-Options`, `X-Frame-Options: DENY`, and HSTS response headers in `next.config.ts` (trust signals; no iframe usage anywhere in the codebase, confirmed by grep, so `DENY` is safe).
+**Open items (2026-10-13):** #7 category/brand descriptions and OG tags, #6 per-page Twitter metadata (root default only), #13 image sitemap entries, #15 custom `not-found` metadata. Everything else below is done and kept for history.
 
 ## What's already good ✅
 
-- **Server-rendered catalog**: home, `/products`, PDP, category, brand pages are all server components with ISR (`revalidate` 60–120) — content is visible to crawlers.
+- **Server-rendered catalog**: home, `/products`, PDP, category, brand pages are all server components with ISR (`revalidate` 60–120) — content is visible to crawlers. Filtered/search views rewrite to `/live/*` twins that canonicalize to the base path; a search (`q`) or direct `/live/*` hit is `noindex` (`src/app/components/listing-query.ts`).
 - **Dynamic sitemap** (`src/app/sitemap.ts`): all published products (up to 5000), categories, brands with `lastModified`/priority.
 - **robots.ts**: sensible disallows (api, dashboard, account, cart, checkout, auth pages), sitemap + host declared.
 - **PDP metadata**: `generateMetadata` uses per-product `metaTitle`/`metaDescription` (admin-editable fields exist!), OpenGraph with product image.
 - **Product JSON-LD** on PDP (`product-detail.tsx` `buildJsonLd`): name, description, images, brand, sku, single Offer with BDT price and availability — server-rendered.
+- **Security headers** (`X-Content-Type-Options`, `X-Frame-Options: DENY`, HSTS) set in `next.config.ts`; no iframe usage in the codebase.
 - **Title template** (`%s | Cryptech`) in root layout; `lang="en"`.
-- **next/image everywhere** with mostly-good alt texts; self-hosted fonts via `next/font`.
+- **next/image everywhere** with mostly-good alt texts; self-hosted subsetted woff2 fonts via `next/font`.
 
 ## Gaps, by impact
 
 ### HIGH
 
 1. ~~**No `metadataBase`, no canonical URLs** — zero matches for `metadataBase`/`canonical`/`alternates` in `src`. Filtered/paginated listing URLs (`/products?page=2&sort=…`) have no canonical, risking duplicate-content dilution; OG image URL resolution is unspecified.~~ (✅ completed — `metadataBase` set in `src/app/layout.tsx`; `alternates.canonical` added on home, `/products`, PDP, category, brand. Filtered/sorted listing query strings still canonicalize to their base path, by design.)
-2. ~~**Reviews are invisible to crawlers and absent from structured data** — PDP reviews load via `next/dynamic ssr:false` (`deferred-reviews-section.tsx`), and Product JSON-LD has no `aggregateRating`/`review`. You forfeit star rich results, the single biggest e-commerce SERP CTR lever.~~ (✅ completed — PDP now fetches `reviewsService.summaryForProduct` server-side and `buildJsonLd` adds `aggregateRating` when `count > 0`; interactive list stays client-side as before.)
+2. ~~**Reviews are invisible to crawlers and absent from structured data** — PDP reviews load via `next/dynamic ssr:false` (`deferred-reviews-section.tsx`), and Product JSON-LD has no `aggregateRating`/`review`. You forfeit star rich results, the single biggest e-commerce SERP CTR lever.~~ (✅ completed — PDP fetches the summary server-side and `buildJsonLd` adds `aggregateRating` when `count > 0`; the newest 10 reviews are also in the ISR HTML, the full list loads on "Show all reviews".)
 3. ~~**No `BreadcrumbList` JSON-LD and no visible breadcrumbs** — a `CustomBreadcrumb` component exists but is never used. Category → product breadcrumbs help both UX and SERP display.~~ (✅ completed — `CustomBreadcrumb` wired into PDP (Home → Brand → Product) and `CommonListPage` (Home → Category/Brand/All products); matching `BreadcrumbList` JSON-LD via new `buildBreadcrumbJsonLd` helper.)
 4. ~~**Home page has no `<h1>`**; listing pages have an out-of-order `<h2>Filter Panel</h2>` before the `<h1>` (`product-filters.tsx:73`).~~ (✅ completed — home page has a `sr-only` `<h1>`; "Filter Panel" demoted from `<h2>` to a non-heading `<span>` since it sits before the page's own `<h1>` in DOM order.)
 
@@ -34,10 +35,10 @@ Audit date: 2026-07-11, re-verified 2026-09-30. Verdict: **solid foundation, sev
 
 ### LOW
 
-11. Fonts are `.ttf` (convert to `woff2` — smaller, faster LCP/CLS).
-12. Duplicate hero image loaded twice with `priority` on home (LCP waste).
+11. ~~Fonts are `.ttf` (convert to `woff2` — smaller, faster LCP/CLS).~~ (✅ completed — three subsetted woff2 files, `display: 'swap'`)
+12. ~~Duplicate hero image loaded twice with `priority` on home (LCP waste).~~ (✅ completed — single banner image)
 13. No image entries in the sitemap (product image sitemaps help Google Images traffic).
-14. `/products?q=` search results are indexable (not disallowed) — consider `noindex` on search-result views to preserve crawl budget.
+14. ~~`/products?q=` search results are indexable — consider `noindex` on search-result views.~~ (✅ completed — `q` requests are served from `/live/products`, which is `noindex`)
 15. 404 page exists (good); no custom `not-found` metadata.
 
 ## Recommended order of work

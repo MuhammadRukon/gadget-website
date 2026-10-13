@@ -16,15 +16,17 @@ Rules of thumb:
 - Only `src/server/common/http.ts` imports `next/server` in server-layer code.
 - Money is always integer cents; use helpers in `src/server/common/money.ts`.
 - Slugs via `src/server/common/slug.ts`.
-- Multi-step DB writes go inside `prisma.$transaction` — and pass the `tx` client to any service helpers called within (a known existing violation: coupon validate in checkout).
+- Multi-step DB writes go inside `prisma.$transaction` — and pass the `tx` client to any service helpers called within (checkout passes `tx` into coupon validation and pricing).
+- Admin writes that change what the storefront shows call `src/app/api/_lib/revalidate.ts` (`revalidateCatalog`, `revalidateProductPage`) after the service call succeeds; that file is the only `next/cache` importer. See [02-architecture.md](./02-architecture.md#caching--isr).
+- Cache keys: build them with `buildKey(...)` and hash filters with `stableHash` (`src/server/common/cache.ts`); put a `v1` segment in the key and bump it when the cached DTO shape changes. Redis is fail-open: never make correctness depend on a cache hit, and never put emails, IPs or other PII in a key or value.
 - Forms: react-hook-form + `zodResolver` with the same contract schema.
 - Toasts via `sonner`; loading states per-component.
 
 ## Testing
 
-- Vitest (`npm run test`), config in `vitest.config.ts` (**node** environment, not jsdom; two projects: `parallel` and `settings-serial` for singleton-mutating tests).
+- Vitest (`npm run test`), config in `vitest.config.ts` (default **node** environment; two projects: `parallel` and `settings-serial` for singleton-mutating tests). A file that needs a DOM (hooks, components) opts into jsdom with a `// @vitest-environment jsdom` docblock, as `src/hooks/__tests__/use-header-search-preview.test.ts` does.
 - **Test DB must be local** (`localhost:5433` or configured in `.env.dev`); `vitest.global-setup.ts` aborts on a non-local `DATABASE_URL`/`SHADOW_DATABASE_URL` or a missing `DATABASE_URL`, with no opt-out. Run tests via `npm test` (dotenv-cli loads `.env.dev`, i.e. the local dev DB). Test env blanks `RESEND_API_KEY` and `EMAIL_FROM` to prevent mailer calls.
-- Tests cover pure logic and some services (live Prisma, not mocked). Pattern: pure functions in `src/server/common` are easiest; checkout/payments/orders services use real DB fixtures. Any test touching `placeOrder`, `quote`, `PaymentSettings`, or COD fee logic must be named `*.serial.test.ts` to run serialized (one forked worker); fixture helpers throw if called from non-serial files.
+- Tests cover pure logic, services (live Prisma, not mocked), route handlers (`src/app/api/__tests__`) and a few jsdom hook tests; there is no browser E2E yet. Pattern: pure functions in `src/server/common` are easiest; checkout/payments/orders services use real DB fixtures. Any test touching `placeOrder`, `quote`, `PaymentSettings`, or COD fee logic must be named `*.serial.test.ts` to run serialized (one forked worker); fixture helpers throw if called from non-serial files.
 - Single test file: `npm test -- src/server/common/__tests__/money.test.ts`; single test by name: `npm test -- -t "free shipping"`.
 
 ## Git flow

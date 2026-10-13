@@ -1,6 +1,6 @@
 /**
  * Security regression: a `sandbox_`-prefixed ref is trusted ONLY while the
- * gateway's credentials are absent (see docs/issues/01-security.md #1).
+ * gateway's credentials are absent (see the "Sandbox fallback" note in CLAUDE.md).
  *
  * The matrix pins the exact presence rule the providers have always used:
  * a variable counts as present when its value is a non-empty string, so
