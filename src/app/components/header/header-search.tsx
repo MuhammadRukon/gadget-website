@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { formatBDT } from '@/server/common/money';
-import { useHeaderSearchPreview } from '@/hooks/use-header-search-preview';
+import { MIN_PREVIEW_CHARS, useHeaderSearchPreview } from '@/hooks/use-header-search-preview';
 import { useMobileSearch } from '../../../stores/mobile-search.store';
 
 /**
@@ -24,7 +24,7 @@ export function HeaderSearch() {
   const wrapperRef = useRef<HTMLDivElement>(null);
 
   const trimmed = search.trim();
-  const showPreviewPanel = searchFocused && trimmed.length > 0;
+  const showPreviewPanel = searchFocused && trimmed.length >= MIN_PREVIEW_CHARS;
 
   // close when clicking outside
   useEffect(() => {

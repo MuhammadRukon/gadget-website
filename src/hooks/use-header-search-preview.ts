@@ -8,6 +8,30 @@ import { debounce } from '@/lib/debounce';
 
 const SEARCH_PREVIEW_DEBOUNCE_MS = 400;
 const SEARCH_PREVIEW_LIMIT = '8';
+export const MIN_PREVIEW_CHARS = 3;
+const PREVIEW_CACHE_TTL_MS = 60_000;
+const PREVIEW_CACHE_MAX = 30;
+
+// shortcut: per-tab in-memory cache, no cross-tab sharing; move to TanStack Query if more client caching is needed.
+const previewCache = new Map<string, { data: PublicProductPage; at: number }>();
+
+export const previewCacheKey = (q: string) => q.trim().toLowerCase().replace(/\s+/g, ' ');
+
+export function readPreviewCache(key: string, now = Date.now()): PublicProductPage | undefined {
+  const hit = previewCache.get(key);
+  if (!hit) return undefined;
+  if (now - hit.at > PREVIEW_CACHE_TTL_MS) {
+    previewCache.delete(key);
+    return undefined;
+  }
+  return hit.data;
+}
+
+export function writePreviewCache(key: string, data: PublicProductPage, now = Date.now()): void {
+  previewCache.delete(key);
+  if (previewCache.size >= PREVIEW_CACHE_MAX) previewCache.delete(previewCache.keys().next().value!);
+  previewCache.set(key, { data, at: now });
+}
 
 const emptyPublicProductPage: PublicProductPage = {
   items: [],
@@ -41,6 +65,7 @@ export function useHeaderSearchPreview(): UseHeaderSearchPreviewResult {
         return;
       }
       const data: PublicProductPage = await res.json();
+      writePreviewCache(previewCacheKey(q), data);
       if (!signal.aborted) setPreview(data);
     } catch (err) {
       if ((err as Error).name === 'AbortError') return;
@@ -70,10 +95,18 @@ export function useHeaderSearchPreview(): UseHeaderSearchPreviewResult {
   useEffect(() => {
     const q = search.trim();
     latestQueryRef.current = q;
-    if (!q) {
+    if (q.length < MIN_PREVIEW_CHARS) {
       schedulePreviewFetch.current.cancel();
       previewAbortRef.current?.abort();
       setPreview(null);
+      setPreviewLoading(false);
+      return;
+    }
+    const cachedPreview = readPreviewCache(previewCacheKey(q));
+    if (cachedPreview) {
+      schedulePreviewFetch.current.cancel();
+      previewAbortRef.current?.abort();
+      setPreview(cachedPreview);
       setPreviewLoading(false);
       return;
     }
@@ -96,7 +129,7 @@ export function useHeaderSearchPreview(): UseHeaderSearchPreviewResult {
   );
 
   const trimmedSearch = search.trim();
-  const effectivePreviewLoading = previewLoading || (trimmedSearch.length > 0 && preview === null);
+  const effectivePreviewLoading = previewLoading || (trimmedSearch.length >= MIN_PREVIEW_CHARS && preview === null);
 
   return {
     search,

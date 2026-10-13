@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma';
 import type { CartLine, CartSnapshot, GuestCartLine } from '@/contracts/cart';
 import { applyDiscount } from '@/server/common/money';
 import { NotFoundError, ValidationError } from '@/server/common/errors';
-import { buildKey, withStore } from '@/server/common/cache';
+import { buildKey, runDeferred, withStore } from '@/server/common/cache';
 
 /** Cached per variant: display data only, no quantity, nothing user-specific. */
 type VariantDisplay = {
@@ -248,7 +248,7 @@ export const cartService = {
           },
         },
       });
-      const writes: Promise<unknown>[] = [];
+      const writes: Array<() => Promise<unknown>> = [];
       for (const v of variants) {
         const p = v.product;
         const dto: VariantDisplay = {
@@ -266,9 +266,9 @@ export const cartService = {
         };
         byVariantId.set(v.id, dto);
         // Skip writes if the read already failed (store down/breaker open).
-        if (hits.ok) writes.push(withStore((s) => s.set(keyOf(v.id), dto, 30)));
+        if (hits.ok) writes.push(() => withStore((s) => s.set(keyOf(v.id), dto, 30)));
       }
-      await Promise.all(writes);
+      if (writes.length > 0) await runDeferred(() => Promise.all(writes.map((w) => w())));
     }
 
     const lines: CartLine[] = [];
