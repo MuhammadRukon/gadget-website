@@ -1,10 +1,16 @@
 import { Prisma } from '@prisma/client';
 
 import { prisma } from '@/lib/prisma';
-import type { CartLine, CartSnapshot, GuestCartLine } from '@/contracts/cart';
+import type {
+  CartLine,
+  CartMergeResult,
+  CartSnapshot,
+  GuestCartLine,
+  MergeAdjustment,
+} from '@/contracts/cart';
 import { applyDiscount } from '@/server/common/money';
 import { NotFoundError, ValidationError } from '@/server/common/errors';
-import { buildKey, withStore } from '@/server/common/cache';
+import { buildKey, runDeferred, withStore } from '@/server/common/cache';
 
 /** Cached per variant: display data only, no quantity, nothing user-specific. */
 type VariantDisplay = {
@@ -248,7 +254,7 @@ export const cartService = {
           },
         },
       });
-      const writes: Promise<unknown>[] = [];
+      const toCache: Array<[string, VariantDisplay]> = [];
       for (const v of variants) {
         const p = v.product;
         const dto: VariantDisplay = {
@@ -266,9 +272,13 @@ export const cartService = {
         };
         byVariantId.set(v.id, dto);
         // Skip writes if the read already failed (store down/breaker open).
-        if (hits.ok) writes.push(withStore((s) => s.set(keyOf(v.id), dto, 30)));
+        if (hits.ok) toCache.push([v.id, dto]);
       }
-      await Promise.all(writes);
+      if (toCache.length > 0) {
+        await runDeferred(() =>
+          Promise.all(toCache.map(([id, dto]) => withStore((s) => s.set(keyOf(id), dto, 30)))),
+        );
+      }
     }
 
     const lines: CartLine[] = [];
@@ -300,10 +310,11 @@ export const cartService = {
    * Merge a guest cart (typically held in localStorage) into the
    * authenticated user's server cart on login. Quantities are summed
    * and clamped to available stock; unavailable variants are silently
-   * skipped so the merge never fails the login flow.
+   * skipped so the merge never fails the login flow. `adjustments` lists
+   * every guest line that was not fully applied (applied 0 = removed).
    */
-  async mergeGuestCart(userId: string, guestLines: GuestCartLine[]): Promise<CartSnapshot> {
-    if (guestLines.length === 0) return loadCart(userId);
+  async mergeGuestCart(userId: string, guestLines: GuestCartLine[]): Promise<CartMergeResult> {
+    if (guestLines.length === 0) return { ...(await loadCart(userId)), adjustments: [] };
     const cart = await ensureCart(userId);
     const aggregatedGuestQty = new Map<string, number>();
     for (const line of guestLines) {
@@ -317,7 +328,7 @@ export const cartService = {
           id: true,
           stock: true,
           isActive: true,
-          product: { select: { status: true } },
+          product: { select: { status: true, name: true } },
         },
       }),
       prisma.cartItem.findMany({
@@ -334,14 +345,19 @@ export const cartService = {
     const existingItemByVariantId = new Map(existingItems.map((i) => [i.variantId, i] as const));
     const createRows: Array<{ cartId: string; variantId: string; quantity: number }> = [];
     const updateOps: Array<ReturnType<typeof prisma.cartItem.update>> = [];
+    const adjustments: MergeAdjustment[] = [];
+    const nameById = new Map(variants.map((v) => [v.id, v.product.name] as const));
 
     for (const [variantId, guestQty] of aggregatedGuestQty.entries()) {
       const variant = validVariantById.get(variantId);
-      if (!variant) continue;
       const existing = existingItemByVariantId.get(variantId);
-      const desired = (existing?.quantity ?? 0) + guestQty;
-      const clamped = Math.min(desired, variant.stock);
-      if (clamped <= 0) continue;
+      const clamped = variant ? Math.min((existing?.quantity ?? 0) + guestQty, variant.stock) : 0;
+      const applied = Math.max(0, clamped - (existing?.quantity ?? 0));
+      if (applied < guestQty) {
+        const name = nameById.get(variantId);
+        adjustments.push({ variantId, ...(name ? { name } : {}), requested: guestQty, applied });
+      }
+      if (!variant || clamped <= 0) continue;
 
       if (existing) {
         if (existing.quantity !== clamped) {
@@ -364,6 +380,6 @@ export const cartService = {
       ...updateOps,
     ]);
 
-    return loadCart(userId);
+    return { ...(await loadCart(userId)), adjustments };
   },
 };

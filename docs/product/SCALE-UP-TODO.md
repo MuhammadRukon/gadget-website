@@ -2,7 +2,7 @@
 
 A staged checklist of infrastructure, tooling, and features to adopt **as revenue and traffic justify the cost**. Complements [FEATURE-GAPS.md](./FEATURE-GAPS.md) (which covers what's needed *now*). Don't build ahead of need — each stage has a trigger.
 
-Current baseline: Vercel free tier, Prisma-hosted Postgres, Cloudinary free tier, no email/Redis/queue/monitoring.
+Current baseline: Vercel free tier, Prisma-hosted Postgres, Cloudinary free tier, Resend email, optional Upstash Redis (cache and limiter); no queue or monitoring.
 
 ---
 
@@ -18,12 +18,12 @@ Trigger: consistent daily orders, or free-tier limits start pinching.
 - [ ] **Vercel spend guard** — set a hard spending limit before upgrading to Pro so a traffic spike can't surprise-bill you.
 
 ### Caching (cheap wins first)
-- [ ] **Tune ISR/`revalidate`** — you already use it; add `revalidate` to category/brand API responses and lengthen PDP revalidate for stable products.
-- [ ] **`Cache-Control` headers on public API routes** (`/api/catalog/*`) — lets Vercel's edge CDN absorb repeat reads; the CDN itself is already in front of you for free.
-- [ ] **Upstash Redis (free tier)** — one client, three uses: real rate limiting (replaces the in-memory Map — see issues/01 §3), hot catalog cache (home/menu queries), and coupon counters.
+- [x] **Tune ISR/`revalidate`** — done: listings 60 s, home/PDP 120 s, on-demand purge on admin writes, filtered listings on dynamic `/live/*` twins (see [02-architecture.md](../context/02-architecture.md#caching--isr)).
+- [x] **`Cache-Control` headers on public API routes** (`/api/catalog/*`) — done (`src/app/api/_lib/cache-control.ts`).
+- [ ] **Upstash Redis (free tier)** — rate limiting, catalog/list cache and guest-cart display cache are done (optional, fail-open). Remaining: coupon counters, measure real command usage, set the budget cap and 80% alert.
 
 ### Email/SMS (if not already done from FEATURE-GAPS P0)
-- [ ] Resend/Brevo for transactional email; a BD SMS gateway (e.g. BulkSMS BD, Alpha SMS) for order updates — SMS converts better than email locally.
+- [x] Transactional email via Resend — done. [ ] A BD SMS gateway (e.g. BulkSMS BD, Alpha SMS) for order updates — SMS converts better than email locally.
 
 ### Analytics
 - [ ] **Product analytics** — PostHog (generous free tier) or GA4: funnels (view → cart → checkout → paid), search terms with zero results, abandonment points. Vercel Analytics only gives you page views.
@@ -41,13 +41,13 @@ Trigger: free tiers exhausted, or ops pain is costing real time/money.
 - [ ] **Structured log drain** — ship Vercel logs to Axiom/Better Stack for searchable history beyond the retention window.
 
 ### Database
-- [ ] **Query review** — fix the known offenders first (analytics in-memory aggregation, admin lists without pagination — issues/03), then add missing indexes based on `pg_stat_statements`.
+- [ ] **Query review** — fix the known offenders first (analytics in-memory aggregation, admin lists without pagination — see [KNOWN-ISSUES](../KNOWN-ISSUES.md#architecture)), then add missing indexes based on `pg_stat_statements`.
 - [ ] **Full-text / faceted search** — Postgres `tsvector` first (free, good for ~10k SKUs); jump to Meilisearch/Typesense (self-host or cloud) when you need typo tolerance, facets, and merchandising. Skip Algolia unless margins are fat.
 - [ ] **Read scaling** — only if dashboards/analytics start hurting checkout latency: read replica or move analytics to nightly materialized views.
 
 ### Media
 - [ ] **Cloudinary plan review** — you'll hit the free 25 credits with real catalog + traffic. Alternatives at scale: Cloudflare Images or S3/R2 + `next/image` optimization, which is dramatically cheaper per GB.
-- [ ] **Media hygiene** — orphan sweep for Cloudinary assets (the uploader already leaks — issues/04 §2), image variant policy (upload once, transform on delivery), enforce max dimensions.
+- [ ] **Media hygiene** — orphan sweep for Cloudinary assets (the uploader already leaks — see [KNOWN-ISSUES](../KNOWN-ISSUES.md#frontend)), image variant policy (upload once, transform on delivery), enforce max dimensions.
 - [ ] **Product video support** — short demo clips on PDP measurably lift gadget conversion.
 
 ### Features (growth levers)
@@ -68,7 +68,7 @@ Trigger: free tiers exhausted, or ops pain is costing real time/money.
 ### Engineering process
 - [ ] **CI pipeline** — GitHub Actions: lint + typecheck + tests + build on every PR (currently nothing enforces this).
 - [ ] **E2E smoke tests** — Playwright over the money path: browse → add to cart → checkout (sandbox payment) → order visible. Run in CI on `dev → main` PRs.
-- [ ] Service-layer test coverage for checkout/payments (the race-condition zone — issues/03 §10).
+- [ ] Service-layer test coverage for checkout/payments (the race-condition zone — see [KNOWN-ISSUES](../KNOWN-ISSUES.md#correctness)).
 
 ---
 
@@ -89,7 +89,7 @@ Trigger: hiring staff, multiple people in the admin, real money at stake.
 - [ ] Fraud signals for COD (repeat-refuser detection, phone/address blocklists) — COD refusal is the #1 margin killer in BD e-commerce.
 
 ### Team & ops features
-- [ ] Staff roles/permissions (ORDER_MANAGER, CATALOG_EDITOR…) — replaces the single ADMIN role (issues/03 §11).
+- [ ] Staff roles/permissions (ORDER_MANAGER, CATALOG_EDITOR…) — replaces the single ADMIN role ([KNOWN-ISSUES](../KNOWN-ISSUES.md#architecture)).
 - [ ] Full audit log across all admin mutations.
 - [ ] Inventory ledger (stock movements with reasons: sale, return, damage, purchase) + multi-warehouse if applicable.
 - [ ] Supplier/purchase-order module (buying price already exists per variant — extend it).

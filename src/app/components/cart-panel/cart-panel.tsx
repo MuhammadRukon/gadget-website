@@ -3,8 +3,8 @@
 import Link from 'next/link';
 import { ShoppingCart } from 'lucide-react';
 
-import { Loader } from '@/app/common/loader/loader';
-import { CartLineItem } from '@/app/components/cart/cart-line-item';
+import { CartLineItem, CartLinesLoading } from '@/app/components/cart/cart-line-item';
+import { CartNotices } from '@/app/components/cart/cart-notices';
 import { CartSummary } from '@/app/components/cart/cart-summary';
 import { Button } from '@/components/ui/button';
 import {
@@ -17,12 +17,11 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet';
-import { useCart } from '@/modules/cart/hooks';
+import { cartAvailability, cartHeaderLabel } from '@/modules/cart/availability';
+import { useCart, useCartBadgeCount } from '@/modules/cart/hooks';
 
 export function CartPanel() {
-  const { cart, isLoading, isAuthenticated } = useCart();
-  const isEmpty = !cart || cart.lines.length === 0;
-  const itemCount = cart?.itemCount ?? 0;
+  const itemCount = useCartBadgeCount();
 
   return (
     <Sheet>
@@ -40,54 +39,74 @@ export function CartPanel() {
         </button>
       </SheetTrigger>
       <SheetContent className="flex flex-col gap-0">
-        <SheetHeader>
-          <SheetTitle>Cart</SheetTitle>
-          <SheetDescription>You cart items.</SheetDescription>
-        </SheetHeader>
-
-        <div className="flex-1 overflow-y-auto px-4">
-          {isLoading ? (
-            <div className="flex justify-center py-10">
-              <Loader />
-            </div>
-          ) : isEmpty ? (
-            <p className="py-10 text-center text-sm text-muted-foreground">
-              Your cart is empty.{' '}
-              <SheetClose asChild>
-                <Link href="/products" className="underline">
-                  Browse products
-                </Link>
-              </SheetClose>
-              .
-            </p>
-          ) : (
-            <ul className="divide-y">
-              {cart?.lines.map((line) => (
-                <li key={line.itemId}>
-                  <CartLineItem line={line} compact />
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
-        <SheetFooter className="gap-3">
-          {isEmpty ? null : <CartSummary cart={cart} authenticated={isAuthenticated} isPanel />}
-          <div className="flex w-full gap-2">
-            <SheetClose asChild>
-              <Button asChild className="flex-1" disabled={isEmpty}>
-                <Link href="/checkout">Proceed to checkout</Link>
-              </Button>
-            </SheetClose>
-
-            <SheetClose asChild>
-              <Button asChild variant="outline" className="flex-1" disabled={isEmpty}>
-                <Link href="/cart">View cart</Link>
-              </Button>
-            </SheetClose>
-          </div>
-        </SheetFooter>
+        <CartPanelContent />
       </SheetContent>
     </Sheet>
+  );
+}
+
+/** Radix unmounts SheetContent children while closed, so the full cart is only fetched once the panel opens. */
+function CartPanelContent() {
+  const { cart, isLoading, isPriceLoading, isAuthenticated } = useCart();
+  const isEmpty = !cart || cart.lines.length === 0;
+
+  return (
+    <>
+      <SheetHeader>
+        <SheetTitle>Cart</SheetTitle>
+        <SheetDescription>
+          {isEmpty ? 'You cart items.' : cartHeaderLabel(cartAvailability(cart.lines))}
+        </SheetDescription>
+      </SheetHeader>
+
+      <div className="flex-1 overflow-y-auto px-4">
+        <CartNotices lines={cart?.lines} />
+        {isLoading ? (
+          <CartLinesLoading authenticated={isAuthenticated} compact />
+        ) : isEmpty ? (
+          <p className="py-10 text-center text-sm text-muted-foreground">
+            Your cart is empty.{' '}
+            <SheetClose asChild>
+              <Link href="/products" className="underline">
+                Browse products
+              </Link>
+            </SheetClose>
+            .
+          </p>
+        ) : (
+          <ul className="divide-y">
+            {cart?.lines.map((line) => (
+              <li key={line.itemId}>
+                <CartLineItem line={line} compact priceLoading={isPriceLoading} />
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <SheetFooter className="gap-3">
+        {isEmpty ? null : (
+          <CartSummary
+            cart={cart}
+            authenticated={isAuthenticated}
+            isPanel
+            priceLoading={isPriceLoading}
+          />
+        )}
+        <div className="flex w-full gap-2">
+          <SheetClose asChild>
+            <Button asChild className="flex-1" disabled={isEmpty}>
+              <Link href="/checkout">Proceed to checkout</Link>
+            </Button>
+          </SheetClose>
+
+          <SheetClose asChild>
+            <Button asChild variant="outline" className="flex-1" disabled={isEmpty}>
+              <Link href="/cart">View cart</Link>
+            </Button>
+          </SheetClose>
+        </div>
+      </SheetFooter>
+    </>
   );
 }

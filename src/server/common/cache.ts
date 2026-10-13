@@ -11,7 +11,7 @@ export interface CacheStore {
   incrWindow(key: string, windowMs: number): Promise<{ count: number; pttlMs: number }>;
 }
 
-const TIMEOUT_MS = 400;
+const TIMEOUT_MS = 250;
 const MAX_PAYLOAD_BYTES = 100 * 1024;
 const BREAKER_THRESHOLD = 5;
 const BREAKER_OPEN_MS = 30_000;
@@ -134,6 +134,29 @@ export async function withStore<T>(
   }
 }
 
+// Held on globalThis: instrumentation.ts injects it from its own module graph, which may not share this module instance.
+const DEFER_KEY = Symbol.for('gw.cache.defer');
+type Defer = (task: () => Promise<unknown>) => void;
+
+/** Inject a post-response scheduler (Next `after`) from instrumentation.ts. undefined = await writes inline. */
+export function setDefer(fn: Defer | undefined): void {
+  (globalThis as { [DEFER_KEY]?: Defer })[DEFER_KEY] = fn;
+}
+
+/** Run a store write after the response when a scheduler is set; if it is unset or throws (no request scope), await it inline. */
+export async function runDeferred(task: () => Promise<unknown>): Promise<void> {
+  const defer = (globalThis as { [DEFER_KEY]?: Defer })[DEFER_KEY];
+  if (defer) {
+    try {
+      defer(task);
+      return;
+    } catch {
+      // outside a request scope (tests, build): fall through to the awaited write
+    }
+  }
+  await task();
+}
+
 export async function cacheDel(...keys: string[]): Promise<void> {
   await withStore((s) => s.del(...keys));
 }
@@ -164,7 +187,7 @@ export async function cached<T>(
         1,
         Math.round((opts.ttlFor?.(value) ?? opts.ttlSec) * (1 + (rnd * 2 - 1) * jitter)),
       );
-      await withStore((s) => s.set(opts.key, value, ttl));
+      await runDeferred(() => withStore((s) => s.set(opts.key, value, ttl)));
     }
     return value;
   })().finally(() => inflight.delete(opts.key));

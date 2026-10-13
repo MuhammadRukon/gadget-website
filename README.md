@@ -2,7 +2,7 @@
 
 A full-stack e-commerce MVP for gadgets/electronics targeting the Bangladesh market. Customers get catalog browsing, search/filters, guest + logged-in cart, checkout with local payment methods (COD, bKash, SSLCommerz, bank transfer), order tracking, verified-purchase reviews, and warranty claims. Admins get a dashboard for catalog, orders, payment verification, coupons, warranty, users, and analytics.
 
-**📚 Full documentation lives in [`docs/`](./docs/context/00-INDEX.md)** — architecture, data model, API reference, known flaws, feature roadmap, and SEO audit.
+**📚 Full documentation lives in [`docs/`](./docs/context/00-INDEX.md)** — architecture, data model, API reference, known issues, feature roadmap, and SEO audit.
 
 ## Tech Stack
 
@@ -11,9 +11,10 @@ A full-stack e-commerce MVP for gadgets/electronics targeting the Bangladesh mar
 - **Auth:** Auth.js v5 (next-auth) — credentials + Google OAuth, JWT sessions
 - **Validation:** Zod contracts shared client/server (`src/contracts/`)
 - **State:** TanStack Query (server state) + Zustand (guest cart)
+- **Caching:** Next ISR for public catalog pages; optional Upstash Redis (cache + rate limiter), fail-open to Postgres
 - **UI:** Tailwind CSS 4 + shadcn/ui (Radix)
 - **Media:** Cloudinary
-- **Testing:** Vitest + React Testing Library
+- **Testing:** Vitest (node, DB-backed via `npm test` against the local Postgres; jsdom per file for hooks) + React Testing Library
 - **Deployment:** Vercel (free tier) — `main` auto-deploys
 
 ## Features
@@ -42,7 +43,7 @@ Local configuration lives in `.env.dev` (gitignored; variables are listed in [do
 | --- | --- |
 | `npm run dev` | Dev server (Turbopack), loads `.env.dev` |
 | `npm run build` / `start` | Production build / serve. Plain `build` fails locally by design; see [Local vs production notes](#local-vs-production-notes) |
-| `npm run lint` / `typecheck` | ESLint / `tsc --noEmit` |
+| `npm run lint` / `typecheck` | ESLint / `tsc --noEmit`. `lint` is currently broken (see [KNOWN-ISSUES](./docs/KNOWN-ISSUES.md#tooling)) |
 | `npm run test` / `test:watch` | Vitest, DB-backed: runs against the local `gadget_dev` through the guard. Single file: `npm test -- src/server/common/__tests__/money.test.ts`; single test: `npm test -- -t "free shipping"` |
 | `npm run db:deploy` | `prisma migrate deploy` against the local DB |
 | `npm run db:migrate` | `prisma migrate dev` after editing `schema.prisma` (requires `SHADOW_DATABASE_URL`; the guard fails if it is unset) |
@@ -70,6 +71,7 @@ UI (src/app, src/modules)  →  API routes (src/app/api/**)  →  Services (src/
 - Money is integer cents everywhere; order items are snapshotted for historical correctness.
 - Payments use a strategy interface (`src/server/payments/`) — providers are pluggable and DB-free.
 - Auth guard: `src/proxy.ts` (edge) + `requireAdminSession()` in every admin route + role check in the dashboard layout.
+- Public catalog pages are ISR (60-120 s) with on-demand purge on admin writes; Upstash Redis is an optional cache/limiter layer that fails open to Postgres (`UPSTASH_REDIS_REST_URL`/`_TOKEN`, see `.env.example`).
 
 Details: [docs/context/02-architecture.md](./docs/context/02-architecture.md)
 
@@ -88,9 +90,10 @@ src/
   lib/                  # prisma client, fetcher, query client
 docs/
   context/              # orientation docs (start at 00-INDEX.md)
-  issues/               # known flaws / fix list
-  product/              # feature gap analysis
-  SEO-AUDIT.md          # SEO findings
+  KNOWN-ISSUES.md       # verified-open issues, each with a code location
+  product/              # feature gaps and scale-up roadmap
+  plans/                # active plans (E2E, Redis follow-ups, perf and docs cleanup)
+  SEO-AUDIT.md          # SEO state and open items
 ```
 
 ## Git Flow
@@ -99,7 +102,6 @@ docs/
 
 ## Known Issues & Roadmap
 
-- ⚠️ **Before taking live payments**, read [docs/issues/01-security.md](./docs/issues/01-security.md) — there is a critical payment-callback forgery issue.
-- Full fix list: [docs/issues/](./docs/issues/README.md)
+- Open issues (security, correctness, tooling), each with a code location: [docs/KNOWN-ISSUES.md](./docs/KNOWN-ISSUES.md). Read the Security and Correctness sections before taking live online payments.
 - What to build next: [docs/product/FEATURE-GAPS.md](./docs/product/FEATURE-GAPS.md)
 - Scale-up roadmap (post-success): [docs/product/SCALE-UP-TODO.md](./docs/product/SCALE-UP-TODO.md)

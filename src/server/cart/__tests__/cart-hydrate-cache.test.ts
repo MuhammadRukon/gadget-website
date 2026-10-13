@@ -10,6 +10,7 @@ import {
   __resetCacheStateForTests,
   buildKey,
   memoryStore,
+  setDefer,
   setStoreForTests,
   type CacheStore,
 } from '@/server/common/cache';
@@ -41,7 +42,10 @@ beforeEach(() => {
     where.id.in.map((id) => DB[id]).filter(Boolean),
   );
 });
-afterEach(() => setStoreForTests(undefined));
+afterEach(() => {
+  setStoreForTests(undefined);
+  setDefer(undefined);
+});
 
 const g = (variantId: string, quantity: number) => ({ variantId, quantity });
 
@@ -125,6 +129,22 @@ describe('hydrateGuestCart with a store', () => {
     expect(prisma.productVariant.findMany.mock.calls[0][0].where.id.in).toEqual(['A', 'B']);
     expect(out.lines.map((l) => l.variantId)).toEqual(['A', 'B']);
     expect(out.itemCount).toBe(3);
+  });
+});
+
+describe('hydrateGuestCart with a deferred scheduler', () => {
+  it('returns without waiting for the Redis SETs, which run when the task is invoked', async () => {
+    const store = memoryStore();
+    const set = vi.spyOn(store, 'set').mockImplementation(() => new Promise(() => {}));
+    setStoreForTests(store);
+    const tasks: Array<() => Promise<unknown>> = [];
+    setDefer((task) => void tasks.push(task));
+    const out = await cartService.hydrateGuestCart([g('A', 1), g('B', 1)]);
+    expect(out.lines.map((l) => l.variantId)).toEqual(['A', 'B']);
+    expect(set).not.toHaveBeenCalled();
+    expect(tasks).toHaveLength(1);
+    void tasks[0]();
+    expect(set).toHaveBeenCalledTimes(2);
   });
 });
 

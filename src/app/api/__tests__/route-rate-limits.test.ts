@@ -36,6 +36,7 @@ import { POST as quote } from '@/app/api/checkout/quote/route';
 import { POST as review } from '@/app/api/reviews/route';
 import { POST as warranty } from '@/app/api/orders/[id]/warranty/route';
 import { __resetCacheStateForTests, memoryStore, setStoreForTests } from '@/server/common/cache';
+import { __memoryWindowsForTests } from '@/server/common/rate-limit';
 
 const post = (url: string, body: unknown, ip = '1.1.1.1') =>
   new Request(`http://t${url}`, {
@@ -50,6 +51,7 @@ let incr: ReturnType<typeof vi.fn>;
 beforeEach(() => {
   vi.clearAllMocks();
   __resetCacheStateForTests();
+  __memoryWindowsForTests.clear();
   const store = memoryStore();
   incr = vi.fn(store.incrWindow);
   setStoreForTests({ ...store, incrWindow: incr });
@@ -82,10 +84,12 @@ describe('hot public endpoints', () => {
     expect(incr).not.toHaveBeenCalled();
   });
 
-  it('hot endpoints fail open without Postgres when Redis is absent', async () => {
+  it('hot endpoints use the in-memory window without Postgres when Redis is absent', async () => {
     setStoreForTests(null);
-    for (let i = 0; i < 130; i++) expect((await products(get('/api/catalog/products?q=abc'))).status).toBe(200);
-    for (let i = 0; i < 130; i++) expect((await hydrate(post('/api/cart/hydrate', { lines: [] }))).status).toBe(200);
+    for (let i = 0; i < 120; i++) expect((await products(get('/api/catalog/products?q=abc'))).status).toBe(200);
+    expect((await products(get('/api/catalog/products?q=abc'))).status).toBe(429);
+    for (let i = 0; i < 120; i++) expect((await hydrate(post('/api/cart/hydrate', { lines: [] }))).status).toBe(200);
+    expect((await hydrate(post('/api/cart/hydrate', { lines: [] }))).status).toBe(429);
   });
 });
 

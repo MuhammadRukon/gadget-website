@@ -29,6 +29,19 @@ export interface CartSnapshot {
   itemCount: number;
 }
 
+/** One guest line the merge could not fully apply: applied 0 = removed, applied < requested = clamped. */
+const mergeAdjustmentSchema = z.object({
+  variantId: z.string(),
+  name: z.string().optional(),
+  requested: z.number().int().min(0),
+  applied: z.number().int().min(0),
+});
+export type MergeAdjustment = z.infer<typeof mergeAdjustmentSchema>;
+
+/** Snapshot fields stay at the top level (older clients ignore `adjustments`). */
+export const mergeResultSchema = z.object({ adjustments: z.array(mergeAdjustmentSchema) });
+export type CartMergeResult = CartSnapshot & z.infer<typeof mergeResultSchema>;
+
 export interface CartSummary {
   subtotalCents: number;
   itemCount: number;
@@ -41,4 +54,7 @@ export const guestCartLineSchema = z.object({
 });
 export type GuestCartLine = z.infer<typeof guestCartLineSchema>;
 
-export const hydrateBodySchema = z.object({ lines: z.array(guestCartLineSchema).max(50) });
+export const MAX_GUEST_LINES = 50;
+export const hydrateBodySchema = z.object({
+  lines: z.array(guestCartLineSchema).max(MAX_GUEST_LINES),
+});

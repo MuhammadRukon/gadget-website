@@ -2,6 +2,7 @@
 
 import { signIn } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
+import { authLandingUrl } from '@/lib/auth-hint';
 
 interface GoogleButtonProps {
   callbackUrl?: string;
@@ -20,7 +21,7 @@ export function GoogleButton({
       variant="outline"
       className="w-full"
       disabled={disabled}
-      onClick={() => signIn('google', { callbackUrl })}
+      onClick={() => signIn('google', { callbackUrl: authLandingUrl(callbackUrl) })}
     >
       {label}
     </Button>

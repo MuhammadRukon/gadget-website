@@ -2,11 +2,11 @@ import Link from 'next/link';
 
 import { Card, CardContent } from '@/components/ui/card';
 import type { PublicProductDetail } from '@/contracts/catalog';
-import type { ReviewSummary } from '@/contracts/reviews';
+import type { PublicReview, ReviewSummary } from '@/contracts/reviews';
 import { env } from '@/env';
 import { ProductDetailGallery } from '@/modules/storefront/components/product-detail-gallery';
 import { ProductDetailPurchasePanel } from '@/modules/storefront/components/product-detail-purchase-panel';
-import { DeferredReviewsSection } from '@/modules/storefront/components/deferred-reviews-section';
+import { ReviewsSection } from '@/modules/reviews/components/reviews-section';
 import {
   CustomBreadcrumb,
   buildBreadcrumbJsonLd,
@@ -15,9 +15,14 @@ import {
 interface ProductDetailProps {
   product: PublicProductDetail;
   reviewSummary: ReviewSummary;
+  initialReviews: PublicReview[];
 }
 
-export function ProductDetail({ product, reviewSummary }: Readonly<ProductDetailProps>) {
+export function ProductDetail({
+  product,
+  reviewSummary,
+  initialReviews,
+}: Readonly<ProductDetailProps>) {
   const initialVariant = product.variants.find((v) => v.inStock) ?? product.variants[0] ?? null;
   const ldJson = buildJsonLd(product, initialVariant, reviewSummary);
   const breadcrumbItems = [
@@ -86,7 +91,11 @@ export function ProductDetail({ product, reviewSummary }: Readonly<ProductDetail
       </section>
 
       <section className="md:col-span-2 mt-6">
-        <DeferredReviewsSection productId={product.id} summary={reviewSummary} />
+        <ReviewsSection
+          productId={product.id}
+          summary={reviewSummary}
+          initialReviews={initialReviews}
+        />
       </section>
     </article>
   );
