@@ -6,14 +6,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 "Cryptech" — gadget/electronics e-commerce MVP for the Bangladesh market. Next.js 16 App Router + React 19 + TypeScript, Prisma + PostgreSQL, Auth.js v5 (JWT sessions), TanStack Query + Zustand, Tailwind 4 + shadcn/ui, Cloudinary media, Vitest.
 
-Hosted on Vercel free tier + Prisma-hosted Postgres. Cost-sensitive: free tier first, prefer DB-backed solutions over paid infra. Upstash Redis (REST) is an **optional, fail-open** cache/limiter layer (`src/server/common/cache.ts`); enabled by `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` (unset = Redis layer disabled); with them unset or Redis failing, the app falls back to the DB (rate limiting uses the Postgres `RateLimitBucket`).
+Hosted on Vercel free tier + Prisma-hosted Postgres. Cost-sensitive: free tier first, prefer DB-backed solutions over paid infra. Upstash Redis (REST) is an **optional, fail-open** cache/limiter layer (`src/server/common/cache.ts`); enabled by `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` (unset = Redis layer disabled); with them unset or Redis failing, the app falls back to the DB (rate limiting uses the Postgres `RateLimitBucket`; the public IP limiters on cart hydrate and catalog `q` use a per-instance in-memory window instead of Postgres).
 
 ## Commands
 
 ```bash
 npm run dev          # Turbopack dev server on :3000 (loads .env.dev)
 npm run build        # production build (Vercel); fails locally by design, see below
-npm run lint         # eslint (next/core-web-vitals + next/typescript)
+npm run lint         # currently broken (see docs/KNOWN-ISSUES.md, Tooling); rely on typecheck + tests
 npm run typecheck    # tsc --noEmit
 npm run test         # vitest run (loads .env.dev)
 npm run test:watch
@@ -33,7 +33,7 @@ npm test -- src/server/common/__tests__/money.test.ts
 npm test -- -t "free shipping"
 ```
 
-Vitest runs in the **node** environment (`vitest.config.ts`), not jsdom, and only picks up `src/**/*.{test,spec}.{ts,tsx}`. Tests use explicit imports (`globals: false`) — import `describe`/`it`/`expect` from `vitest`.
+Vitest runs in the **node** environment by default (`vitest.config.ts`); a file opts into jsdom with a `// @vitest-environment jsdom` docblock. It only picks up `src/**/*.{test,spec}.{ts,tsx}`. Tests use explicit imports (`globals: false`) — import `describe`/`it`/`expect` from `vitest`.
 
 `src/env.ts` fail-fast validates env at boot via `instrumentation.ts`; a missing required var crashes the server rather than failing later. Copy `.env.example` to `.env.dev` for local work (production values live only in the Vercel dashboard).
 
@@ -52,7 +52,8 @@ Key invariants:
 - Errors: throw `AppError` subclasses from `src/server/common/errors.ts`; routes `catch → jsonError(err)`, which maps `ErrorCode` (from `src/contracts/errors.ts`) to HTTP status and special-cases `RateLimitedError` (429 + Retry-After), `TxnIdDuplicateError` (409), and `ZodError` (422).
 - **Money is integer cents (BDT paisa) everywhere.** Never floats. Helpers in `src/server/common/money.ts`.
 - Order items are **snapshotted** (name/sku/price copied at checkout) so historical orders stay correct when the catalog changes.
-- The repo layer is inconsistent by drift: `catalog.repo.ts` / `reviews.repo.ts` hold real queries; `cart.repo.ts`, `orders.repo.ts`, `coupons.repo.ts` are `{ prisma }` passthroughs and their services call Prisma directly. Don't assume a repo exists.
+- Only `catalog.repo.ts` and `reviews.repo.ts` exist; every other service calls Prisma directly. Don't assume a repo exists.
+- **Caching and ISR**: public catalog pages are ISR, filtered listings rewrite to dynamic `/live/*` twins, admin writes purge via `src/app/api/_lib/revalidate.ts`, and Redis writes are deferred through Next `after()`. Never call `auth()`/`cookies()` in the root or `(public)` layouts (kills ISR). Details: `docs/context/02-architecture.md` (Caching / ISR).
 
 ### Contracts-first workflow
 
@@ -109,10 +110,10 @@ Logged-in carts are `Cart`/`CartItem` rows (unique per `userId`; `getCart` uses 
 - **Settings**: singleton `PaymentSettings` model managed via `paymentsSettingsService.get()`/`update()`; accessed in routes/services via `tx` client in transactions. `GET /api/checkout/config` returns public config (methods, fee rule, contact, QR, note). Config endpoint is `force-dynamic` + `no-store`.
 - **Transaction IDs** (COD confirmation): normalized via `normalizeTxnId` (trim + uppercase), unique index on `Payment.customerTxnId`. Bank transfer refs (`bankRef`) are matched case-insensitively via raw `lower("bankRef") = lower($1)` query served by a functional index `Payment_bankRef_lower_idx` (migration-only; Prisma schema cannot express it). Rate-limited per user+IP and per user (separate buckets), boolean-only check via `POST /api/payments/txn-check`, admin modal shows existing order number on duplicate (no customer privacy leak). Customer can add once (add-only during PENDING/VERIFIED); admin can set/replace during PENDING.
 - **Customer payment responses** (order APIs): `Payment` rows use trimmed `CustomerPayment` select (excludes raw payloads, admin-only fields).
-- Rate limiting (`src/server/common/rate-limit.ts`) is Postgres-backed via the `RateLimitBucket` model so it works across serverless instances; Redis is an optional layer on top and any Redis failure falls back to Postgres. Currently applied to signup, forgot, reset, checkout, and txn-check/txn-id.
+- Rate limiting (`src/server/common/rate-limit.ts`) is Postgres-backed via the `RateLimitBucket` model so it works across serverless instances; Redis is an optional layer on top (250 ms timeout) and any Redis failure falls back to Postgres; `enforceIpLimit` (public cart hydrate, catalog `q`) passes `fallback: 'none'`, which uses a per-instance in-memory fixed window (cap 5000 keys) instead. Applied to login, signup, forgot, reset, verify, resend-verify, change-password, checkout, quote, warranty, reviews, txn-check/txn-id, cart hydrate and catalog `q`.
 - Mailer (`src/server/common/mailer.ts`) uses Resend; with `RESEND_API_KEY` unset it logs and skips instead of sending. **Test env blanks these vars** to prevent actual sends during test runs.
 - Component trees: `src/components/ui/*` are generated shadcn primitives (edit sparingly), `src/components/*` are shared app components. `src/app/components/*` and `src/app/common/*` are legacy storefront-specific duplicates — **prefer `src/components` for new shared work.**
-- Tests: Vitest runs in **node** environment via `vitest.config.ts` (two projects: `parallel` and `settings-serial` for singleton-mutating tests). **Test DB must be local**; `vitest.global-setup.ts` aborts on a non-local `DATABASE_URL`/`SHADOW_DATABASE_URL` or a missing `DATABASE_URL`, with no opt-out; run tests via `npm test` (dotenv-cli loads `.env.dev`). Test files touching PaymentSettings or checkout fee logic must be named `*.serial.test.ts` to run serialized (one forked worker, no parallel isolation); fixture helpers throw if called from non-serial files. Pure functions in `src/server/common` are the easiest targets; there are no API/integration or E2E tests.
+- Tests: Vitest runs in **node** environment via `vitest.config.ts` (two projects: `parallel` and `settings-serial` for singleton-mutating tests). **Test DB must be local**; `vitest.global-setup.ts` aborts on a non-local `DATABASE_URL`/`SHADOW_DATABASE_URL` or a missing `DATABASE_URL`, with no opt-out; run tests via `npm test` (dotenv-cli loads `.env.dev`). Test files touching PaymentSettings or checkout fee logic must be named `*.serial.test.ts` to run serialized (one forked worker, no parallel isolation); fixture helpers throw if called from non-serial files. Pure functions in `src/server/common` are the easiest targets. Route-level tests live in `src/app/api/__tests__`; there is no browser E2E yet.
 
 ## Git flow
 
@@ -120,6 +121,6 @@ Logged-in carts are `Cart`/`CartItem` rows (unique per `userId`; `getCart` uses 
 
 ## Docs
 
-`docs/context/00-INDEX.md` is the orientation hub — overview/env, architecture, data model, full API reference, frontend map, conventions. `docs/issues/` is the known-flaws fix list (read `01-security.md` before touching payments). `docs/product/FEATURE-GAPS.md` and `SCALE-UP-TODO.md` cover the roadmap. Root `cotext.md` is superseded by `docs/context/`.
+`docs/context/00-INDEX.md` is the orientation hub — overview/env, architecture (incl. Caching / ISR), data model, full API reference, frontend map, conventions. `docs/KNOWN-ISSUES.md` lists verified-open issues with code locations (read the Correctness section before touching payments or order cancellation). `docs/product/FEATURE-GAPS.md` and `SCALE-UP-TODO.md` cover the roadmap; `docs/plans/` holds the active plans.
 
-These docs are detailed but can lag the code — e.g. `02-architecture.md` still describes the edge guard as cookie-presence-only and the Vitest environment as jsdom, both since changed. Verify against source before relying on a specific claim.
+The context docs are checked against the code, but they can still lag it. Verify a specific claim in source before relying on it, and update the matching doc in the same change.

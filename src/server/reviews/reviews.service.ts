@@ -16,6 +16,14 @@ import type {
 
 import { reviewsRepo } from './reviews.repo';
 
+// Names land in cached public HTML: expose only "First L.", never the full name.
+function publicAuthorName(name: string | null): string {
+  const parts = name?.trim().split(/\s+/).filter(Boolean) ?? [];
+  if (parts.length === 0) return 'Verified buyer';
+  if (parts.length === 1) return parts[0];
+  return `${parts[0]} ${[...parts[parts.length - 1]][0].toUpperCase()}.`;
+}
+
 function toPublicReview(r: {
   id: string;
   rating: number;
@@ -29,14 +37,14 @@ function toPublicReview(r: {
     rating: r.rating,
     title: r.title,
     body: r.body,
-    authorName: r.user.name ?? 'Verified buyer',
+    authorName: publicAuthorName(r.user.name),
     createdAt: r.createdAt.toISOString(),
   };
 }
 
 export const reviewsService = {
-  async listForProduct(productId: string): Promise<PublicReview[]> {
-    const rows = await reviewsRepo.listByProduct(productId);
+  async listForProduct(productId: string, take?: number): Promise<PublicReview[]> {
+    const rows = await reviewsRepo.listByProduct(productId, take);
     return rows.map(toPublicReview);
   },
 

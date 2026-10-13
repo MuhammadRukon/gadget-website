@@ -25,6 +25,7 @@ import { useCheckoutTxnId } from '@/modules/checkout/use-checkout-txn-id';
 import { CheckoutPaymentCard } from '@/modules/checkout/components/checkout-payment-card';
 import { OrderSummaryCard } from '@/modules/checkout/components/order-summary-card';
 import { useServerCart } from '@/modules/cart/hooks';
+import { useCheckoutCartCleanup } from '@/modules/checkout/use-cart-cleanup';
 import { useAddresses } from '@/modules/account/hooks';
 import { AddressForm } from '@/modules/account/components/address-form';
 
@@ -120,7 +121,8 @@ export function CheckoutClient() {
     !!config.data &&
     !!paymentMethod &&
     !txn.blocksOrder;
-  const cartHasIssues = !!cart.data?.hasIssues;
+  // Unavailable lines are removed and over-stock lines clamped on entry (replaces the old blocking card).
+  const cleanup = useCheckoutCartCleanup(!!cart.data?.hasIssues);
 
   async function applyCoupon() {
     setAppliedCoupon(couponCode.trim() || null);
@@ -164,7 +166,12 @@ export function CheckoutClient() {
 
   // After a successful order the cart refetches empty while navigation is in
   // flight; keep the loader up instead of flashing "Your cart is empty".
-  if (cart.isLoading || addresses.isLoading || (itemCount === 0 && orderPlaced)) {
+  if (
+    cart.isLoading ||
+    addresses.isLoading ||
+    cleanup.cleaning ||
+    (itemCount === 0 && orderPlaced)
+  ) {
     return (
       <div className="flex justify-center py-20">
         <Loader />
@@ -176,6 +183,7 @@ export function CheckoutClient() {
     return (
       <Card>
         <CardContent className="p-8 text-center text-muted-foreground">
+          {cleanup.notice ? <p className="mb-2 text-sm">{cleanup.notice}</p> : null}
           Your cart is empty.{' '}
           <Link href="/products" className="underline">
             Browse products
@@ -186,23 +194,14 @@ export function CheckoutClient() {
     );
   }
 
-  if (cartHasIssues) {
-    return (
-      <Card>
-        <CardContent className="p-8 text-center text-destructive">
-          Some items in your cart are no longer available.{' '}
-          <Link href="/cart" className="underline">
-            Review your cart
-          </Link>{' '}
-          before continuing.
-        </CardContent>
-      </Card>
-    );
-  }
-
   return (
     <section className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6 py-6">
       <h1 className="text-2xl font-semibold lg:col-span-2">Checkout</h1>
+      {cleanup.notice ? (
+        <p role="status" className="lg:col-span-2 rounded border border-amber-500 p-3 text-sm">
+          {cleanup.notice}
+        </p>
+      ) : null}
       <div className="space-y-4">
         <Card>
           <CardHeader>

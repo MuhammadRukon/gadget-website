@@ -4,6 +4,8 @@ Source: the browser regression runs done with Chrome DevTools MCP agents on bran
 
 All three runs finished with no failures. The latest targeted run covered the cases marked "recent change" below, except the ones listed under "Could not verify in the manual runs" at the end. Treat every case as a case to implement, not as a recorded pass: the runs were done by an agent clicking through the app, and their notes (strings, request counts, observed quirks) are what this file records.
 
+Setup, project layout and the core smoke flows live in [the Playwright plan](../plans/playwright-e2e-testing-plan.md); this file adds the payment-settings and COD-fee cases on top of it.
+
 ## Why Playwright instead of the MCP agent runs
 
 - An MCP agent spends tokens on every click and snapshot and is not repeatable. A Playwright suite costs nothing per run, is deterministic and runs in CI.

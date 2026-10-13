@@ -9,27 +9,19 @@ import { env } from '@/env';
 const googleSans = localFont({
   src: [
     {
-      path: './fonts/GoogleSans-Regular.ttf',
+      path: './fonts/GoogleSans-Regular.woff2',
       weight: '400',
     },
     {
-      path: './fonts/GoogleSans-Medium.ttf',
+      path: './fonts/GoogleSans-Medium.woff2',
       weight: '500',
     },
     {
-      path: './fonts/GoogleSans-SemiBold.ttf',
+      path: './fonts/GoogleSans-SemiBold.woff2',
       weight: '600',
     },
-    {
-      path: './fonts/GoogleSans-Bold.ttf',
-      weight: '700',
-    },
-    {
-      path: './fonts/GoogleSans-Italic.ttf',
-      weight: '400',
-      style: 'italic',
-    },
   ],
+  display: 'swap',
   variable: '--font-google-sans',
 });
 

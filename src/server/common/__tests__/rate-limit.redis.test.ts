@@ -32,12 +32,19 @@ import {
   setStoreForTests,
   type CacheStore,
 } from '@/server/common/cache';
-import { clearRateLimit, rateLimit } from '@/server/common/rate-limit';
+import {
+  __memoryWindowsForTests,
+  clearRateLimit,
+  enforceRateLimit,
+  RateLimitedError,
+  rateLimit,
+} from '@/server/common/rate-limit';
 
 const policy = { max: 3, windowMs: 30_000 };
 
 beforeEach(() => {
   db.buckets.clear();
+  __memoryWindowsForTests.clear();
   __resetCacheStateForTests();
 });
 afterEach(() => {
@@ -98,19 +105,38 @@ describe('store failure', () => {
     expect(db.buckets.size).toBe(1);
   });
 
-  it("fallback 'none' fails open and never throws", async () => {
+  it("fallback 'none' limits per instance in memory and never touches Postgres", async () => {
+    vi.useFakeTimers();
     setStoreForTests(broken);
-    for (let i = 0; i < 10; i++) {
-      const r = await rateLimit('open', policy, { fallback: 'none' });
-      expect(r.ok).toBe(true);
-    }
+    const none = { fallback: 'none' as const };
+    const r = [];
+    for (let i = 0; i < 4; i++) r.push(await rateLimit('open', policy, none));
+    expect(r.map((x) => x.ok)).toEqual([true, true, true, false]);
+    expect(r.map((x) => x.remaining)).toEqual([2, 1, 0, 0]);
     expect(db.buckets.size).toBe(0);
   });
 
-  it("fallback 'none' with no store at all is fail-open and skips the DB", async () => {
+  it("fallback 'none' with no store: 4th call throws RateLimitedError, window expiry frees it, keys are independent", async () => {
+    vi.useFakeTimers();
     setStoreForTests(null);
-    expect((await rateLimit('x', policy, { fallback: 'none' })).ok).toBe(true);
+    const none = { fallback: 'none' as const };
+    for (let i = 0; i < 3; i++) await enforceRateLimit('w', policy, none);
+    await expect(enforceRateLimit('w', policy, none)).rejects.toBeInstanceOf(RateLimitedError);
+    await expect(enforceRateLimit('other', policy, none)).resolves.toBeUndefined();
+    vi.advanceTimersByTime(30_001);
+    await expect(enforceRateLimit('w', policy, none)).resolves.toBeUndefined();
     expect(db.buckets.size).toBe(0);
+  });
+
+  it("fallback 'none' keeps at most 5000 keys", async () => {
+    vi.useFakeTimers();
+    setStoreForTests(null);
+    const none = { fallback: 'none' as const };
+    for (let i = 0; i < 5001; i++) await rateLimit(`cap:${i}`, policy, none);
+    expect(__memoryWindowsForTests.size).toBeLessThanOrEqual(5000);
+    // oldest key was dropped, so it starts a fresh window; the newest is still counted
+    expect((await rateLimit('cap:0', policy, none)).remaining).toBe(2);
+    expect((await rateLimit('cap:5000', policy, none)).remaining).toBe(1);
   });
 });
 

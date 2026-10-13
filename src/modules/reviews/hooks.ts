@@ -1,6 +1,6 @@
 'use client';
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
 import { apiFetch } from '@/lib/fetcher';
@@ -10,15 +10,31 @@ import type {
   ReviewableItem,
 } from '@/contracts/reviews';
 
-export function useProductReviews(productId: string | null) {
-  return useQuery({
+interface ProductReviewsOptions {
+  /** First reviews rendered by the server; shown until the full list is requested. */
+  initialItems?: PublicReview[];
+  enabled?: boolean;
+}
+
+export function productReviewsQuery(
+  productId: string | null,
+  { initialItems, enabled = true }: ProductReviewsOptions = {},
+) {
+  return queryOptions({
     queryKey: ['reviews', 'product', productId],
     queryFn: () =>
       apiFetch<{ items: PublicReview[] }>(
         `/api/reviews?productId=${productId}`,
       ),
-    enabled: !!productId,
+    enabled: !!productId && enabled,
+    staleTime: 60_000,
+    // Epoch 0 marks the SSR items stale so enabling the query still fetches the full list.
+    ...(initialItems && { initialData: { items: initialItems }, initialDataUpdatedAt: 0 }),
   });
+}
+
+export function useProductReviews(productId: string | null, options?: ProductReviewsOptions) {
+  return useQuery(productReviewsQuery(productId, options));
 }
 
 export function useReviewableItems() {

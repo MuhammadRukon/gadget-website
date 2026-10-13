@@ -27,12 +27,33 @@ export interface RateLimitResult {
 }
 
 export interface RateLimitOptions {
-  /** What to do when Redis is unconfigured or down. 'none' fails open without touching Postgres. */
+  /** What to do when Redis is unconfigured or down. 'none' uses a per-instance in-memory window without touching Postgres. */
   fallback?: 'postgres' | 'none';
 }
 
 // Hashed so raw emails/IPs never reach Redis.
 const redisKey = (key: string) => buildKey('rl', createHash('sha256').update(key).digest('hex').slice(0, 32));
+
+const MEMORY_MAX_KEYS = 5000;
+const memoryWindows = new Map<string, { count: number; resetAt: number }>();
+export const __memoryWindowsForTests = memoryWindows;
+
+// shortcut: per-instance fixed window, so the effective cap is max x instances; upgrade only if abuse shows up with Redis on.
+function memoryRateLimit(key: string, policy: RateLimitPolicy): RateLimitResult {
+  const now = Date.now();
+  let w = memoryWindows.get(key);
+  if (!w || w.resetAt <= now) {
+    memoryWindows.delete(key); // re-insert so Map order stays oldest-first
+    if (memoryWindows.size >= MEMORY_MAX_KEYS) {
+      for (const [k, v] of memoryWindows) if (v.resetAt <= now) memoryWindows.delete(k);
+      if (memoryWindows.size >= MEMORY_MAX_KEYS) memoryWindows.delete(memoryWindows.keys().next().value!);
+    }
+    w = { count: 0, resetAt: now + policy.windowMs };
+    memoryWindows.set(key, w);
+  }
+  w.count += 1;
+  return { ok: w.count <= policy.max, remaining: Math.max(0, policy.max - w.count), resetAt: w.resetAt };
+}
 
 export async function rateLimit(
   key: string,
@@ -47,9 +68,7 @@ export async function rateLimit(
       resetAt: Date.now() + hit.value.pttlMs,
     };
   }
-  if (opts.fallback === 'none') {
-    return { ok: true, remaining: policy.max, resetAt: Date.now() + policy.windowMs };
-  }
+  if (opts.fallback === 'none') return memoryRateLimit(key, policy);
 
   const now = new Date();
   const resetAt = new Date(now.getTime() + policy.windowMs);
@@ -119,7 +138,7 @@ export async function enforceRateLimit(
   if (!result.ok) throw new RateLimitedError(result.resetAt);
 }
 
-// shortcut: fails open when Redis is absent/failing; cost is bounded by input caps (q max 100, hydrate lines max 50); upgrade to a per-instance in-memory fixed window when Redis is always on
+// shortcut: no Postgres when Redis is absent/failing; falls back to a per-instance in-memory window (see memoryRateLimit); cost is bounded by input caps (q max 100, hydrate lines max 50)
 export function enforceIpLimit(
   request: Request,
   name: string,

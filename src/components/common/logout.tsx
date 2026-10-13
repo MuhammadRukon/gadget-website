@@ -6,6 +6,7 @@ import { DropdownMenuItem } from '../ui/dropdown-menu';
 import { toast } from 'sonner';
 import { signOut } from 'next-auth/react';
 import { queryKeys } from '@/constants/queryKeys';
+import { clearAuthHint } from '@/lib/auth-hint';
 import { useQueryClient } from '@tanstack/react-query';
 
 export default function Logout() {
@@ -16,6 +17,7 @@ export default function Logout() {
   async function onLogout() {
     try {
       await signOut({ redirect: false });
+      clearAuthHint();
       toast.success('Logged out successfully');
       qc.resetQueries({ queryKey: queryKeys.cart });
       router.refresh();

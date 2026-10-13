@@ -1,30 +1,18 @@
-'use client';
-
-import { Loader } from '@/app/common/loader/loader';
-import type { ReviewSummary } from '@/contracts/reviews';
-import { useProductReviews } from '@/modules/reviews/hooks';
+import type { PublicReview, ReviewSummary } from '@/contracts/reviews';
 
 import { RatingStars } from './rating-stars';
+import { ReviewItem } from './review-item';
+import { ShowAllReviews } from './show-all-reviews';
 
 interface ReviewsSectionProps {
   productId: string;
   /** Server-rendered summary from the PDP; avoids a second summary query. */
   summary: ReviewSummary;
+  /** Newest reviews rendered into the ISR HTML; the full list loads only on request. */
+  initialReviews: PublicReview[];
 }
 
-export function ReviewsSection({ productId, summary }: ReviewsSectionProps) {
-  const reviews = useProductReviews(productId);
-
-  if (reviews.isLoading) {
-    return (
-      <div className="flex justify-center py-6">
-        <Loader />
-      </div>
-    );
-  }
-
-  const items = reviews.data?.items ?? [];
-
+export function ReviewsSection({ productId, summary, initialReviews }: ReviewsSectionProps) {
   return (
     <section className="space-y-4">
       <header className="flex items-baseline justify-between">
@@ -38,27 +26,21 @@ export function ReviewsSection({ productId, summary }: ReviewsSectionProps) {
         </div>
       </header>
 
-      {items.length === 0 ? (
+      {initialReviews.length === 0 ? (
         <p className="text-sm text-muted-foreground">
           No reviews yet. Be the first to share what you think after your delivery arrives.
         </p>
       ) : (
         <ul className="space-y-4">
-          {items.map((r) => (
-            <li key={r.id} className="rounded border p-4">
-              <div className="flex items-center gap-2">
-                <RatingStars value={r.rating} />
-                <span className="text-xs text-muted-foreground">
-                  by {r.authorName} ·{' '}
-                  {new Date(r.createdAt).toLocaleDateString()}
-                </span>
-              </div>
-              {r.title ? <p className="mt-1 font-medium">{r.title}</p> : null}
-              <p className="mt-1 text-sm whitespace-pre-line">{r.body}</p>
-            </li>
+          {initialReviews.map((r) => (
+            <ReviewItem key={r.id} review={r} />
           ))}
         </ul>
       )}
+
+      {summary.count > initialReviews.length ? (
+        <ShowAllReviews productId={productId} initialReviews={initialReviews} />
+      ) : null}
     </section>
   );
 }

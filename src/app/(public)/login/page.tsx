@@ -18,6 +18,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { setAuthHint } from '@/lib/auth-hint';
 import { credentialsSchema, type CredentialsInput } from '@/contracts/auth';
 import { AuthCard } from '@/modules/auth/components/auth-card';
 import { GoogleButton } from '@/modules/auth/components/google-button';
@@ -65,6 +66,7 @@ function LoginContent() {
       return;
     }
     toast.success('Signed in');
+    setAuthHint();
     router.push(callbackUrl);
     router.refresh();
   }

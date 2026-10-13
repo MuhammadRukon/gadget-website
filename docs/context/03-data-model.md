@@ -5,8 +5,9 @@ Source of truth: [`prisma/schema.prisma`](../../prisma/schema.prisma). PostgreSQ
 ## Entities
 
 ### Identity & auth
-- **User** — email (unique), optional `passwordHash` (null for OAuth-only), `role` (`CUSTOMER` | `ADMIN`), phone, image.
-- **Account / Session / VerificationToken** — standard Auth.js adapter tables (JWT strategy is used, so `Session` is mostly unused).
+- **User** — email (unique), optional `emailVerified` (credentials login is refused while null), optional `passwordHash` (null for OAuth-only), `role` (`CUSTOMER` | `ADMIN`), phone, image.
+- **Account / Session** — standard Auth.js adapter tables (JWT strategy is used, so `Session` is mostly unused).
+- **VerificationToken** — email verification: per signup/resend two rows keyed by `identifier = email`, a SHA-256 of the 6-digit code and of the link token, 30 min TTL, all rows for the email deleted on success (`src/server/auth/verification.ts`).
 - **PasswordResetToken** — `tokenHash` (SHA-256, unique), `expiresAt`, `usedAt` (single-use).
 - **Address** — per-user shipping addresses; `isDefault` flag; `country` defaults `"BD"`.
 
@@ -30,6 +31,9 @@ Source of truth: [`prisma/schema.prisma`](../../prisma/schema.prisma). PostgreSQ
 - **Review** — one per `orderItemId` (unique), rating + title + body, tied to user & product.
 - **WarrantyRequest** — per order+user, reason, status (`OPEN/APPROVED/REJECTED/RESOLVED`), resolution note.
 
+### Infrastructure
+- **RateLimitBucket** — fixed-window counters (`key` PK, `count`, `resetAt`, index on `resetAt`) behind `src/server/common/rate-limit.ts`; the default fallback when Redis is absent or down.
+
 ### Marketing
 - **Coupon** — code unique, `PERCENT`|`FIXED`, `value`, `minSubtotalCents`, `maxDiscountCents`, start/expiry window, `usageLimit`/`usedCount`, `perUserLimit`, `isActive`.
 
@@ -48,5 +52,5 @@ OrderItem 1—0..1 Review
 - **Snapshots everywhere history matters**: order items copy name/sku/price; orders copy the shipping address; orders copy `couponCode`. Catalog edits/deletes never corrupt past orders.
 - **Archival over deletion**: products referenced by order items are archived, not deleted; variants deactivated.
 - **Money**: integer cents only; helpers in `src/server/common/money.ts` (rounding, percent discounts).
-- **Indexes** exist on the hot paths (status+createdAt on orders, productId+sortOrder on images, etc.).
-- **Gaps to be aware of**: no `AuditLog` beyond OrderEvent; no shipment/tracking entity; no stock-movement ledger; coupon `usedCount` is a plain counter (race-prone; see issues); category tree has no cycle guard.
+- **Indexes** exist on the hot paths (status+createdAt on orders, productId+sortOrder on images, etc.). `Product.slug` is covered by its unique index; the redundant `Product_slug_idx` was dropped by migration `20261013100000_drop_redundant_product_slug_index`.
+- **Gaps to be aware of**: no `AuditLog` beyond OrderEvent; no shipment/tracking entity; no stock-movement ledger; coupon `usedCount` is a plain counter (incremented with a conditional guard at checkout, not released on most cancel paths); category tree has no cycle guard. Open items: [../KNOWN-ISSUES.md](../KNOWN-ISSUES.md).

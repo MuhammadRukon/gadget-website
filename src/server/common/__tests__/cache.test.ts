@@ -6,6 +6,7 @@ import {
   cached,
   getStore,
   memoryStore,
+  setDefer,
   setStoreForTests,
   stableHash,
   upstashStore,
@@ -21,6 +22,7 @@ afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllEnvs();
   setStoreForTests(undefined);
+  setDefer(undefined);
 });
 
 const opts = { key: 'k', ttlSec: 60, jitter: 0 };
@@ -163,12 +165,48 @@ describe('fail-open and circuit breaker', () => {
   });
 });
 
+describe('deferred store writes', () => {
+  const setup = () => {
+    const store = memoryStore();
+    const set = vi.spyOn(store, 'set');
+    setStoreForTests(store);
+    return set;
+  };
+
+  it('returns the loader value before set; running the captured task sets once', async () => {
+    const set = setup();
+    const tasks: Array<() => Promise<unknown>> = [];
+    setDefer((task) => void tasks.push(task));
+    expect(await cached(opts, async () => 'v')).toBe('v');
+    expect(set).not.toHaveBeenCalled();
+    expect(tasks).toHaveLength(1);
+    await tasks[0]();
+    expect(set).toHaveBeenCalledTimes(1);
+    expect(set).toHaveBeenCalledWith('k', 'v', 60);
+  });
+
+  it('falls back to an awaited set when defer is unset', async () => {
+    const set = setup();
+    expect(await cached(opts, async () => 'v')).toBe('v');
+    expect(set).toHaveBeenCalledTimes(1);
+  });
+
+  it('falls back to an awaited set when defer throws (outside a request scope)', async () => {
+    const set = setup();
+    setDefer(() => {
+      throw new Error('`after` was called outside a request scope');
+    });
+    expect(await cached(opts, async () => 'v')).toBe('v');
+    expect(set).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('upstashStore', () => {
-  it('times out a hung request after 400ms', async () => {
+  it('times out a hung request after 250ms', async () => {
     const redis = { get: () => new Promise(() => {}) } as never;
     const p = upstashStore(redis).get('k');
     const assertion = expect(p).rejects.toThrow(/timeout/i);
-    await vi.advanceTimersByTimeAsync(401);
+    await vi.advanceTimersByTimeAsync(251);
     await assertion;
   });
 

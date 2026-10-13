@@ -54,6 +54,11 @@ export default async function ProductDetailPage({ params }: Readonly<PageProps>)
     }
     throw err;
   }
-  const reviewSummary = await reviewsService.summaryForProduct(product.id);
-  return <ProductDetail product={product} reviewSummary={reviewSummary} />;
+  const [reviewSummary, initialReviews] = await Promise.all([
+    reviewsService.summaryForProduct(product.id),
+    reviewsService.listForProduct(product.id, 10),
+  ]);
+  return (
+    <ProductDetail product={product} reviewSummary={reviewSummary} initialReviews={initialReviews} />
+  );
 }
