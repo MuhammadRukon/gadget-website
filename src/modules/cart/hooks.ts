@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSession } from 'next-auth/react';
 import { toast } from 'sonner';
@@ -239,9 +239,12 @@ export function useGuestCartMerge() {
   const qc = useQueryClient();
   const lines = useGuestCart((s) => s.lines);
   const clear = useGuestCart((s) => s.clear);
+  // A rehydrate (new `lines` reference) re-runs the effect: a second PUT would double the quantities.
+  const inFlight = useRef(false);
 
   useEffect(() => {
-    if (status !== 'authenticated' || lines.length === 0) return;
+    if (status !== 'authenticated' || lines.length === 0 || inFlight.current) return;
+    inFlight.current = true;
     void apiFetch<unknown>(CART_URL, {
       method: 'PUT',
       body: { lines },
@@ -263,6 +266,9 @@ export function useGuestCartMerge() {
         // We swallow the error so the login flow is never blocked by
         // a transient merge failure. The guest cart stays around so a
         // retry on the next render will succeed.
+      })
+      .finally(() => {
+        inFlight.current = false;
       });
   }, [status, lines, clear, qc]);
 }

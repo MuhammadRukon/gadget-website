@@ -214,6 +214,34 @@ describe('useGuestCartMerge', () => {
     expect(toast.info).not.toHaveBeenCalled();
   });
 
+  it('a storage rehydrate while the PUT is in flight does not send a second PUT', async () => {
+    session.status = 'authenticated';
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const fetchMock = vi.fn(async () => {
+      await gate;
+      return {
+        ok: true,
+        status: 200,
+        text: async () => JSON.stringify({ lines: [], subtotalCents: 0, itemCount: 0 }),
+      };
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    useGuestCart.setState({ lines: guestLines });
+    const { wrapper } = setup();
+    renderHook(() => useGuestCartMerge(), { wrapper });
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+
+    // Another tab's write rehydrates the store: same lines, new array reference.
+    act(() => useGuestCart.setState({ lines: guestLines.map((l) => ({ ...l })) }));
+    await new Promise((r) => setTimeout(r, 30));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    release();
+    await waitFor(() => expect(useGuestCart.getState().lines).toEqual([]));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it('a failed merge keeps the store and shows no toast', async () => {
     session.status = 'authenticated';
     const fetchMock = stubFetch(() => ({ status: 500, body: { code: 'INTERNAL', message: 'x' } }));

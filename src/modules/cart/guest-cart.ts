@@ -91,14 +91,18 @@ export const useGuestCart = create<GuestCartState>()(
       },
       remove: (variantId) =>
         set((state) => ({ lines: state.lines.filter((l) => l.variantId !== variantId) })),
-      clear: () => set({ lines: [], unavailable: [] }),
+      clear: () => set({ lines: [], unavailable: [], prunedCount: 0, lastValidatedAt: null }),
+      // Only variants still in the store count: a hydrate finishing after a clear/remove must not leave stale state.
       applyHydrate: ({ missing, unavailable }) =>
-        set((state) => ({
-          lines: state.lines.filter((l) => !missing.includes(l.variantId)),
-          unavailable,
-          prunedCount: state.prunedCount + missing.length,
-          lastValidatedAt: Date.now(),
-        })),
+        set((state) => {
+          const has = (id: string) => state.lines.some((l) => l.variantId === id);
+          return {
+            lines: state.lines.filter((l) => !missing.includes(l.variantId)),
+            unavailable: unavailable.filter(has),
+            prunedCount: state.prunedCount + missing.filter(has).length,
+            lastValidatedAt: Date.now(),
+          };
+        }),
       dismissPruned: () => set({ prunedCount: 0 }),
     }),
     {

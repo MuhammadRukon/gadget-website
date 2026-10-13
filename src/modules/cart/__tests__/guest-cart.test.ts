@@ -86,6 +86,26 @@ describe('guest cart hydrate result', () => {
     expect(store.getState().prunedCount).toBe(0);
   });
 
+  it('clear resets the hydrate bookkeeping, and a hydrate finishing after the clear changes nothing', async () => {
+    const store = await freshStore();
+    store.getState().add('gone', 1);
+    store.getState().add('soldout', 1);
+    store.getState().applyHydrate({ missing: ['gone'], unavailable: ['soldout'] });
+    expect(store.getState().prunedCount).toBe(1);
+
+    store.getState().clear();
+    expect(store.getState()).toMatchObject({
+      lines: [],
+      unavailable: [],
+      prunedCount: 0,
+      lastValidatedAt: null,
+    });
+
+    // A hydrate computed for the pre-merge lines lands late.
+    store.getState().applyHydrate({ missing: ['gone'], unavailable: ['soldout'] });
+    expect(store.getState()).toMatchObject({ lines: [], unavailable: [], prunedCount: 0 });
+  });
+
   it('persists lines and lastValidatedAt only', async () => {
     const store = await freshStore();
     store.getState().add('v', 1);

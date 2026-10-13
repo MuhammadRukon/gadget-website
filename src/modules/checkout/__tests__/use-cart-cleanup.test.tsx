@@ -73,7 +73,13 @@ function setup(hasIssues: boolean) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const wrapper = ({ children }: { children: ReactNode }) =>
     createElement(QueryClientProvider, { client }, children);
-  return { client, ...renderHook(() => useCheckoutCartCleanup(hasIssues), { wrapper }) };
+  return {
+    client,
+    ...renderHook(({ issues }) => useCheckoutCartCleanup(issues), {
+      wrapper,
+      initialProps: { issues: hasIssues },
+    }),
+  };
 }
 
 beforeEach(() => {
@@ -123,13 +129,13 @@ describe('useCheckoutCartCleanup', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('a failed removal ends the cleanup without a notice (placeOrder still validates)', async () => {
+  it('a failed removal ends the cleanup with a notice pointing at the cart, and is not retried', async () => {
     const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
       if (init?.method === 'DELETE') {
         return {
           ok: false,
-          status: 500,
-          text: async () => JSON.stringify({ code: 'INTERNAL', message: 'x' }),
+          status: 404,
+          text: async () => JSON.stringify({ code: 'NOT_FOUND', message: 'x' }),
         };
       }
       return {
@@ -141,6 +147,20 @@ describe('useCheckoutCartCleanup', () => {
     vi.stubGlobal('fetch', fetchMock);
     const { result } = setup(true);
     await waitFor(() => expect(result.current.cleaning).toBe(false));
-    expect(result.current.notice).toBeNull();
+    expect(result.current.notice).toBe('Some items could not be updated. Review your cart.');
+    await new Promise((r) => setTimeout(r, 30)); // a retry loop would show up by now
+    expect(methods(fetchMock).filter((m) => m.startsWith('DELETE'))).toHaveLength(1);
+  });
+
+  it('issues that come back after a finished cleanup block the form again and are cleaned up', async () => {
+    const fetchMock = stubCartApi([line('sold', { stock: 0 })]);
+    const { result, rerender } = setup(true);
+    await waitFor(() => expect(result.current.cleaning).toBe(false));
+
+    rerender({ issues: false });
+    rerender({ issues: true });
+    expect(result.current.cleaning).toBe(true);
+    await waitFor(() => expect(result.current.cleaning).toBe(false));
+    expect(methods(fetchMock).filter((m) => m.startsWith('GET'))).toHaveLength(2);
   });
 });

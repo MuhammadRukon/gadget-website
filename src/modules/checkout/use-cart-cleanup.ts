@@ -13,8 +13,8 @@ import { cleanupNotice, planCartCleanup } from './cart-cleanup';
 /**
  * On checkout entry with cart issues: removes inactive/out-of-stock lines and
  * clamps lines above stock through the existing cart endpoints, then reports
- * what changed. `cleaning` is true until the first attempt ends (the form waits).
- * A failure ends the attempt silently: placeOrder still validates every line.
+ * what changed. `cleaning` is true until the current attempt ends (the form waits).
+ * A failure ends the attempt with a notice: placeOrder still validates every line.
  */
 export function useCheckoutCartCleanup(hasIssues: boolean): {
   cleaning: boolean;
@@ -28,8 +28,11 @@ export function useCheckoutCartCleanup(hasIssues: boolean): {
   const running = useRef(false);
 
   useEffect(() => {
-    // Re-arms once the issues are gone, so a later stock race is cleaned up too.
-    if (!hasIssues) running.current = false;
+    // Re-arms once the issues are gone, so a later stock race is cleaned up (and blocks the form) too.
+    if (!hasIssues) {
+      running.current = false;
+      setAttempted(false);
+    }
     // The cart mutations act on the guest store unless the session is authenticated.
     if (!hasIssues || running.current || status !== 'authenticated') return;
     running.current = true;
@@ -53,6 +56,8 @@ export function useCheckoutCartCleanup(hasIssues: boolean): {
         }
         setNotice(cleanupNotice(plan));
       } catch {
+        // running stays set: the failing mutation re-renders this hook, and a reset would retry forever.
+        setNotice('Some items could not be updated. Review your cart.');
         void qc.invalidateQueries({ queryKey: queryKeys.cart });
       } finally {
         setAttempted(true);
