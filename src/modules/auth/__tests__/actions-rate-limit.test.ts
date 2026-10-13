@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // In-memory stand-in for the RateLimitBucket table so the real limiter logic runs.
 const db = vi.hoisted(() => {
@@ -36,13 +36,16 @@ vi.mock('next/headers', () => ({
   headers: async () => new Headers({ 'x-forwarded-for': `${ip.value}, 10.0.0.1` }),
 }));
 
+import { setStoreForTests } from '@/server/common/cache';
 import { forgotPasswordAction, resetPasswordAction, signupAction } from '@/modules/auth/actions';
 
 const signupInput = { name: 'Test User', email: 'a@b.co', password: 'Passw0rd!long' };
 const forgotInput = { email: 'a@b.co' };
 const resetInput = { token: 't'.repeat(40), password: 'Passw0rd!long' };
 
+// Exercise the Postgres path above, never a real Upstash store from .env.dev.
 beforeEach(() => {
+  setStoreForTests(null);
   db.buckets.clear();
   ip.value = '1.1.1.1';
   vi.clearAllMocks();
@@ -50,6 +53,8 @@ beforeEach(() => {
   auth.issuePasswordReset.mockResolvedValue({});
   auth.resetPassword.mockResolvedValue(undefined);
 });
+
+afterEach(() => setStoreForTests(undefined));
 
 describe('auth server actions are rate limited per IP', () => {
   it('signup: 6th call is refused before any user is created; other IP unaffected', async () => {
