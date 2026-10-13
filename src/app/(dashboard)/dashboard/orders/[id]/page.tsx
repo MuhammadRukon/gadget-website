@@ -81,7 +81,9 @@ export default function AdminOrderDetailPage() {
             Placed {new Date(o.createdAt).toLocaleString()}
           </p>
         </div>
-        <OrderStatusBadge status={o.status} />
+        <span data-testid="admin-order-status">
+          <OrderStatusBadge status={o.status} />
+        </span>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">

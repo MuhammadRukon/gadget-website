@@ -76,7 +76,9 @@ export default function OrderDetailPage() {
             Placed on {new Date(o.createdAt).toLocaleString()}
           </p>
         </div>
-        <OrderStatusBadge status={o.status} />
+        <span data-testid="order-status">
+          <OrderStatusBadge status={o.status} />
+        </span>
       </div>
 
       {feeState !== 'none' && feePayment ? (

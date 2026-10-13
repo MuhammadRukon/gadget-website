@@ -72,7 +72,9 @@ export function OrderSummaryCard({
         <div className="space-y-1 text-sm">
           <div className="flex justify-between">
             <span>Subtotal</span>
-            <span>{formatBDT(quote?.subtotalCents ?? cartSubtotalCents ?? 0)}</span>
+            <span data-testid="checkout-subtotal">
+              {formatBDT(quote?.subtotalCents ?? cartSubtotalCents ?? 0)}
+            </span>
           </div>
           <div className="flex justify-between">
             <span>Discount</span>
@@ -84,7 +86,7 @@ export function OrderSummaryCard({
           </div>
           <div className="flex justify-between font-semibold pt-2 border-t mt-2">
             <span>Total</span>
-            <span>{quote ? formatBDT(quote.totalCents) : '...'}</span>
+            <span data-testid="checkout-total">{quote ? formatBDT(quote.totalCents) : '...'}</span>
           </div>
           {feeActive && quote ? (
             <FeeSummaryRows
