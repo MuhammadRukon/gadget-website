@@ -27,7 +27,8 @@
     "db:status": "dotenv -e .env.dev -- prisma migrate status",
     "predb:backfill-email": "npm run db:guard",
     "db:backfill-email": "dotenv -e .env.dev -- tsx prisma/backfill-email-verified.ts",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "test:e2e": "playwright test"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -87,6 +88,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
+    "@playwright/test": "^1.64.0",
     "@tailwindcss/postcss": "^4",
     "@tanstack/eslint-plugin-query": "^5.90.1",
     "@testing-library/dom": "^10.4.1",

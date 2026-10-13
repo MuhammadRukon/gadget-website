@@ -42,3 +42,9 @@ yarn-error.log*
 next-env.d.ts
 
 /src/generated/prisma
+
+# playwright e2e
+.env.e2e
+test-results/
+playwright-report/
+e2e/.auth/
