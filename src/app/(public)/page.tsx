@@ -1,7 +1,6 @@
 import Image from 'next/image';
 import Link from 'next/link';
 
-import { Carousel, CarouselContent, CarouselItem } from '@/components/ui/carousel';
 import { Button } from '@/components/ui/button';
 import { catalogService } from '@/server/catalog/catalog.service';
 import { ProductGrid } from '@/modules/storefront/components/product-grid';
@@ -20,32 +19,16 @@ export default async function HomePage() {
   return (
     <div className="space-y-10 py-6">
       <h1 className="sr-only">Cryptech — gadgets &amp; electronics in Bangladesh</h1>
-      <Carousel opts={{ loop: true }}>
-        <CarouselContent>
-          <CarouselItem>
-            <Image
-              className="w-full max-h-96 object-cover rounded"
-              src="/banner.webp"
-              loading="eager"
-              alt="Storefront banner"
-              width={1600}
-              height={500}
-              priority
-            />
-          </CarouselItem>
-          <CarouselItem>
-            <Image
-              className="w-full max-h-96 object-cover rounded"
-              src="/banner.webp"
-              alt="Storefront banner"
-              width={1600}
-              height={500}
-              loading="eager"
-              priority
-            />
-          </CarouselItem>
-        </CarouselContent>
-      </Carousel>
+      <Image
+        className="w-full max-h-96 object-cover rounded"
+        src="/banner.webp"
+        loading="eager"
+        alt="Storefront banner"
+        width={2000}
+        height={1000}
+        sizes="100vw"
+        priority
+      />
 
       <section className="space-y-4">
         <div className="flex items-end justify-between">
