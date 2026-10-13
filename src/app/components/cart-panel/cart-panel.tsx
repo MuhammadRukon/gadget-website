@@ -4,7 +4,8 @@ import Link from 'next/link';
 import { ShoppingCart } from 'lucide-react';
 
 import { Loader } from '@/app/common/loader/loader';
-import { CartLineItem } from '@/app/components/cart/cart-line-item';
+import { CartLineItem, CartLineSkeleton } from '@/app/components/cart/cart-line-item';
+import { CartNotices } from '@/app/components/cart/cart-notices';
 import { CartSummary } from '@/app/components/cart/cart-summary';
 import { Button } from '@/components/ui/button';
 import {
@@ -17,6 +18,8 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet';
+import { cartAvailability, cartHeaderLabel } from '@/modules/cart/availability';
+import { useGuestCart } from '@/modules/cart/guest-cart';
 import { useCart, useCartBadgeCount } from '@/modules/cart/hooks';
 
 export function CartPanel() {
@@ -46,18 +49,28 @@ export function CartPanel() {
 
 /** Radix unmounts SheetContent children while closed, so the full cart is only fetched once the panel opens. */
 function CartPanelContent() {
-  const { cart, isLoading, isAuthenticated } = useCart();
+  const { cart, isLoading, isPriceLoading, isAuthenticated } = useCart();
+  const guestLineCount = useGuestCart((s) => s.lines.length);
   const isEmpty = !cart || cart.lines.length === 0;
 
   return (
     <>
       <SheetHeader>
         <SheetTitle>Cart</SheetTitle>
-        <SheetDescription>You cart items.</SheetDescription>
+        <SheetDescription>
+          {isEmpty ? 'You cart items.' : cartHeaderLabel(cartAvailability(cart.lines))}
+        </SheetDescription>
       </SheetHeader>
 
       <div className="flex-1 overflow-y-auto px-4">
-        {isLoading ? (
+        <CartNotices lines={cart?.lines} />
+        {isLoading && !isAuthenticated && guestLineCount > 0 ? (
+          <div>
+            {Array.from({ length: guestLineCount }, (_, i) => (
+              <CartLineSkeleton key={i} compact />
+            ))}
+          </div>
+        ) : isLoading ? (
           <div className="flex justify-center py-10">
             <Loader />
           </div>
@@ -75,7 +88,7 @@ function CartPanelContent() {
           <ul className="divide-y">
             {cart?.lines.map((line) => (
               <li key={line.itemId}>
-                <CartLineItem line={line} compact />
+                <CartLineItem line={line} compact priceLoading={isPriceLoading} />
               </li>
             ))}
           </ul>
@@ -83,7 +96,14 @@ function CartPanelContent() {
       </div>
 
       <SheetFooter className="gap-3">
-        {isEmpty ? null : <CartSummary cart={cart} authenticated={isAuthenticated} isPanel />}
+        {isEmpty ? null : (
+          <CartSummary
+            cart={cart}
+            authenticated={isAuthenticated}
+            isPanel
+            priceLoading={isPriceLoading}
+          />
+        )}
         <div className="flex w-full gap-2">
           <SheetClose asChild>
             <Button asChild className="flex-1" disabled={isEmpty}>

@@ -5,8 +5,10 @@ import Link from 'next/link';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import type { CartLine } from '@/contracts/cart';
 import { cn } from '@/lib/utils';
+import { lineUnavailableReason } from '@/modules/cart/availability';
 import { useCartMutations } from '@/modules/cart/hooks';
 import { formatBDT } from '@/server/common/money';
 
@@ -18,15 +20,36 @@ export interface CartLineItemProps {
    * where vertical space is constrained.
    */
   compact?: boolean;
+  /** Guest prices are being hydrated: show a skeleton instead of the price. */
+  priceLoading?: boolean;
 }
 
-export function CartLineItem({ line, compact = false }: Readonly<CartLineItemProps>) {
+/** Placeholder row for a guest line while its first hydrate runs. */
+export function CartLineSkeleton({ compact = false }: Readonly<{ compact?: boolean }>) {
+  return (
+    <div className="flex gap-3 p-2 border-b last:border-b-0">
+      <Skeleton className={cn('shrink-0', compact ? 'w-14 h-14' : 'w-20 h-20')} />
+      <div className="flex-1 space-y-2">
+        <Skeleton className="h-4 w-2/3" />
+        <Skeleton className="h-3 w-20" />
+      </div>
+    </div>
+  );
+}
+
+export function CartLineItem({
+  line,
+  compact = false,
+  priceLoading = false,
+}: Readonly<CartLineItemProps>) {
   const { updateItem, removeItem } = useCartMutations();
+  const unavailableReason = lineUnavailableReason(line);
   const changeQuantity = (nextQuantity: number) =>
     updateItem.mutate({
       itemId: line.itemId,
       variantId: line.variantId,
       quantity: Math.max(0, Math.min(99, nextQuantity)),
+      maxStock: line.stock,
     });
 
   const inner = (
@@ -50,7 +73,10 @@ export function CartLineItem({ line, compact = false }: Readonly<CartLineItemPro
       <div className="flex-1 min-w-0">
         <Link
           href={`/products/${line.productSlug}`}
-          className="font-medium hover:underline line-clamp-1"
+          className={cn(
+            'font-medium hover:underline line-clamp-1',
+            unavailableReason && 'line-through text-muted-foreground',
+          )}
         >
           {line.productName}
         </Link>
@@ -59,13 +85,21 @@ export function CartLineItem({ line, compact = false }: Readonly<CartLineItemPro
             {line.variantName ? `${line.variantName} · ` : ''}SKU: {line.sku}
           </p>
         )}
-        <p className={cn('mt-1', compact ? 'text-xs' : 'text-sm')}>
-          {formatBDT(line.unitPriceCents)} each
-        </p>
-        {!line.isActive ? (
-          <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-            This product is no longer available.
+        {priceLoading ? (
+          <Skeleton className="mt-1 h-4 w-20" />
+        ) : (
+          <p
+            className={cn(
+              'mt-1',
+              compact ? 'text-xs' : 'text-sm',
+              unavailableReason && 'line-through text-muted-foreground',
+            )}
+          >
+            {formatBDT(line.unitPriceCents)} each
           </p>
+        )}
+        {unavailableReason ? (
+          <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">{unavailableReason}</p>
         ) : line.quantity > line.stock ? (
           <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
             Only {line.stock} in stock.
@@ -73,7 +107,7 @@ export function CartLineItem({ line, compact = false }: Readonly<CartLineItemPro
         ) : null}
       </div>
       <div className="flex flex-col items-end gap-2 shrink-0">
-        <div className="ml-auto flex items-center gap-1">
+        <div className={cn('ml-auto flex items-center gap-1', unavailableReason && 'hidden')}>
           <Button
             type="button"
             size="icon"
