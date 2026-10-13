@@ -34,6 +34,7 @@ Verified-open items only, each checked against the code on 2026-10-13. When you 
 - **Product image uploader destroys Cloudinary assets before save.** `src/modules/admin/catalog/components/admin-image-uploader.tsx:80-90` calls `/api/admin/media/delete` on removal; only the COD settings card opts out (`deferDelete`, `cod-fee-card.tsx:207`).
 - **No `loading.tsx` anywhere.** Server pages (PDP, listings) block with no skeleton.
 - **Account pages redirect client-side.** `src/app/(public)/account/*/page.tsx` (for example `orders/page.tsx:20-24`) flash a loader, then `router.replace` from a `useEffect`, instead of being server-gated like `/checkout`.
+- **Signup form's optional Phone field blocks submit when empty.** `zodResolver` validates `''` against `z.string().min(6).optional()` (`src/contracts/auth.ts:13`) before the submit handler maps it to `undefined`; the e2e specs fill a valid phone as a workaround.
 - **Client lists have no error state.** `src/app/(public)/account/orders/page.tsx:26` renders loading then data only; a failed fetch leaves a stuck loader (the order detail and bank-transfer pages handle `error`).
 - **Admin forms show raw cents.** `src/modules/admin/catalog/components/product-form.tsx:452-500` ("Buying price (cents)") and the coupon form take integer cents.
 

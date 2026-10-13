@@ -14,6 +14,9 @@ test('[E2E-PERF-08] header search waits for 3 characters and caches the result',
   // The hook debounces 400 ms; wait comfortably past it before asserting "nothing was sent".
   const pastDebounce = () => page.waitForTimeout(900);
 
+  // Below 640 px (Pixel 7) the search bar is collapsed behind a toggle: open it like a user would.
+  const toggle = page.getByLabel('Toggle search');
+  if (await toggle.isVisible()) await toggle.click();
   await search.click();
   await search.pressSequentially('ip', { delay: 50 });
   await pastDebounce();

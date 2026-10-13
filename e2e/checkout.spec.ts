@@ -9,6 +9,9 @@ test('[E2E-CHECKOUT-01] customer places a COD order through the UI', async ({ pa
   expect((await request.delete('/api/cart')).ok()).toBe(true);
 
   await page.goto('/products/iphone-15-pro');
+  // While the session is still loading, "Add to cart" writes to the guest store, and the merge on /checkout can then
+  // run twice (a navigation aborts the first PUT after the server applied it): quantity 2. Wait for the account menu.
+  await expect(page.locator('header button[aria-haspopup="menu"]')).toBeVisible();
   await page.getByRole('button', { name: 'Add to cart' }).click();
   await expect(page.getByText('Added to cart')).toBeVisible();
 

@@ -18,7 +18,15 @@ export default defineConfig({
       name: 'chromium-desktop',
       testIgnore: ['infra.spec.ts', 'auth.setup.ts'],
       dependencies: ['setup'],
-      use: { ...devices['Desktop Chrome'] },
+      // Distinct client IP per browser project: signup is limited to 5 per 15 min per IP (`clientIp` trusts x-forwarded-for)
+      // and both projects sign up 3 times in one DB lifetime.
+      use: { ...devices['Desktop Chrome'], extraHTTPHeaders: { 'x-forwarded-for': '203.0.113.10' } },
+    },
+    {
+      name: 'chromium-mobile',
+      testIgnore: ['infra.spec.ts', 'auth.setup.ts'],
+      dependencies: ['setup'],
+      use: { ...devices['Pixel 7'], extraHTTPHeaders: { 'x-forwarded-for': '203.0.113.11' } },
     },
   ],
   webServer: {
