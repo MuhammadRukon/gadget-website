@@ -164,3 +164,23 @@ CI or GitHub Actions gate; Firefox and WebKit; bKash, SSLCommerz and bank-transf
 ## Rollback
 
 `git worktree remove --force C:\Users\muhammad\Desktop\gadget-website-e2e`, `git branch -D feature/playwright-e2e-suite` (only after it is pushed or abandoned; owner runs it), drop DB `gadget_e2e`. The main checkout is already restored by Workspace setup step 1.
+
+## Execution Progress
+
+**Status: in progress**
+
+_Last updated: 2026-10-13 - Branch: feature/playwright-e2e-suite (from `37a0fb0`) - Workspace: worktree at `.claude/worktrees/e2e`_
+
+Final commit list: `3e95e2a` (plan: add Phase 6)
+
+Execution order: 1, 2, 3, 4, 6, 5, Cross-Validation (phases share one DB and port 3100, so they run sequentially).
+
+| Phase | Status | Commit | Review | Notes |
+| --- | --- | --- | --- | --- |
+| 1. Foundation | pending | - | deferred | - |
+| 2. Guest browse and cart | pending | - | deferred | - |
+| 3. Auth and guards | pending | - | deferred | - |
+| 4. Orders and admin | pending | - | deferred | - |
+| 6. Perf PR guards | pending | - | deferred | - |
+| 5. Mobile and docs | pending | - | deferred | - |
+| Cross-Validation | pending | - | - | - |
