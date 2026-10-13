@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSession } from 'next-auth/react';
 import { toast } from 'sonner';
 
-import { apiFetch } from '@/lib/fetcher';
+import { clearAuthHint, readAuthHint } from '@/lib/auth-hint';
+import { ApiClientError, apiFetch } from '@/lib/fetcher';
 import { queryKeys } from '@/constants/queryKeys';
 import type { CartSnapshot, CartSummary } from '@/contracts/cart';
 import { useGuestCart } from './guest-cart';
@@ -17,21 +18,44 @@ function explainError(err: unknown, fallback: string): string {
   return fallback;
 }
 
-export function useServerCart(view: 'full'): ReturnType<typeof useQuery<CartSnapshot>>;
-export function useServerCart(view: 'summary'): ReturnType<typeof useQuery<CartSummary>>;
+interface ServerCartOptions {
+  staleTime?: number;
+  refetchOnMount?: boolean;
+}
+
+const isUnauthorized = (err: unknown) => err instanceof ApiClientError && err.status === 401;
+
+export function useServerCart(
+  view: 'full',
+  options?: ServerCartOptions,
+): ReturnType<typeof useQuery<CartSnapshot>>;
+export function useServerCart(
+  view: 'summary',
+  options?: ServerCartOptions,
+): ReturnType<typeof useQuery<CartSummary>>;
 export function useServerCart(
   view: 'full' | 'summary' = 'full',
+  options: ServerCartOptions = {},
 ): ReturnType<typeof useQuery<CartSnapshot | CartSummary>> {
   const { status } = useSession();
   return useQuery({
     queryKey: view === 'summary' ? queryKeys.cartSummary : queryKeys.cart,
     queryFn: async () => {
-      if (view === 'summary') {
-        return apiFetch<CartSummary>(`${CART_URL}?view=summary`);
+      try {
+        if (view === 'summary') {
+          return await apiFetch<CartSummary>(`${CART_URL}?view=summary`);
+        }
+        return await apiFetch<CartSnapshot>(CART_URL);
+      } catch (err) {
+        // A forged or stale hint: the server says there is no session.
+        if (isUnauthorized(err)) clearAuthHint();
+        throw err;
       }
-      return apiFetch<CartSnapshot>(CART_URL);
     },
-    enabled: status === 'authenticated',
+    // With the hint the summary starts in parallel with the session call instead of waiting for it.
+    enabled: status === 'authenticated' || (view === 'summary' && readAuthHint()),
+    retry: (count, err) => !isUnauthorized(err) && count < 1,
+    ...options,
   });
 }
 
@@ -84,6 +108,22 @@ export function useCart(): {
     isLoading: status === 'loading' || (isAuthenticated ? server.isLoading : guest.isLoading),
     isAuthenticated,
   };
+}
+
+/**
+ * Header badge count. Guests: localStorage store (no request). Signed-in: the
+ * cheap summary query, kept for 5 minutes and updated by cart mutations via
+ * setQueryData. Renders 0 until mounted so SSR and hydration markup match.
+ */
+export function useCartBadgeCount(): number {
+  const { status } = useSession();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const guestCount = useGuestCart((s) => s.lines.reduce((sum, l) => sum + l.quantity, 0));
+  const summary = useServerCart('summary', { staleTime: 5 * 60_000, refetchOnMount: false });
+
+  if (!mounted) return 0;
+  return status === 'unauthenticated' ? guestCount : (summary.data?.itemCount ?? 0);
 }
 
 export function useCartMutations() {
