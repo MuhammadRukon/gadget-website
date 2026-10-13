@@ -83,4 +83,4 @@ Public catalog pages are ISR; Redis is an optional layer only for what ISR canno
 
 ## Testing
 
-Vitest in the node environment (config in `vitest.config.ts`), about 60 test files: pure-logic unit tests, service tests against the local Postgres (live Prisma, not mocked), and route-level tests in `src/app/api/__tests__`. A test file can opt into jsdom with a `// @vitest-environment jsdom` docblock (e.g. `src/hooks/__tests__/use-header-search-preview.test.ts`); the default stays node. No browser E2E yet (see `docs/plans/playwright-e2e-testing-plan.md`).
+Vitest in the node environment (config in `vitest.config.ts`), about 70 test files: pure-logic unit tests, service tests against the local Postgres (live Prisma, not mocked), and route-level tests in `src/app/api/__tests__`. A test file can opt into jsdom with a `// @vitest-environment jsdom` docblock (e.g. `src/hooks/__tests__/use-header-search-preview.test.ts`); the default stays node. No browser E2E yet (see `docs/plans/playwright-e2e-testing-plan.md`).

@@ -201,7 +201,7 @@ Acceptance criteria:
 - Shortcuts taken: auth hint is a localStorage flag, not a cookie (limit: a stale hint costs one extra session call; upgrade to a server-set non-httpOnly cookie if Google-login flash becomes a complaint; the OAuth landing-route fetch in Phase 2 is required either way); search preview cache is per tab and in memory (limit: no cross-tab sharing; upgrade to TanStack Query if more client caching is needed); memory limiter state is per instance (limit: effective cap is `max x instances`; upgrade only if abuse shows up with Redis on).
 
 ## 8. Rollback
-Each phase is one commit: `git revert <sha>`. Phase 5 deletions are recoverable from git history (`git show <sha>^:<path>`). Abandon entirely: delete the execution branch (or worktree). No migrations, no data changes.
+Each phase is one commit: `git revert <sha>`. Phase 5 deletions are recoverable from git history (`git show <sha>^:<path>`). Abandon entirely: delete the execution branch (or worktree). No migrations, no data changes. Caveat: Phase 2B bumps the guest-cart storage to `version: 1`; reverting 2B alone leaves old code reading `version: 1` data without a `migrate` function, which zustand discards, so guests lose their saved carts on that rollback (keep an identity `migrate` in the revert to avoid it).
 
 ## Execution Progress
 **Status: in progress**
