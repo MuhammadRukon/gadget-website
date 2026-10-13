@@ -3,12 +3,14 @@
 import Image from 'next/image';
 import Link from 'next/link';
 
+import { Loader } from '@/app/common/loader/loader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { CartLine } from '@/contracts/cart';
 import { cn } from '@/lib/utils';
 import { lineUnavailableReason } from '@/modules/cart/availability';
+import { useGuestCart } from '@/modules/cart/guest-cart';
 import { useCartMutations } from '@/modules/cart/hooks';
 import { formatBDT } from '@/server/common/money';
 
@@ -37,6 +39,29 @@ export function CartLineSkeleton({ compact = false }: Readonly<{ compact?: boole
   );
 }
 
+/** Guest carts show one skeleton per stored line while hydrating; everyone else gets the spinner. */
+export function CartLinesLoading({
+  authenticated,
+  compact = false,
+}: Readonly<{ authenticated: boolean; compact?: boolean }>) {
+  const guestLineCount = useGuestCart((s) => s.lines.length);
+
+  if (!authenticated && guestLineCount > 0) {
+    return (
+      <div>
+        {Array.from({ length: guestLineCount }, (_, i) => (
+          <CartLineSkeleton key={i} compact={compact} />
+        ))}
+      </div>
+    );
+  }
+  return (
+    <div className="flex justify-center py-10">
+      <Loader />
+    </div>
+  );
+}
+
 export function CartLineItem({
   line,
   compact = false,
@@ -44,6 +69,7 @@ export function CartLineItem({
 }: Readonly<CartLineItemProps>) {
   const { updateItem, removeItem } = useCartMutations();
   const unavailableReason = lineUnavailableReason(line);
+  const struck = unavailableReason && 'line-through text-muted-foreground';
   const changeQuantity = (nextQuantity: number) =>
     updateItem.mutate({
       itemId: line.itemId,
@@ -73,10 +99,7 @@ export function CartLineItem({
       <div className="flex-1 min-w-0">
         <Link
           href={`/products/${line.productSlug}`}
-          className={cn(
-            'font-medium hover:underline line-clamp-1',
-            unavailableReason && 'line-through text-muted-foreground',
-          )}
+          className={cn('font-medium hover:underline line-clamp-1', struck)}
         >
           {line.productName}
         </Link>
@@ -88,13 +111,7 @@ export function CartLineItem({
         {priceLoading ? (
           <Skeleton className="mt-1 h-4 w-20" />
         ) : (
-          <p
-            className={cn(
-              'mt-1',
-              compact ? 'text-xs' : 'text-sm',
-              unavailableReason && 'line-through text-muted-foreground',
-            )}
-          >
+          <p className={cn('mt-1', compact ? 'text-xs' : 'text-sm', struck)}>
             {formatBDT(line.unitPriceCents)} each
           </p>
         )}

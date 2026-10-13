@@ -3,8 +3,7 @@
 import Link from 'next/link';
 import { ShoppingCart } from 'lucide-react';
 
-import { Loader } from '@/app/common/loader/loader';
-import { CartLineItem, CartLineSkeleton } from '@/app/components/cart/cart-line-item';
+import { CartLineItem, CartLinesLoading } from '@/app/components/cart/cart-line-item';
 import { CartNotices } from '@/app/components/cart/cart-notices';
 import { CartSummary } from '@/app/components/cart/cart-summary';
 import { Button } from '@/components/ui/button';
@@ -19,7 +18,6 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet';
 import { cartAvailability, cartHeaderLabel } from '@/modules/cart/availability';
-import { useGuestCart } from '@/modules/cart/guest-cart';
 import { useCart, useCartBadgeCount } from '@/modules/cart/hooks';
 
 export function CartPanel() {
@@ -50,7 +48,6 @@ export function CartPanel() {
 /** Radix unmounts SheetContent children while closed, so the full cart is only fetched once the panel opens. */
 function CartPanelContent() {
   const { cart, isLoading, isPriceLoading, isAuthenticated } = useCart();
-  const guestLineCount = useGuestCart((s) => s.lines.length);
   const isEmpty = !cart || cart.lines.length === 0;
 
   return (
@@ -64,16 +61,8 @@ function CartPanelContent() {
 
       <div className="flex-1 overflow-y-auto px-4">
         <CartNotices lines={cart?.lines} />
-        {isLoading && !isAuthenticated && guestLineCount > 0 ? (
-          <div>
-            {Array.from({ length: guestLineCount }, (_, i) => (
-              <CartLineSkeleton key={i} compact />
-            ))}
-          </div>
-        ) : isLoading ? (
-          <div className="flex justify-center py-10">
-            <Loader />
-          </div>
+        {isLoading ? (
+          <CartLinesLoading authenticated={isAuthenticated} compact />
         ) : isEmpty ? (
           <p className="py-10 text-center text-sm text-muted-foreground">
             Your cart is empty.{' '}

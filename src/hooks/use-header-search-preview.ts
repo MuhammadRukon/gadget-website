@@ -95,18 +95,12 @@ export function useHeaderSearchPreview(): UseHeaderSearchPreviewResult {
   useEffect(() => {
     const q = search.trim();
     latestQueryRef.current = q;
-    if (q.length < MIN_PREVIEW_CHARS) {
+    const cachedPreview =
+      q.length >= MIN_PREVIEW_CHARS ? readPreviewCache(previewCacheKey(q)) : undefined;
+    if (q.length < MIN_PREVIEW_CHARS || cachedPreview) {
       schedulePreviewFetch.current.cancel();
       previewAbortRef.current?.abort();
-      setPreview(null);
-      setPreviewLoading(false);
-      return;
-    }
-    const cachedPreview = readPreviewCache(previewCacheKey(q));
-    if (cachedPreview) {
-      schedulePreviewFetch.current.cancel();
-      previewAbortRef.current?.abort();
-      setPreview(cachedPreview);
+      setPreview(cachedPreview ?? null);
       setPreviewLoading(false);
       return;
     }

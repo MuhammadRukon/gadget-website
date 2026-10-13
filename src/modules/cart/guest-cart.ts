@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 
-import { guestCartLineSchema, type GuestCartLine } from '@/contracts/cart';
+import { guestCartLineSchema, MAX_GUEST_LINES, type GuestCartLine } from '@/contracts/cart';
 
 /**
  * Guest cart held in localStorage. The real (authoritative) cart for
@@ -36,20 +36,19 @@ const STORAGE_KEY = 'Cryptech.guestCart';
 const storedLineSchema = guestCartLineSchema.extend({
   variantId: guestCartLineSchema.shape.variantId.min(1),
 });
-const MAX_LINES = 50;
 
 /** Keeps the valid lines of whatever was stored; anything else is dropped. */
 function sanitize(raw: unknown): PersistedGuestCart {
   const stored = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
   const lines = Array.isArray(stored.lines)
-    ? stored.lines.flatMap((l) => {
+    ? stored.lines.slice(0, MAX_GUEST_LINES).flatMap((l) => {
         const parsed = storedLineSchema.safeParse(l);
         return parsed.success ? [parsed.data] : [];
       })
     : [];
   const at = stored.lastValidatedAt;
   return {
-    lines: lines.slice(0, MAX_LINES),
+    lines,
     lastValidatedAt: typeof at === 'number' && Number.isFinite(at) ? at : null,
   };
 }
@@ -95,11 +94,15 @@ export const useGuestCart = create<GuestCartState>()(
       // Only variants still in the store count: a hydrate finishing after a clear/remove must not leave stale state.
       applyHydrate: ({ missing, unavailable }) =>
         set((state) => {
-          const has = (id: string) => state.lines.some((l) => l.variantId === id);
+          const present = new Set(state.lines.map((l) => l.variantId));
+          const pruned = missing.filter((id) => present.has(id));
           return {
-            lines: state.lines.filter((l) => !missing.includes(l.variantId)),
-            unavailable: unavailable.filter(has),
-            prunedCount: state.prunedCount + missing.filter(has).length,
+            // Same reference when nothing was pruned, so lines subscribers do not re-run.
+            lines: pruned.length
+              ? state.lines.filter((l) => !missing.includes(l.variantId))
+              : state.lines,
+            unavailable: unavailable.filter((id) => present.has(id)),
+            prunedCount: state.prunedCount + pruned.length,
             lastValidatedAt: Date.now(),
           };
         }),

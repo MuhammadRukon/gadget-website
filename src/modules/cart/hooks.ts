@@ -42,20 +42,15 @@ export function useServerCart(
   options: ServerCartOptions = {},
 ): ReturnType<typeof useQuery<CartSnapshot | CartSummary>> {
   const { status } = useSession();
+  const url = view === 'summary' ? `${CART_URL}?view=summary` : CART_URL;
   return useQuery({
     queryKey: view === 'summary' ? queryKeys.cartSummary : queryKeys.cart,
-    queryFn: async () => {
-      try {
-        if (view === 'summary') {
-          return await apiFetch<CartSummary>(`${CART_URL}?view=summary`);
-        }
-        return await apiFetch<CartSnapshot>(CART_URL);
-      } catch (err) {
+    queryFn: () =>
+      apiFetch<CartSnapshot | CartSummary>(url).catch((err: unknown) => {
         // A forged or stale hint: the server says there is no session.
         if (isUnauthorized(err)) clearAuthHint();
         throw err;
-      }
-    },
+      }),
     // With the hint the summary starts in parallel with the session call instead of waiting for it.
     enabled: status === 'authenticated' || (view === 'summary' && readAuthHint()),
     retry: (count, err) => !isUnauthorized(err) && count < 1,
@@ -157,7 +152,8 @@ export function useCartBadgeCount(): number {
 export function useCartMutations() {
   const qc = useQueryClient();
   const { status } = useSession();
-  const guest = useGuestCart();
+  // Actions are read at call time: subscribing to the whole store re-rendered every caller on each hydrate.
+  const guest = useGuestCart.getState;
   const syncCartCache = (snapshot: CartSnapshot | null) => {
     if (!snapshot) return;
     qc.setQueryData(queryKeys.cart, snapshot);
@@ -172,7 +168,7 @@ export function useCartMutations() {
     // maxStock: known stock, enforced for guests only (the server checks for signed-in users).
     mutationFn: async (input: { variantId: string; quantity: number; maxStock?: number }) => {
       if (status !== 'authenticated') {
-        if (!guest.add(input.variantId, input.quantity, input.maxStock)) {
+        if (!guest().add(input.variantId, input.quantity, input.maxStock)) {
           throw new Error(stockMessage(input.maxStock));
         }
         return null;
@@ -197,7 +193,7 @@ export function useCartMutations() {
       maxStock?: number;
     }) => {
       if (status !== 'authenticated') {
-        if (!guest.setQuantity(input.variantId, input.quantity, input.maxStock)) {
+        if (!guest().setQuantity(input.variantId, input.quantity, input.maxStock)) {
           throw new Error(stockMessage(input.maxStock));
         }
         return null;
@@ -217,7 +213,7 @@ export function useCartMutations() {
   const removeItem = useMutation({
     mutationFn: async (input: { itemId: string; variantId: string }) => {
       if (status !== 'authenticated') {
-        guest.remove(input.variantId);
+        guest().remove(input.variantId);
         return null;
       }
       return apiFetch<CartSnapshot>(`${CART_URL}/${input.itemId}`, { method: 'DELETE' });
@@ -251,8 +247,7 @@ export function useGuestCartMerge() {
     })
       .then((res) => {
         // An unexpected shape must not stop the store from clearing (the merge already happened).
-        const parsed = mergeResultSchema.safeParse(res);
-        const adjusted = parsed.success ? parsed.data.adjustments.length : 0;
+        const adjusted = mergeResultSchema.safeParse(res).data?.adjustments.length ?? 0;
         clear();
         qc.invalidateQueries({ queryKey: queryKeys.cart });
         qc.invalidateQueries({ queryKey: queryKeys.cartSummary });

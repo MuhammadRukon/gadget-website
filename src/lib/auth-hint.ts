@@ -5,9 +5,18 @@
  */
 const KEY = 'Cryptech.authHint';
 
+/** null on the server or when storage is blocked: the hint is only an optimization. */
+function store(): Storage | null {
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
 export function readAuthHint(): boolean {
   try {
-    return typeof window !== 'undefined' && window.localStorage.getItem(KEY) === '1';
+    return store()?.getItem(KEY) === '1';
   } catch {
     return false;
   }
@@ -15,17 +24,17 @@ export function readAuthHint(): boolean {
 
 export function setAuthHint(): void {
   try {
-    if (typeof window !== 'undefined') window.localStorage.setItem(KEY, '1');
+    store()?.setItem(KEY, '1');
   } catch {
-    // storage blocked: the hint is only an optimization
+    // quota / blocked
   }
 }
 
 export function clearAuthHint(): void {
   try {
-    if (typeof window !== 'undefined') window.localStorage.removeItem(KEY);
+    store()?.removeItem(KEY);
   } catch {
-    // storage blocked
+    // quota / blocked
   }
 }
 

@@ -254,7 +254,7 @@ export const cartService = {
           },
         },
       });
-      const writes: Array<() => Promise<unknown>> = [];
+      const toCache: Array<[string, VariantDisplay]> = [];
       for (const v of variants) {
         const p = v.product;
         const dto: VariantDisplay = {
@@ -272,9 +272,13 @@ export const cartService = {
         };
         byVariantId.set(v.id, dto);
         // Skip writes if the read already failed (store down/breaker open).
-        if (hits.ok) writes.push(() => withStore((s) => s.set(keyOf(v.id), dto, 30)));
+        if (hits.ok) toCache.push([v.id, dto]);
       }
-      if (writes.length > 0) await runDeferred(() => Promise.all(writes.map((w) => w())));
+      if (toCache.length > 0) {
+        await runDeferred(() =>
+          Promise.all(toCache.map(([id, dto]) => withStore((s) => s.set(keyOf(id), dto, 30)))),
+        );
+      }
     }
 
     const lines: CartLine[] = [];
