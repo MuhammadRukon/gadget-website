@@ -48,7 +48,9 @@ Add `@playwright/test` with a smoke suite over 7 core flows. It runs locally aga
 
 ## Workspace setup (first step)
 
-User chose a dedicated worktree so main checkout stays free for other work. Branch is based off `main` (already at `65bce8b`). PR target `dev` per `git-hygiene`.
+**Updated 2026-10-13 (owner confirmed):** execution uses worktree `.claude/worktrees/e2e` (under the main checkout) on branch `feature/playwright-e2e-suite`, created from `feature/perf-waterfall-and-docs-cleanup` @ `37a0fb0` (the perf PR) so the perf specs run against the new code. A fresh branch name is used because `feature/playwright-e2e-testing` already exists on origin at an old `main` commit (reusing it would need a force push). PR target `dev`; if the perf PR has merged by then, rebase onto `dev` before the PR. Steps 1-4 below are superseded (worktree exists, `npm ci` done; run `npx playwright install chromium` once); step 5 (`.env.e2e`) still applies.
+
+Original text: dedicated worktree so main checkout stays free for other work. PR target `dev` per `git-hygiene`.
 
 1. Main checkout: `git checkout chore/dev-environment-setup`, then `git stash pop`. This frees the branch.
 2. `git worktree add C:\Users\muhammad\Desktop\gadget-website-e2e feature/playwright-e2e-testing`.
@@ -123,6 +125,23 @@ User chose a dedicated worktree so main checkout stays free for other work. Bran
 - [ ] README documents: `.env.e2e` setup, `npm run test:e2e`, `npm run test:e2e -- -g "E2E-CHECKOUT"`, port 3100, and "DB is wiped each run".
 - [ ] CLAUDE.md gains 3 lines or fewer: run `npm run test:e2e` (line reporter, failures only) instead of manual browser checks; cite `[E2E-*]` IDs in specs. The stale COD-only statement is left for a separate fix.
 
+## Phase 6: Guards for the perf/waterfall PR (added 2026-10-13)
+
+Run after Phase 4, before Phase 5 (Phase 5's README must list these IDs too). Safeguards the behavior of the PR "perf: cut request waterfalls, shrink fonts, clean up docs" (plan `docs/plans/perf-waterfall-and-docs-cleanup-plan.md`, Phases 1-4). Specs live in `e2e/perf-*.spec.ts` plus helpers in `e2e/support/`. Rules: only `data-testid` additions in `src/`; DB mutations inside a test (deactivating a variant, inserting reviews) go through a Prisma client with explicit `datasourceUrl` from the guarded e2e URL and are reverted in `finally`/`afterEach`; count network requests with `page.on('request')` filtered by pathname, never by timing alone. `next dev` runs React Strict Mode, which doubles some effects: where a request count differs from production because of it, assert the production-relevant bound (for example "no `/api/auth/session` request before the first user interaction for a guest with no hint") and record the dev-mode caveat as a comment. If a criterion is unreliable in dev mode, STOP and report (deviation checkpoint) instead of weakening it silently.
+
+**Acceptance criteria** (each is one test titled with its ID)
+- [ ] `[E2E-PERF-01]` reviews in HTML: the e2e setup inserts 12 approved reviews on `iphone-15-pro` via Prisma (never edit `prisma/seed.ts`). `GET /products/iphone-15-pro` raw HTML (via `request.get`, no JS) contains the text of review 1 and review 10 and not review 11. Loading the page in the browser issues 0 requests to `/api/reviews` and shows no "Loading reviews" text. Clicking "Show all reviews" issues exactly 1 GET `/api/reviews` and then shows review 11 and 12. Author names render as "First L." (a single-word name shows the first name only).
+- [ ] `[E2E-PERF-02]` guest request diet: a fresh guest context (empty localStorage) loads `/`, `/products`, then `/products/iphone-15-pro`; none of those loads issues a request to `/api/cart` (full or `?view=summary`) and, apart from the dev Strict Mode caveat, none to `/api/auth/session` before the first interaction.
+- [ ] `[E2E-PERF-03]` auth hint: after a UI login as `customer@tecnologia.test`, `localStorage['Cryptech.authHint']` is `'1'`. A reload then issues `/api/cart?view=summary` and the header badge reflects the server count. Logging out removes the hint. A guest context with a forged `Cryptech.authHint='1'`: the summary request returns 401 and the hint is cleared (no error toast, no redirect).
+- [ ] `[E2E-PERF-04]` guest cart stays local: adding, increasing, decreasing and removing a line on the PDP and `/cart` issues 0 requests to `/api/cart*` other than `POST /api/cart/hydrate` (allowed, counted separately: at most 1 per distinct set of variants).
+- [ ] `[E2E-PERF-05]` unavailable lines: a guest cart with `iphone-15-pro` in localStorage while its variant is set inactive in the DB shows the line struck through with a reason, the warning "Some items are unavailable. Remove them, or they will be removed automatically when you check out.", and an enabled "Proceed to checkout" control; the line is not removed from localStorage. A stored line with a non-existent `variantId` is pruned from localStorage with the inline notice "1 item is no longer sold and was removed". Corrupt localStorage JSON does not crash the page. Variant state is restored afterwards.
+- [ ] `[E2E-PERF-06]` merge: a guest cart with 1 valid line and 1 line over stock, then login as the customer: the server cart contains the clamped quantity, the guest store is cleared, and when `PUT /api/cart` returns `adjustments` the toast "N items were removed or reduced because of stock" appears.
+- [ ] `[E2E-PERF-07]` checkout never blocked: as the customer with `iphone-15-pro` in the server cart and its variant set inactive in the DB, `/checkout` renders the normal form with a notice naming the removed item, "Place order" is not disabled by the cart issue, and the server cart no longer contains the line. Restored afterwards.
+- [ ] `[E2E-PERF-08]` search gate and cache: typing 2 characters in the header search issues 0 requests to `/api/catalog/products`; the 3rd character issues exactly 1 after the debounce; retyping the same query within 60 s issues 0 more.
+- [ ] `[E2E-PERF-09]` assets: loading `/` transfers fonts only as `.woff2` totalling under 200 KB, the banner image is requested once, and no `.ttf` is requested.
+
+**Out of scope for Phase 6:** Redis `after()` behavior, LCP/Lighthouse numbers, ISR revalidation (not active in `next dev`), Google OAuth (`?auth=1` landing is covered by vitest hook tests only).
+
 ## Cross-Validation Phase (always last)
 
 - [ ] `npm run test:e2e` passes in full, twice consecutively (the DB is wiped each run, so results are deterministic).
@@ -134,7 +153,7 @@ User chose a dedicated worktree so main checkout stays free for other work. Bran
 
 ## Out of scope
 
-CI or GitHub Actions gate; Firefox and WebKit; bKash, SSLCommerz and bank-transfer payment paths; admin product CRUD and Cloudinary; coupons; reviews; warranty; forgot and reset password; Google OAuth; visual regression and a11y checks; integrating with the dev-env plan; production build mode; fixing the `npm test` live-DB hazard; fixing stale CLAUDE.md payment text.
+CI or GitHub Actions gate; Firefox and WebKit; bKash, SSLCommerz and bank-transfer payment paths; admin product CRUD and Cloudinary; coupons; reviews other than the Phase 6 perf guards; warranty; forgot and reset password; Google OAuth; visual regression and a11y checks; integrating with the dev-env plan; production build mode (Phase 6 may add one build+start project only if a dev-mode artifact makes a perf assertion unreliable); fixing the `npm test` live-DB hazard; fixing stale CLAUDE.md payment text.
 
 **Shortcuts taken** (execution turns each into a `shortcut: <limit>, <when to upgrade>` code comment)
 - `shortcut: next dev server, upgrade to build+start if compile time makes tests flaky.`
@@ -144,4 +163,4 @@ CI or GitHub Actions gate; Firefox and WebKit; bKash, SSLCommerz and bank-transf
 
 ## Rollback
 
-`git worktree remove --force C:\Users\muhammad\Desktop\gadget-website-e2e`, `git branch -D feature/playwright-e2e-testing` (nothing pushed, equals `main`), drop DB `gadget_e2e`. The main checkout is already restored by Workspace setup step 1.
+`git worktree remove --force C:\Users\muhammad\Desktop\gadget-website-e2e`, `git branch -D feature/playwright-e2e-suite` (only after it is pushed or abandoned; owner runs it), drop DB `gadget_e2e`. The main checkout is already restored by Workspace setup step 1.
