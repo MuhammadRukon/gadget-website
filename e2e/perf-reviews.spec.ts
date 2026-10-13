@@ -1,9 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { IPHONE_SLUG, reviewAuthor, reviewBody, seedReviews } from './support/perf-db';
 
-// Cold `next dev` compiles each route on first visit: allow for it.
-test.setTimeout(90_000);
-
 let removeReviews: () => Promise<void>;
 test.beforeAll(async () => {
   removeReviews = await seedReviews();

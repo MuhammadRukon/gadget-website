@@ -8,10 +8,12 @@ const statusButton = (page: Page, name: string) =>
 
 test('[E2E-ADMIN-01] admin finds an order and moves it to PROCESSING', async ({ page, playwright }) => {
   const customer = await customerRequest(playwright);
+  await createCodOrder(customer); // a second order, so the search must reduce the list rather than show the only row
   const order = await createCodOrder(customer);
   await customer.dispose();
 
   await page.goto('/dashboard/orders');
+  await expect.poll(() => page.locator('tbody tr').count()).toBeGreaterThanOrEqual(2); // unfiltered list
   await expect(page.getByRole('heading', { level: 1, name: 'Orders' })).toBeVisible();
   await page.getByPlaceholder('Search by order number, name, phone, or email').fill(order.orderNumber);
   await expect(page.locator('tbody tr')).toHaveCount(1);
@@ -42,7 +44,8 @@ test('[E2E-ADMIN-02] admin cannot skip from PROCESSING to DELIVERED', async ({ r
   await customer.dispose();
 
   const patch = (status: string) => request.patch(`/api/admin/orders/${order.id}`, { data: { status } });
-  expect((await patch('PROCESSING')).ok()).toBe(true);
+  const toProcessing = await patch('PROCESSING');
+  expect(toProcessing.ok(), `PATCH -> ${toProcessing.status()} ${await toProcessing.text()}`).toBe(true);
 
   const res = await patch('DELIVERED');
   expect(res.status()).toBe(409);

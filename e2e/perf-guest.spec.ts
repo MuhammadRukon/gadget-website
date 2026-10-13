@@ -1,10 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
-import { IPHONE_SKU, IPHONE_SLUG, setVariantActive, variantIdBySku } from './support/perf-db';
-
-// Cold `next dev` compiles each route on first visit: allow for it.
-test.setTimeout(90_000);
+import { activateVariant, IPHONE_SKU, IPHONE_SLUG, setVariantActive, variantIdBySku } from './support/perf-db';
 
 const CART_KEY = 'Cryptech.guestCart';
+
+test.afterAll(() => activateVariant(IPHONE_SKU));
 
 /** Collects "METHOD /path" for every request whose path starts with one of `prefixes`. */
 function trackRequests(page: Page, prefixes: string[]) {
@@ -97,7 +96,9 @@ test('[E2E-PERF-05] unavailable lines stay visible, vanished variants are pruned
       page.getByText('Some items are unavailable. Remove them, or they will be removed automatically when you check out.'),
     ).toBeVisible();
     // Guests see "Sign in to checkout" where signed-in users see "Proceed to checkout"; neither may be disabled.
-    await expect(page.getByRole('link', { name: 'Sign in to checkout' })).toBeEnabled();
+    const signIn = page.getByRole('link', { name: 'Sign in to checkout' });
+    await expect(signIn).toBeEnabled();
+    await expect(signIn).toHaveAttribute('href', '/login?callbackUrl=/checkout');
     expect(await storedLines(page)).toEqual([{ variantId, quantity: 1 }]);
   } finally {
     await restore();

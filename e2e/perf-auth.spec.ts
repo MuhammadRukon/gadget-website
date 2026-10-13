@@ -1,7 +1,7 @@
 import { expect, test, type Page, type Response } from '@playwright/test';
 import { variantId, variantStock } from './support/db';
 import { customerRequest } from './support/orders';
-import { IPHONE_SKU, setVariantActive } from './support/perf-db';
+import { activateVariant, IPHONE_SKU, setVariantActive } from './support/perf-db';
 
 const HINT_KEY = 'Cryptech.authHint';
 const CART_KEY = 'Cryptech.guestCart';
@@ -10,6 +10,8 @@ const MACBOOK_SKU = 'APL-MBA-M3-512';
 
 // First visits compile routes in `next dev`: generous timeouts, not the 5 s default.
 const SLOW = 60_000;
+
+test.afterAll(() => activateVariant(IPHONE_SKU));
 
 const hint = (page: Page) => page.evaluate((k) => localStorage.getItem(k), HINT_KEY);
 const isSummary = (r: Response) => {
@@ -25,7 +27,6 @@ async function logInCustomer(page: Page) {
 }
 
 test('[E2E-PERF-03] auth hint is set on login, drives the summary request, and is cleared on logout', async ({ browser, playwright }) => {
-  test.setTimeout(180_000);
   const api = await customerRequest(playwright);
   const context = await browser.newContext(); // fresh: no storage state
   const page = await context.newPage();
@@ -59,9 +60,21 @@ test('[E2E-PERF-03] auth hint is set on login, drives the summary request, and i
 });
 
 test('[E2E-PERF-03] a forged hint as a guest gets 401 on the summary request and is cleared quietly', async ({ browser }) => {
-  test.setTimeout(120_000);
   const context = await browser.newContext();
   const page = await context.newPage();
+  // Toasts live ~2 s, so a single check after networkidle could miss one: record every toast that ever mounts.
+  const toasts: string[] = [];
+  await page.exposeFunction('reportToast', (text: string) => void toasts.push(text));
+  await page.addInitScript(() => {
+    const selector = '[data-sonner-toast]';
+    new MutationObserver((records) => {
+      for (const node of records.flatMap((r) => [...r.addedNodes])) {
+        if (!(node instanceof Element)) continue;
+        const toast = node.matches(selector) ? node : node.querySelector(selector);
+        if (toast) (window as unknown as { reportToast(t: string): void }).reportToast(toast.textContent ?? '');
+      }
+    }).observe(document, { childList: true, subtree: true });
+  });
   try {
     await page.goto('/products', { timeout: SLOW });
     await page.evaluate((k) => localStorage.setItem(k, '1'), HINT_KEY);
@@ -73,7 +86,8 @@ test('[E2E-PERF-03] a forged hint as a guest gets 401 on the summary request and
 
     await page.waitForLoadState('networkidle');
     await expect(page).toHaveURL(/\/products$/); // no redirect to /login
-    await expect(page.locator('[data-sonner-toast]')).toHaveCount(0); // no error toast
+    await expect(page.locator('[data-sonner-toast]')).toHaveCount(0); // no error toast now ...
+    expect(toasts).toEqual([]); // ... and none ever appeared
     await expect(page.getByRole('link', { name: 'Login' })).toBeVisible(); // still a guest, header intact
   } finally {
     await context.close();
@@ -81,7 +95,6 @@ test('[E2E-PERF-03] a forged hint as a guest gets 401 on the summary request and
 });
 
 test('[E2E-PERF-06] logging in merges the guest cart: clamped server cart, cleared store, adjustments toast', async ({ browser, playwright }) => {
-  test.setTimeout(180_000);
   const api = await customerRequest(playwright);
   const context = await browser.newContext();
   const page = await context.newPage();
@@ -137,7 +150,6 @@ test('[E2E-PERF-06] logging in merges the guest cart: clamped server cart, clear
 });
 
 test('[E2E-PERF-07] checkout is never blocked by an unavailable line: it is removed and the form still renders', async ({ browser, playwright }) => {
-  test.setTimeout(180_000);
   const api = await customerRequest(playwright);
   const context = await browser.newContext({ storageState: 'e2e/.auth/customer.json' });
   const page = await context.newPage();

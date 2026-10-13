@@ -1,8 +1,5 @@
 import { expect, test } from '@playwright/test';
 
-// Cold `next dev` compiles each route on first visit: allow for it.
-test.setTimeout(90_000);
-
 test('[E2E-PERF-09] home page ships small woff2 fonts and the banner once', async ({ page }) => {
   const requested: string[] = [];
   const fontBytes: number[] = [];

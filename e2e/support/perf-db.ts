@@ -20,18 +20,17 @@ async function withDb<T>(fn: (db: PrismaClient) => Promise<T>): Promise<T> {
 export const variantIdBySku = (sku: string) =>
   withDb(async (db) => (await db.productVariant.findUniqueOrThrow({ where: { sku } })).id);
 
-/** Sets the variant's `isActive` and returns a function that puts the previous value back. */
+/** Sets the variant's `isActive` and returns a function that restores the seed state (active). */
 export async function setVariantActive(sku: string, isActive: boolean): Promise<() => Promise<void>> {
-  const previous = await withDb(async (db) => {
-    const v = await db.productVariant.findUniqueOrThrow({ where: { sku } });
-    await db.productVariant.update({ where: { sku }, data: { isActive } });
-    return v.isActive;
-  });
-  return () =>
-    withDb(async (db) => {
-      await db.productVariant.update({ where: { sku }, data: { isActive: previous } });
-    });
+  await withDb((db) => db.productVariant.update({ where: { sku }, data: { isActive } }));
+  return () => activateVariant(sku);
 }
+
+/** Safety net for `test.afterAll`: a timeout or crash must not leave the variant inactive for later specs. */
+export const activateVariant = (sku: string) =>
+  withDb(async (db) => {
+    await db.productVariant.updateMany({ where: { sku }, data: { isActive: true } });
+  });
 
 const REVIEW_COUNT = 12;
 const REVIEWER_EMAILS = ['e2e-perf-anika@example.test', 'e2e-perf-sufia@example.test'];

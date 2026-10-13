@@ -46,5 +46,10 @@ test('[E2E-CHECKOUT-02] empty cart shows no way to place an order', async ({ pag
 
   await page.goto('/checkout');
   await expect(page.getByText('Your cart is empty.')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Place order', disabled: false })).toHaveCount(0);
+  // The empty-cart card renders no form at all, so there is no Place order button in any state. Assert the empty state
+  // positively (a way back to the catalog) and the button's absence regardless of disabled/enabled: a rename of the
+  // button can no longer keep this green because the filter is gone, and a card that gains a button fails here.
+  await expect(page.getByRole('link', { name: 'Browse products' })).toHaveAttribute('href', '/products');
+  await expect(page.getByRole('button', { name: /place order/i })).toHaveCount(0);
+  await expect(page.getByRole('heading', { level: 1, name: 'Checkout' })).toHaveCount(0);
 });

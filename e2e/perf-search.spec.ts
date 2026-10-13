@@ -1,8 +1,5 @@
 import { expect, test } from '@playwright/test';
 
-// Cold `next dev` compiles each route on first visit: allow for it.
-test.setTimeout(90_000);
-
 test('[E2E-PERF-08] header search waits for 3 characters and caches the result', async ({ page }) => {
   await page.goto('/');
   await page.waitForLoadState('networkidle');

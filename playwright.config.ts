@@ -6,6 +6,10 @@ export default defineConfig({
   globalSetup: './e2e/global-setup.ts',
   // shortcut: retries 0, upgrade only if a root-caused flake cannot be fixed.
   retries: 0,
+  forbidOnly: true,
+  // A cold `next dev` compiles each route on first visit; the slowest cold test took 18 s, so 60 s leaves headroom.
+  timeout: 60_000,
+  expect: { timeout: 30_000 }, // only failing waits pay this; passing ones return as soon as the condition holds
   // One worker: all specs share one DB and one dev server.
   workers: 1,
   reporter: [['line'], ['html', { open: 'never' }]],

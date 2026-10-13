@@ -50,16 +50,16 @@ Every test title starts with its ID. Cite the ID in new specs. Keep this table i
 | `[E2E-ADMIN-02]` | Admin cannot skip PROCESSING to DELIVERED (409) | CLAUDE.md "Orders" (`ALLOWED_TRANSITIONS`) |
 | `[E2E-PERF-01]` | Reviews are in the HTML; full list loads on one click | `docs/context/02-architecture.md` Reviews & warranty |
 | `[E2E-PERF-02]` | Fresh guest makes no cart or session requests | CLAUDE.md "Cart"; `docs/context/02-architecture.md` Cart |
-| `[E2E-PERF-03]` | Auth hint is set on login, drives the summary request, cleared on logout; forged hint gets 401 and is cleared quietly | `docs/context/02-architecture.md` Cart, Auth & RBAC |
+| `[E2E-PERF-03]` | Auth hint is set on login, drives the summary request, cleared on logout; forged hint gets 401 and is cleared quietly (two tests share this ID: login/logout and forged hint) | `docs/context/02-architecture.md` Cart, Auth & RBAC |
 | `[E2E-PERF-04]` | Guest cart edits stay local (only `POST /api/cart/hydrate`) | CLAUDE.md "Cart" |
 | `[E2E-PERF-05]` | Unavailable lines stay visible, vanished variants pruned, corrupt storage survivable | CLAUDE.md "Cart" |
 | `[E2E-PERF-06]` | Login merges the guest cart: clamped server cart, store cleared, adjustments toast | CLAUDE.md "Cart" (`useGuestCartMerge`) |
 | `[E2E-PERF-07]` | Checkout is never blocked by an unavailable line | CLAUDE.md "Checkout"; `docs/context/02-architecture.md` Checkout |
 | `[E2E-PERF-08]` | Header search waits for 3 characters and caches the result | `docs/context/02-architecture.md` Rate limiting & logging, Caching / ISR (catalog `q`) |
-| `[E2E-PERF-09]` | Home page ships small woff2 fonts and the banner once | `docs/context/02-architecture.md` Caching / ISR |
+| `[E2E-PERF-09]` | Home page ships small woff2 fonts and the banner once | `docs/plans/perf-waterfall-and-docs-cleanup-plan.md` Phase 4 (banner and fonts) |
 
 ## Conventions
 
 - Mobile-specific adaptations are comments inside the test, never skips.
-- Specs that change shared DB state (reviews, variant `isActive`, carts) restore it in `finally` / `afterAll`, so a second project in the same DB lifetime starts clean.
+- Specs restore the shared state they change: the variant `isActive` flag (reset to active, with an `afterAll` safety net), perf reviews and their users, and guest state (each test uses a fresh context or clears the cart). They do NOT restore stock, orders or addresses: every run consumes about 6 of the 25 iPhone units, and the DB is wiped at the next run anyway.
 - Seed constants (slugs, SKU, credentials) are hard-coded in `e2e/support`; `prisma/seed.ts` is the source.

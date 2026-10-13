@@ -35,6 +35,7 @@ Verified-open items only, each checked against the code on 2026-10-13. When you 
 - **No `loading.tsx` anywhere.** Server pages (PDP, listings) block with no skeleton.
 - **Account pages redirect client-side.** `src/app/(public)/account/*/page.tsx` (for example `orders/page.tsx:20-24`) flash a loader, then `router.replace` from a `useEffect`, instead of being server-gated like `/checkout`.
 - **Signup form's optional Phone field blocks submit when empty.** `zodResolver` validates `''` against `z.string().min(6).optional()` (`src/contracts/auth.ts:13`) before the submit handler maps it to `undefined`; the e2e specs fill a valid phone as a workaround.
+- **Signed-in user can add to the guest cart before the session resolves.** "Add to cart" on the PDP writes to the guest store while the session is still loading; the guest-cart merge on `/checkout` can then fire two `PUT /api/cart` calls (a navigation aborts the first after the server applied it) and double the quantity. Inferred from a trace, not isolated; the e2e workaround is in the comment at `e2e/checkout.spec.ts:12-14`.
 - **Client lists have no error state.** `src/app/(public)/account/orders/page.tsx:26` renders loading then data only; a failed fetch leaves a stuck loader (the order detail and bank-transfer pages handle `error`).
 - **Admin forms show raw cents.** `src/modules/admin/catalog/components/product-form.tsx:452-500` ("Buying price (cents)") and the coupon form take integer cents.
 
