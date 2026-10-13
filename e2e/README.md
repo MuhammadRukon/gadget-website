@@ -62,4 +62,6 @@ Every test title starts with its ID. Cite the ID in new specs. Keep this table i
 
 - Mobile-specific adaptations are comments inside the test, never skips.
 - Specs restore the shared state they change: the variant `isActive` flag (reset to active, with an `afterAll` safety net), perf reviews and their users, and guest state (each test uses a fresh context or clears the cart). They do NOT restore stock, orders or addresses: every run consumes about 6 of the 25 iPhone units, and the DB is wiped at the next run anyway.
-- Seed constants (slugs, SKU, credentials) are hard-coded in `e2e/support`; `prisma/seed.ts` is the source.
+- Seed constants (slugs, SKUs, price, credentials, auth-file paths) live once in `e2e/support/seed.ts` (credentials derive from the `SEED_*` values `env.ts` pins); `prisma/seed.ts` is the source.
+- Shared helpers in `e2e/support`: `db.ts` (the one guarded Prisma client, `withDb`), `orders.ts` (API order helpers), `ui.ts` (login, account menu, add to cart), `guest-cart.ts` (guest cart storage), `network.ts` (request tracking). Specs never create their own Prisma client.
+- Global setup pre-warms the main routes after seeding so cold `next dev` compiles do not land inside tests. It is best effort; no test relies on it.

@@ -1,18 +1,21 @@
 import { expect, test } from '@playwright/test';
-import { IPHONE_SKU, variantStock } from './support/db';
+import { variantStock } from './support/db';
 import { formatBDT } from './support/format';
+import { clearCart } from './support/orders';
+import { AUTH_FILE, IPHONE_PRICE_CENTS, IPHONE_SKU, IPHONE_SLUG } from './support/seed';
+import { accountMenu, addToCart } from './support/ui';
 
-test.use({ storageState: 'e2e/.auth/customer.json' });
+test.use({ storageState: AUTH_FILE.customer });
 
 test('[E2E-CHECKOUT-01] customer places a COD order through the UI', async ({ page, request }) => {
   // Start from an empty server cart so the order holds exactly the iphone.
-  expect((await request.delete('/api/cart')).ok()).toBe(true);
+  await clearCart(request);
 
-  await page.goto('/products/iphone-15-pro');
+  await page.goto(`/products/${IPHONE_SLUG}`);
   // While the session is still loading, "Add to cart" writes to the guest store, and the merge on /checkout can then
   // run twice (a navigation aborts the first PUT after the server applied it): quantity 2. Wait for the account menu.
-  await expect(page.locator('header button[aria-haspopup="menu"]')).toBeVisible();
-  await page.getByRole('button', { name: 'Add to cart' }).click();
+  await expect(accountMenu(page)).toBeVisible();
+  await addToCart(page);
   await expect(page.getByText('Added to cart')).toBeVisible();
 
   await page.goto('/checkout');
@@ -26,8 +29,8 @@ test('[E2E-CHECKOUT-01] customer places a COD order through the UI', async ({ pa
 
   await expect(page.getByRole('radio', { name: 'Cash on delivery (COD)' })).toBeChecked();
   // Free shipping above Tk 5,000, so the total equals the subtotal.
-  await expect(page.getByTestId('checkout-subtotal')).toHaveText(formatBDT(16500000));
-  await expect(page.getByTestId('checkout-total')).toHaveText(formatBDT(16500000));
+  await expect(page.getByTestId('checkout-subtotal')).toHaveText(formatBDT(IPHONE_PRICE_CENTS));
+  await expect(page.getByTestId('checkout-total')).toHaveText(formatBDT(IPHONE_PRICE_CENTS));
   const placeOrder = page.getByRole('button', { name: 'Place order' });
   await expect(placeOrder).toBeEnabled();
 
@@ -42,13 +45,12 @@ test('[E2E-CHECKOUT-01] customer places a COD order through the UI', async ({ pa
 });
 
 test('[E2E-CHECKOUT-02] empty cart shows no way to place an order', async ({ page, request }) => {
-  expect((await request.delete('/api/cart')).ok()).toBe(true);
+  await clearCart(request);
 
   await page.goto('/checkout');
   await expect(page.getByText('Your cart is empty.')).toBeVisible();
-  // The empty-cart card renders no form at all, so there is no Place order button in any state. Assert the empty state
-  // positively (a way back to the catalog) and the button's absence regardless of disabled/enabled: a rename of the
-  // button can no longer keep this green because the filter is gone, and a card that gains a button fails here.
+  // The empty-cart card renders no form, so assert the empty state positively (a way back to the catalog) and the
+  // button's absence in any state (no disabled/enabled filter a rename could hide behind).
   await expect(page.getByRole('link', { name: 'Browse products' })).toHaveAttribute('href', '/products');
   await expect(page.getByRole('button', { name: /place order/i })).toHaveCount(0);
   await expect(page.getByRole('heading', { level: 1, name: 'Checkout' })).toHaveCount(0);

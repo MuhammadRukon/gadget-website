@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { AUTH_FILE } from './support/seed';
 
 test.describe('anonymous', () => {
   test('[E2E-GUARD-01] guarded pages redirect to /login, admin API returns 401', async ({ page, request }) => {
@@ -17,7 +18,7 @@ test.describe('anonymous', () => {
 });
 
 test.describe('customer', () => {
-  test.use({ storageState: 'e2e/.auth/customer.json' });
+  test.use({ storageState: AUTH_FILE.customer });
 
   test('[E2E-GUARD-02] customer cannot reach admin pages or API', async ({ page, request }) => {
     await page.goto('/dashboard');

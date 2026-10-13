@@ -1,18 +1,11 @@
 import { expect, test as setup } from '@playwright/test';
+import { AUTH_FILE, SEED } from './support/seed';
+import { logIn } from './support/ui';
 
-// shortcut: seed credentials hard-coded, upgrade by exporting from prisma/seed.ts when it is next touched.
-const users = [
-  { file: 'e2e/.auth/admin.json', email: 'admin@tecnologia.test', password: 'admin12345' },
-  { file: 'e2e/.auth/customer.json', email: 'customer@tecnologia.test', password: 'customer12345' },
-];
-
-for (const { file, email, password } of users) {
-  setup(`log in ${email}`, async ({ page }) => {
-    await page.goto('/login');
-    await page.getByLabel('Email').fill(email);
-    await page.getByLabel('Password').fill(password);
-    await page.getByRole('button', { name: 'Login' }).click();
+for (const role of ['admin', 'customer'] as const) {
+  setup(`log in ${SEED[role].email}`, async ({ page }) => {
+    await logIn(page, SEED[role].email, SEED[role].password);
     await expect(page).toHaveURL('/');
-    await page.context().storageState({ path: file });
+    await page.context().storageState({ path: AUTH_FILE[role] });
   });
 }

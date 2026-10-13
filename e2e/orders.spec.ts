@@ -1,8 +1,9 @@
 import { expect, test } from '@playwright/test';
-import { IPHONE_SKU, variantStock } from './support/db';
+import { variantStock } from './support/db';
 import { createCodOrder } from './support/orders';
+import { AUTH_FILE, IPHONE_SKU } from './support/seed';
 
-test.use({ storageState: 'e2e/.auth/customer.json' });
+test.use({ storageState: AUTH_FILE.customer });
 
 test('[E2E-ORDER-01] customer cancels an order and the stock is restored', async ({ page, request }) => {
   const stockBefore = await variantStock(IPHONE_SKU);

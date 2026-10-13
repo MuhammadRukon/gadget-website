@@ -1,41 +1,16 @@
-import { expect, test, type Page } from '@playwright/test';
-import { activateVariant, IPHONE_SKU, IPHONE_SLUG, setVariantActive, variantIdBySku } from './support/perf-db';
-
-const CART_KEY = 'Cryptech.guestCart';
+import { expect, test } from '@playwright/test';
+import { activateVariant, setVariantActive, variantId } from './support/db';
+import { guestCartJson, guestLines, seedGuestCart } from './support/guest-cart';
+import { trackRequests, underPaths } from './support/network';
+import { IPHONE_SKU, IPHONE_SLUG } from './support/seed';
+import { addToCart, productName } from './support/ui';
 
 test.afterAll(() => activateVariant(IPHONE_SKU));
-
-/** Collects "METHOD /path" for every request whose path starts with one of `prefixes`. */
-function trackRequests(page: Page, prefixes: string[]) {
-  const seen: string[] = [];
-  page.on('request', (req) => {
-    const { pathname } = new URL(req.url());
-    if (prefixes.some((p) => pathname === p || pathname.startsWith(`${p}/`))) {
-      seen.push(`${req.method()} ${pathname}`);
-    }
-  });
-  return seen;
-}
-
-const storedLines = (page: Page) =>
-  page.evaluate((key) => {
-    const raw = localStorage.getItem(key);
-    return raw ? (JSON.parse(raw).state.lines as { variantId: string; quantity: number }[]) : [];
-  }, CART_KEY);
-
-/** Writes the persisted guest cart (zustand persist format, version 1) before the page under test loads. */
-async function seedGuestCart(page: Page, value: unknown) {
-  await page.goto('/products');
-  await page.evaluate(([key, v]) => localStorage.setItem(key as string, v as string), [
-    CART_KEY,
-    typeof value === 'string' ? value : JSON.stringify(value),
-  ]);
-}
 
 test('[E2E-PERF-02] a fresh guest loads the storefront with no cart or session requests', async ({ browser }) => {
   const context = await browser.newContext(); // empty localStorage, no auth hint
   const page = await context.newPage();
-  const seen = trackRequests(page, ['/api/cart', '/api/auth/session']);
+  const seen = trackRequests(page, underPaths('/api/cart', '/api/auth/session'));
   try {
     for (const path of ['/', '/products', `/products/${IPHONE_SLUG}`]) {
       await page.goto(path);
@@ -49,14 +24,13 @@ test('[E2E-PERF-02] a fresh guest loads the storefront with no cart or session r
 });
 
 test('[E2E-PERF-04] guest cart edits on the PDP and /cart stay in localStorage', async ({ page }) => {
-  const seen = trackRequests(page, ['/api/cart']);
-  const add = () => page.getByRole('button', { name: 'Add to cart' }).click();
+  const seen = trackRequests(page, underPaths('/api/cart'));
 
   await page.goto(`/products/${IPHONE_SLUG}`);
-  const name = await page.getByRole('heading', { level: 1 }).innerText();
-  await add();
+  const name = await productName(page);
+  await addToCart(page);
   await expect(page.getByLabel('1 items in cart', { exact: true })).toBeVisible();
-  await add();
+  await addToCart(page);
   await expect(page.getByLabel('2 items in cart', { exact: true })).toBeVisible();
 
   await page.goto('/cart');
@@ -68,26 +42,25 @@ test('[E2E-PERF-04] guest cart edits on the PDP and /cart stay in localStorage',
   await expect(quantity).toHaveText('2');
   await page.getByRole('main').getByRole('button', { name: 'Remove' }).click();
   await expect(page.getByText('Your cart is empty.')).toBeVisible();
-  expect(await storedLines(page)).toEqual([]);
+  expect(await guestLines(page)).toEqual([]);
   await page.waitForLoadState('networkidle');
 
-  // Hydrate is the one allowed call. Plan wording is "at most 1 per distinct set of variants" (= 1 here), but the
-  // query key is the full lines array (quantities included, `queryKeys.cartGuest`), so /cart hydrates once per
-  // distinct lines state: quantity 2, then 3 (the return to 2 is a cache hit within staleTime). Asserted as that bound.
+  // Hydrate is the one allowed call. The query key is the full lines array (`queryKeys.cartGuest`), so /cart hydrates
+  // once per distinct lines state: quantity 2, then 3 (the return to 2 is a cache hit within staleTime).
   const hydrates = seen.filter((r) => r === 'POST /api/cart/hydrate');
   expect(seen.filter((r) => r !== 'POST /api/cart/hydrate')).toEqual([]);
   expect(hydrates.length).toBeLessThanOrEqual(2);
 });
 
 test('[E2E-PERF-05] unavailable lines stay visible, vanished variants are pruned, corrupt storage is survivable', async ({ page }) => {
-  const variantId = await variantIdBySku(IPHONE_SKU);
+  const iphoneId = await variantId(IPHONE_SKU);
   const errors: Error[] = [];
   page.on('pageerror', (e) => errors.push(e));
-  const state = (lines: unknown[]) => ({ state: { lines, lastValidatedAt: null }, version: 1 });
 
+  await page.goto('/products'); // the app origin, so localStorage can be seeded below
   const restore = await setVariantActive(IPHONE_SKU, false);
   try {
-    await seedGuestCart(page, state([{ variantId, quantity: 1 }]));
+    await seedGuestCart(page, guestCartJson([{ variantId: iphoneId, quantity: 1 }]));
     await page.goto('/cart');
     const line = page.getByRole('main').getByRole('link', { name: /iPhone 15 Pro/ });
     await expect(line).toHaveClass(/line-through/);
@@ -99,19 +72,20 @@ test('[E2E-PERF-05] unavailable lines stay visible, vanished variants are pruned
     const signIn = page.getByRole('link', { name: 'Sign in to checkout' });
     await expect(signIn).toBeEnabled();
     await expect(signIn).toHaveAttribute('href', '/login?callbackUrl=/checkout');
-    expect(await storedLines(page)).toEqual([{ variantId, quantity: 1 }]);
+    expect(await guestLines(page)).toEqual([{ variantId: iphoneId, quantity: 1 }]);
   } finally {
     await restore();
   }
 
   // A line whose variant no longer exists is dropped from storage with one inline notice.
-  await seedGuestCart(page, state([{ variantId: 'e2e-no-such-variant', quantity: 1 }]));
+  await seedGuestCart(page, guestCartJson([{ variantId: 'e2e-no-such-variant', quantity: 1 }]));
   await page.goto('/cart');
   await expect(page.getByText('1 item is no longer sold and was removed')).toBeVisible();
-  await expect.poll(() => storedLines(page)).toEqual([]);
+  await expect.poll(() => guestLines(page)).toEqual([]);
 
   // Corrupt storage: unparseable JSON, then parseable JSON with invalid lines. Neither may crash the page.
-  for (const corrupt of ['{not json', state([{ variantId: 'x', quantity: 0 }, { quantity: 2 }, 'junk', null])]) {
+  const invalidLines = guestCartJson([{ variantId: 'x', quantity: 0 }, { quantity: 2 }, 'junk', null]);
+  for (const corrupt of ['{not json', invalidLines]) {
     await seedGuestCart(page, corrupt);
     await page.goto('/cart');
     await expect(page.getByRole('heading', { level: 1, name: 'Your cart' })).toBeVisible();

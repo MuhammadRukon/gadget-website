@@ -1,7 +1,8 @@
 import { execSync } from 'node:child_process';
 import { PrismaClient } from '@prisma/client';
 import { E2E_DB_NAME } from './support/db-guard';
-import { e2eDatabaseUrl, serverEnv } from './support/env';
+import { BASE_URL, e2eDatabaseUrl, serverEnv } from './support/env';
+import { IPHONE_SLUG } from './support/seed';
 
 export default async function globalSetup() {
   const env = { ...process.env, ...serverEnv };
@@ -18,7 +19,7 @@ export default async function globalSetup() {
     await prisma.$disconnect();
   }
 
-  run('npx --no-install prisma migrate reset --force --skip-seed');
+  run('npx --no-install prisma migrate reset --force --skip-seed --skip-generate');
   run('npx --no-install tsx prisma/seed.ts');
 
   // Seeded users are unverified; login throws UnverifiedEmailError until set.
@@ -28,4 +29,28 @@ export default async function globalSetup() {
   } finally {
     await seeded.$disconnect();
   }
+
+  await warmUp();
+}
+
+// Routes the suite visits. A cold `next dev` compiles each on first hit, so do it here instead of inside a test.
+// Best effort only: failures, non-2xx and the time cap are ignored, and no test relies on it.
+const WARM_ROUTES = [
+  '/',
+  '/login',
+  '/signup',
+  '/products',
+  `/products/${IPHONE_SLUG}`,
+  '/cart',
+  '/checkout',
+  '/dashboard',
+  '/dashboard/orders',
+  '/account',
+  '/api/catalog/products?q=iph&limit=8',
+  '/api/reviews?productId=x',
+];
+
+async function warmUp() {
+  const signal = AbortSignal.timeout(60_000);
+  await Promise.allSettled(WARM_ROUTES.map((route) => fetch(BASE_URL + route, { signal }).then((res) => res.arrayBuffer())));
 }

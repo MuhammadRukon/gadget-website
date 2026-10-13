@@ -1,16 +1,15 @@
 import { expect, test, type Page } from '@playwright/test';
-import { createCodOrder, customerRequest } from './support/orders';
+import { ok, orderAsCustomer } from './support/orders';
+import { AUTH_FILE } from './support/seed';
 
-test.use({ storageState: 'e2e/.auth/admin.json' });
+test.use({ storageState: AUTH_FILE.admin });
 
 const statusButton = (page: Page, name: string) =>
   page.getByRole('button', { name, exact: true });
 
 test('[E2E-ADMIN-01] admin finds an order and moves it to PROCESSING', async ({ page, playwright }) => {
-  const customer = await customerRequest(playwright);
-  await createCodOrder(customer); // a second order, so the search must reduce the list rather than show the only row
-  const order = await createCodOrder(customer);
-  await customer.dispose();
+  await orderAsCustomer(playwright); // a second order, so the search must reduce the list rather than show the only row
+  const order = await orderAsCustomer(playwright);
 
   await page.goto('/dashboard/orders');
   await expect.poll(() => page.locator('tbody tr').count()).toBeGreaterThanOrEqual(2); // unfiltered list
@@ -39,13 +38,10 @@ test('[E2E-ADMIN-01] admin finds an order and moves it to PROCESSING', async ({ 
 });
 
 test('[E2E-ADMIN-02] admin cannot skip from PROCESSING to DELIVERED', async ({ request, playwright }) => {
-  const customer = await customerRequest(playwright);
-  const order = await createCodOrder(customer);
-  await customer.dispose();
+  const order = await orderAsCustomer(playwright);
 
   const patch = (status: string) => request.patch(`/api/admin/orders/${order.id}`, { data: { status } });
-  const toProcessing = await patch('PROCESSING');
-  expect(toProcessing.ok(), `PATCH -> ${toProcessing.status()} ${await toProcessing.text()}`).toBe(true);
+  await ok(await patch('PROCESSING'), 'PATCH');
 
   const res = await patch('DELIVERED');
   expect(res.status()).toBe(409);

@@ -1,15 +1,10 @@
-import { expect, test, type Page } from '@playwright/test';
-
-const guestLines = (page: Page) =>
-  page.evaluate(() => {
-    const raw = localStorage.getItem('Cryptech.guestCart');
-    return raw ? (JSON.parse(raw).state.lines as { variantId: string; quantity: number }[]) : [];
-  });
-
-const addToCart = (page: Page) => page.getByRole('button', { name: 'Add to cart' }).click();
+import { expect, test } from '@playwright/test';
+import { guestLines } from './support/guest-cart';
+import { IPHONE_SLUG } from './support/seed';
+import { addToCart, productName } from './support/ui';
 
 test('[E2E-CART-01] guest adds twice, cart persists across reload', async ({ page }) => {
-  await page.goto('/products/iphone-15-pro');
+  await page.goto(`/products/${IPHONE_SLUG}`);
 
   await addToCart(page);
   // Sonner toasts live about 2 s: assert right after the click.
@@ -32,8 +27,8 @@ test('[E2E-CART-01] guest adds twice, cart persists across reload', async ({ pag
 });
 
 test('[E2E-CART-02] guest increases then removes a cart line', async ({ page }) => {
-  await page.goto('/products/iphone-15-pro');
-  const name = await page.getByRole('heading', { level: 1 }).innerText();
+  await page.goto(`/products/${IPHONE_SLUG}`);
+  const name = await productName(page);
   await addToCart(page);
   await expect(page.getByLabel('1 items in cart', { exact: true })).toBeVisible();
   await addToCart(page);

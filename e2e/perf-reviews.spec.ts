@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test';
-import { IPHONE_SLUG, reviewAuthor, reviewBody, seedReviews } from './support/perf-db';
+import { reviewAuthor, reviewBody, seedReviews } from './support/db';
+import { exactPath, trackRequests } from './support/network';
+import { IPHONE_SLUG } from './support/seed';
 
 let removeReviews: () => Promise<void>;
 test.beforeAll(async () => {
@@ -16,11 +18,7 @@ test('[E2E-PERF-01] reviews are in the HTML, the full list loads on one click', 
   expect(html).toContain(reviewBody(10));
   expect(html).not.toContain(reviewBody(11));
 
-  const reviewRequests: string[] = [];
-  page.on('request', (req) => {
-    const { pathname } = new URL(req.url());
-    if (pathname === '/api/reviews') reviewRequests.push(`${req.method()} ${req.url()}`);
-  });
+  const reviewRequests = trackRequests(page, exactPath('/api/reviews'));
 
   await page.goto(`/products/${IPHONE_SLUG}`);
   await expect(page.getByText(reviewBody(10))).toBeVisible();
@@ -37,6 +35,5 @@ test('[E2E-PERF-01] reviews are in the HTML, the full list loads on one click', 
   await page.getByRole('button', { name: 'Show all reviews' }).click();
   await expect(page.getByText(reviewBody(11))).toBeVisible();
   await expect(page.getByText(reviewBody(12))).toBeVisible();
-  expect(reviewRequests).toHaveLength(1);
-  expect(reviewRequests[0]).toMatch(/^GET /);
+  expect(reviewRequests).toEqual(['GET /api/reviews']);
 });
