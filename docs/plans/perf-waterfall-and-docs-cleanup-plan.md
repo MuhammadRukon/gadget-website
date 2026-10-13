@@ -82,7 +82,7 @@ Acceptance criteria:
 - [ ] After `POST /api/reviews` succeeds (201), the next request to `/products/<slug>` shows the new review within one reload (revalidate on submit), verified on a preview.
 - [ ] A product with 0 reviews renders "No reviews yet" in HTML and no JSON-LD `aggregateRating` (unchanged).
 - [ ] `listForProduct(productId, 10)` returns at most 10 items ordered by `createdAt desc` (unit test with mocked Prisma); `listForProduct(productId)` still returns up to 50.
-- [ ] Review author names in HTML and API are "First L." (or "Verified buyer"); never the full name (unit test on the serializer).
+- [ ] Review author names in HTML and API are "First L." (a single-word name shows as the first name only; no name shows "Verified buyer"); never the full name (unit test on the serializer).
 - [ ] Existing tests pass: `src/app/api/__tests__/review-revalidate.test.ts`, `cache-headers.test.ts` unchanged.
 - [ ] Vercel log for one PDP view after the change: 0 `/api/reviews` function runs (baseline from Phase 0 is 1).
 
