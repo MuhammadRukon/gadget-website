@@ -58,12 +58,16 @@ export function CheckoutClient() {
     }
   }, [addresses.data, addressId]);
 
-  // Waits for the config so the first quote already carries the payment method.
+  // Unavailable lines are removed and over-stock lines clamped on entry (replaces the old blocking card).
+  const cleanup = useCheckoutCartCleanup(!!cart.data?.hasIssues);
+
+  // Waits for the config so the first quote already carries the payment method, and for the
+  // cart check and cleanup: quoting a cart that still holds a bad line is a 409 that never recovers.
   const quoteQuery = useCheckoutQuote({
     addressId,
     couponCode: appliedCoupon,
     paymentMethod,
-    enabled: !configLoading,
+    enabled: !configLoading && !cart.isLoading && !cleanup.cleaning,
   });
   // A failed quote has no totals, even if an earlier answer for this selection is cached.
   const quote = quoteQuery.isError ? null : (quoteQuery.data ?? null);
@@ -121,8 +125,6 @@ export function CheckoutClient() {
     !!config.data &&
     !!paymentMethod &&
     !txn.blocksOrder;
-  // Unavailable lines are removed and over-stock lines clamped on entry (replaces the old blocking card).
-  const cleanup = useCheckoutCartCleanup(!!cart.data?.hasIssues);
 
   async function applyCoupon() {
     setAppliedCoupon(couponCode.trim() || null);
