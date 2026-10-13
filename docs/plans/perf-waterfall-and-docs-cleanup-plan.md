@@ -190,6 +190,10 @@ Acceptance criteria:
 | Trim `docs/plans/redis-caching-strategy-plan.md` to a short "Caching decisions" doc | Low | After the Redis plan's owner follow-ups are recorded |
 | Product PUT/DELETE and review POST extra lookups; cache `this` binding; shared test helpers | Low | Opportunistic |
 | Vercel Hobby -> Pro | Owner | Before real launch (non-commercial and invocation cap) |
+| TODO (found 2026-10-13, Phase 0 browser baseline): production DB unreachable at 07:12:19-21 UTC (`PrismaClientInitializationError: Can't reach database server at db.prisma.io:5432` on `/brand/dell` and a 500 on `/api/admin/analytics`); cause unknown | Owner | Check Prisma console (paused DB, usage or operations cap, connection limit) before Phase 0 numbers are trusted; no code change planned |
+| TODO (found 2026-10-13): baseline shows `/api/auth/session` firing twice per full page load (plan targets exactly 1) | Low | Phase 2 spike: find the second caller; if the hint approach does not remove it, relax the Phase 2 criterion rather than add scope |
+| TODO (found 2026-10-13): Next `Link` prefetch noise (`_rsc` requests for footer links, brand and search-result product links; mostly static HIT, not function runs) | Low | Only if total request count matters after Phase 6; candidate `prefetch={false}` on search-result links |
+| TODO (Phase 0 input): Vercel log export for the browser-baseline window (about 07:00-07:13 UTC, 2026-10-13) filtered to path `/api/` and type function; the first export covered only 6 s and had no session, cart or reviews rows. Exclude `/api/admin/*`, `/dashboard*`, `/_middleware` (owner's admin tabs) | Owner | Before Phase 0 acceptance |
 
 ## 7. Out of scope (deliberate)
 - All backlog items above; `SCALE-UP-TODO.md` roadmap features; server-side `auth()` session provisioning; `@vercel/functions`; moving `memoryStore` out of production code; changing checkout/payment server code (only the `checkout-client.tsx` blocking card changes, Phase 2 step 4f).
