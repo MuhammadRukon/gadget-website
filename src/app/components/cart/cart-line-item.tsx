@@ -135,7 +135,10 @@ export function CartLineItem({
           >
             -
           </Button>
-          <span className={cn('w-8 text-center text-sm', compact ? 'text-xs' : 'text-sm')}>
+          <span
+            data-testid="cart-line-quantity"
+            className={cn('w-8 text-center text-sm', compact ? 'text-xs' : 'text-sm')}
+          >
             {line.quantity}
           </span>
           <Button

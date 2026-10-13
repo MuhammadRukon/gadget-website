@@ -42,7 +42,9 @@ export function ProductDetailPurchasePanel({
       <div className="flex items-baseline gap-3">
         {variant ? (
           <>
-            <span className="text-2xl font-semibold">{formatBDT(variant.priceCents)}</span>
+            <span data-testid="product-price" className="text-2xl font-semibold">
+              {formatBDT(variant.priceCents)}
+            </span>
             {variant.priceCents < variant.originalPriceCents ? (
               <span className="text-sm text-muted-foreground line-through">
                 {formatBDT(variant.originalPriceCents)}
