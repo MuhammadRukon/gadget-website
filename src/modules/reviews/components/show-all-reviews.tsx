@@ -23,7 +23,8 @@ export function ShowAllReviews({
   });
 
   const shown = new Set(initialReviews.map((r) => r.id));
-  const more = (data?.items ?? []).filter((r) => !shown.has(r.id));
+  // Only after the click: a disabled query can still hold cached items from an earlier visit.
+  const more = open ? (data?.items ?? []).filter((r) => !shown.has(r.id)) : [];
 
   return (
     <>
