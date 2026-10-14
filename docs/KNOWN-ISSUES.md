@@ -36,6 +36,9 @@ Verified-open items only, each checked against the code on 2026-10-13. When you 
 - **Account pages redirect client-side.** `src/app/(public)/account/*/page.tsx` (for example `orders/page.tsx:20-24`) flash a loader, then `router.replace` from a `useEffect`, instead of being server-gated like `/checkout`.
 - **Client lists have no error state.** `src/app/(public)/account/orders/page.tsx:26` renders loading then data only; a failed fetch leaves a stuck loader (the order detail and bank-transfer pages handle `error`).
 - **Admin forms show raw cents.** `src/modules/admin/catalog/components/product-form.tsx:452-500` ("Buying price (cents)") and the coupon form take integer cents.
+- **Signup form's optional Phone field blocks submit when empty.** `zodResolver` validates `''` against `z.string().min(6).optional()` (`src/contracts/auth.ts:13`) before the submit handler maps it to `undefined`, so the form shows "Too small: expected string to have >=6 characters". Found by the e2e suite, which fills a valid phone as a workaround.
+- **Adding to the cart before the session resolves can double the quantity.** A signed-in user who clicks Add to cart while `useSession` is still loading adds to the guest store; `useGuestCartMerge` then sends `PUT /api/cart`, and if navigation aborts the first PUT after the server applied it, the merge runs again from the still-full store. Inferred from a test trace, not isolated. `e2e/checkout.spec.ts` waits for the account menu to avoid it.
+- **Guest cart re-hydrates on every quantity change.** `queryKeys.cartGuest(lines)` includes quantities, so each change on `/cart` or in the panel sends another `POST /api/cart/hydrate` (a read). Accepted in the perf plan; fix by keying the query on the sorted variant ids and building the snapshot from the store quantities. `[E2E-PERF-04]` allows at most 2 hydrates because of this.
 
 ## Tooling
 
