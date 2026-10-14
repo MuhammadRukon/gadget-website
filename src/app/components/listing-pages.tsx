@@ -73,6 +73,21 @@ export async function publishedSlugs(kind: 'category' | 'brand'): Promise<{ slug
   }
 }
 
+// Newest published products are prebuilt so a DB blip at request time cannot 500 their first visit; the rest build on demand.
+export async function publishedProductSlugs(limit = 100): Promise<{ slug: string }[]> {
+  try {
+    return await prisma.product.findMany({
+      where: { status: 'PUBLISHED' },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      select: { slug: true },
+    });
+  } catch (err) {
+    log.warn('publishedProductSlugs failed', { error: err instanceof Error ? err.message : String(err) });
+    return [];
+  }
+}
+
 async function loadLists(query: ProductListQuery) {
   const [page, { brands, categories }] = await Promise.all([
     catalogService.listPublicProducts(query),

@@ -5,6 +5,7 @@ import { cache } from 'react';
 import { catalogService } from '@/server/catalog/catalog.service';
 import { reviewsService } from '@/server/reviews/reviews.service';
 import { AppError } from '@/server/common/errors';
+import { publishedProductSlugs } from '@/app/components/listing-pages';
 import { ProductDetail } from '@/modules/storefront/components/product-detail';
 
 interface PageProps {
@@ -12,10 +13,8 @@ interface PageProps {
 }
 export const revalidate = 120;
 
-// Empty list opts the route into on-demand ISR: pages are built on first hit, then cached.
-export async function generateStaticParams() {
-  return [];
-}
+// A partial list still opts the route into on-demand ISR: unlisted slugs are built on first hit, then cached.
+export const generateStaticParams = () => publishedProductSlugs();
 
 const getProductBySlugCached = cache(async (slug: string) => {
   return catalogService.getPublicProductBySlug(slug);
