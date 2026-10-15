@@ -271,7 +271,7 @@ function PriceRange({
 export function ListingSidebar(props: Readonly<ListingFilterProps>) {
   return (
     <aside aria-label="Filters" className="hidden lg:block">
-      <div className="sticky top-32 max-h-[calc(100dvh-9rem)] overflow-y-auto pb-6 pr-2">
+      <div className="sticky top-24 max-h-[calc(100dvh-7rem)] overflow-y-auto pb-6 pr-2">
         <FilterFields {...props} />
       </div>
     </aside>

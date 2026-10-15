@@ -34,17 +34,17 @@ export function HeaderAccount() {
   const isDark = mounted && resolvedTheme === 'dark';
 
   if (status === 'loading') {
-    return <div className="h-11 w-11 md:w-24" aria-hidden />;
+    return <div className="size-11" aria-hidden />;
   }
 
   if (!data?.user) {
     return (
       <Link
         href="/login"
-        className="flex h-11 min-w-11 items-center justify-center gap-2 rounded-md px-2.5 text-sm font-medium text-ink transition-colors hover:bg-field"
+        className="flex size-11 items-center justify-center rounded-md text-ink transition-colors hover:text-raven"
       >
         <UserIcon size={19} aria-hidden />
-        <span className="max-sm:sr-only">Sign in</span>
+        <span className="sr-only">Sign in</span>
       </Link>
     );
   }
@@ -55,11 +55,11 @@ export function HeaderAccount() {
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger
         className={cn(
-          'flex h-11 min-w-11 cursor-pointer items-center justify-center gap-2 rounded-md px-2.5 text-sm font-medium text-ink transition-colors hover:bg-field data-[state=open]:bg-field',
+          'flex size-11 cursor-pointer items-center justify-center rounded-md text-ink transition-colors hover:text-raven',
         )}
       >
         <UserIcon size={19} aria-hidden />
-        <span className="max-sm:sr-only">Account</span>
+        <span className="sr-only">Account</span>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="sf w-60 rounded-md">
         <DropdownMenuLabel className="truncate">{data.user.email}</DropdownMenuLabel>

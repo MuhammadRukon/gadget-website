@@ -48,7 +48,7 @@ export default function CartPage() {
         </ul>
       )}
 
-      <aside className="lg:sticky lg:top-32 lg:self-start">
+      <aside className="lg:sticky lg:top-24 lg:self-start">
         <CartSummary cart={cart} authenticated={isAuthenticated} priceLoading={isPriceLoading} />
       </aside>
     </section>

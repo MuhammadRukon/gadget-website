@@ -14,7 +14,7 @@ export function ScrollStory({ story }: Readonly<{ story: HomeStory }>) {
     <section aria-labelledby="story" data-story className="mt-20 md:mt-28">
       <div
         data-story-panel
-        className="relative overflow-hidden rounded-2xl bg-ink text-paper md:min-h-[min(calc(100dvh-8.5rem),760px)] md:py-16"
+        className="relative overflow-hidden rounded-2xl bg-ink text-paper md:min-h-[min(calc(100dvh-5.5rem),760px)] md:py-16"
       >
         <div className="grid h-full gap-10 px-6 py-12 md:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] md:items-center md:px-12 lg:px-16">
           <div className="relative z-10">

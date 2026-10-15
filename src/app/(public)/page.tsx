@@ -178,7 +178,7 @@ export default async function HomePage() {
           <div className="grid gap-x-10 gap-y-6 border-t-2 border-ink pt-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)]">
             <h2
               id="how-buying-works"
-              className="self-start font-display lg:sticky lg:top-32 text-2xl font-bold leading-tight tracking-[-0.02em] font-stretch-expanded md:text-[32px]"
+              className="self-start font-display lg:sticky lg:top-24 text-2xl font-bold leading-tight tracking-[-0.02em] font-stretch-expanded md:text-[32px]"
             >
               What you know before you pay
             </h2>

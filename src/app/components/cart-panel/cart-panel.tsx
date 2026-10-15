@@ -33,17 +33,14 @@ export function CartPanel() {
               ? `Open cart, ${itemCount} item${itemCount === 1 ? '' : 's'}`
               : 'Open cart'
           }
-          className="relative flex h-11 min-w-11 cursor-pointer items-center justify-center gap-2 rounded-md px-2.5 text-sm font-medium text-ink transition-colors hover:bg-field data-[state=open]:bg-field"
+          className="relative flex size-11 cursor-pointer items-center justify-center rounded-md text-ink transition-colors hover:text-raven"
         >
           <ShoppingCart size={19} aria-hidden />
-          <span className="max-sm:hidden" aria-hidden>
-            Cart
-          </span>
           {itemCount > 0 && (
             <span
               aria-hidden
               key={itemCount}
-              className="flex h-5 min-w-5 animate-[sf-pop_320ms_cubic-bezier(0.16,1,0.3,1)] items-center justify-center rounded-full bg-eye px-1.5 text-[11px] font-semibold leading-none text-ink tabular-nums max-sm:absolute max-sm:right-0.5 max-sm:top-0.5"
+              className="flex animate-[sf-pop_320ms_cubic-bezier(0.16,1,0.3,1)] items-center justify-center rounded-full bg-eye text-[11px] font-semibold leading-none text-ink tabular-nums absolute right-0 top-0.5 h-[18px] min-w-[18px] px-1"
             >
               {itemCount > 99 ? '99+' : itemCount}
             </span>

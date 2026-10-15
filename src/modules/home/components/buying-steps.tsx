@@ -13,7 +13,7 @@ export function BuyingSteps({ steps }: Readonly<{ steps: HomeStep[] }>) {
     <section aria-labelledby="steps" data-rail className="mt-20 md:mt-28">
       <div
         data-rail-pin
-        className="lg:flex lg:h-[calc(100dvh-7rem)] lg:max-h-[760px] lg:flex-col lg:justify-center"
+        className="lg:flex lg:h-[calc(100dvh-4rem)] lg:max-h-[760px] lg:flex-col lg:justify-center"
       >
         <div className="mb-8 flex items-end justify-between gap-6 border-b border-ink pb-4">
           <h2

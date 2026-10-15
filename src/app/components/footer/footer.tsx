@@ -31,11 +31,18 @@ export function Footer({ menu, facts }: Readonly<FooterProps>): JSX.Element {
           <div className="space-y-4">
             <p className="flex items-center gap-2.5 font-display text-2xl font-bold uppercase leading-none font-stretch-expanded">
               <Image
+                src="/brand/ravyntech-mark-inverted.png"
+                alt=""
+                width={54}
+                height={36}
+                className="h-9 w-auto dark:hidden"
+              />
+              <Image
                 src="/brand/ravyntech-mark.png"
                 alt=""
                 width={54}
                 height={36}
-                className="h-9 w-auto"
+                className="hidden h-9 w-auto dark:block"
               />
               <span>
                 Ravyn<span className="text-raven">tech</span>

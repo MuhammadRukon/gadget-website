@@ -54,7 +54,7 @@ export function ProductDetail({
       <CustomBreadcrumb items={breadcrumbItems} />
 
       <div className="mt-5 grid gap-x-12 gap-y-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
-        <div className="lg:sticky lg:top-32 lg:self-start">
+        <div className="lg:sticky lg:top-24 lg:self-start">
           <ProductDetailGallery
             productName={product.name}
             brand={product.brand.name}
@@ -123,7 +123,7 @@ export function ProductDetail({
         </div>
       </div>
 
-      <section id="reviews" className="mt-16 scroll-mt-32 border-t border-ink pt-6 md:mt-24">
+      <section id="reviews" className="mt-16 scroll-mt-24 border-t border-ink pt-6 md:mt-24">
         <ReviewsSection
           productId={product.id}
           summary={reviewSummary}

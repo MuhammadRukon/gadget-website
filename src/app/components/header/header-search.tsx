@@ -1,131 +1,197 @@
 'use client';
 
-import { useEffect, useId, useRef, useState } from 'react';
+import { useId, useRef } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Search } from 'lucide-react';
+import { ArrowRight, Search } from 'lucide-react';
 
-import { cn } from '@/lib/utils';
 import { formatBDT } from '@/server/common/money';
 import { MIN_PREVIEW_CHARS, useHeaderSearchPreview } from '@/hooks/use-header-search-preview';
 
+export interface QuickLink {
+  label: string;
+  href: string;
+}
+
+interface HeaderSearchProps {
+  inputId?: string;
+  /** Called when the visitor leaves for a result or the results page. */
+  onNavigate?: () => void;
+  /** Shown before anything is typed. */
+  quickLinks?: QuickLink[];
+}
+
 /**
- * Storefront search island: debounced product preview, submit-to-results,
- * click-outside and Escape dismissal. Rendered once per breakpoint by the
- * header (only one is ever displayed).
+ * Search inside the header panel: one large borderless field, quick links
+ * while it is empty, live product matches once three characters are in.
+ * Enter goes to the full results page.
  */
-export function HeaderSearch() {
+export function HeaderSearch({
+  inputId,
+  onNavigate,
+  quickLinks = [],
+}: Readonly<HeaderSearchProps>) {
   const { search, setSearch, preview, previewLoading, submitSearch } = useHeaderSearchPreview();
-  const [searchFocused, setSearchFocused] = useState(false);
-  const wrapperRef = useRef<HTMLDivElement>(null);
-  const listId = useId();
-
   const trimmed = search.trim();
-  const showPreviewPanel = searchFocused && trimmed.length >= MIN_PREVIEW_CHARS;
+  const searching = trimmed.length >= MIN_PREVIEW_CHARS;
+  const listRef = useRef<HTMLDivElement>(null);
+  const statusId = useId();
 
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
-        setSearchFocused(false);
-      }
+  const status = !searching
+    ? ''
+    : previewLoading
+      ? 'Searching'
+      : preview?.total
+        ? `${preview.total} ${preview.total === 1 ? 'product' : 'products'} found. Use the down arrow to browse.`
+        : `No products found for ${trimmed}`;
+
+  /** Arrow keys move between the field and the links below it. */
+  function moveFocus(e: React.KeyboardEvent, from: 'input' | 'list') {
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+    const links = Array.from(listRef.current?.querySelectorAll<HTMLAnchorElement>('a[href]') ?? []);
+    if (links.length === 0) return;
+    e.preventDefault();
+    if (from === 'input') {
+      if (e.key === 'ArrowDown') links[0].focus();
+      return;
     }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+    const i = links.indexOf(document.activeElement as HTMLAnchorElement);
+    if (e.key === 'ArrowDown') links[Math.min(i + 1, links.length - 1)].focus();
+    else if (i <= 0) document.getElementById(inputId ?? '')?.focus();
+    else links[i - 1].focus();
+  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setSearchFocused(false);
     submitSearch(e);
-  }
-
-  function closePreview() {
-    setSearchFocused(false);
+    onNavigate?.();
   }
 
   return (
-    <div ref={wrapperRef} className="relative w-full max-w-xl">
-      <form
-        role="search"
-        className="relative flex h-11 w-full items-center md:h-10"
-        onSubmit={handleSubmit}
-      >
-        <Search aria-hidden className="pointer-events-none absolute left-3 size-4 text-ink-2" />
+    <div className="w-full">
+      <form role="search" className="flex items-center gap-3 md:gap-4" onSubmit={handleSubmit}>
+        <Search aria-hidden className="size-5 shrink-0 text-ink-2 md:size-6" strokeWidth={1.75} />
         <input
+          id={inputId}
           type="search"
           aria-label="Search products"
-          placeholder="Search phones, laptops, brands"
+          placeholder="Search Ravyntech"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          onFocus={() => setSearchFocused(true)}
-          onKeyDown={(e) => {
-            if (e.key === 'Escape') closePreview();
-          }}
           autoComplete="off"
+          spellCheck={false}
+          aria-describedby={statusId}
+          onKeyDown={(e) => moveFocus(e, 'input')}
           maxLength={100}
-          aria-expanded={showPreviewPanel}
-          aria-controls={showPreviewPanel ? listId : undefined}
-          className="h-full w-full rounded-md border border-rule-strong bg-surface pl-9 pr-3 text-[15px] text-ink outline-none transition-colors placeholder:text-ink-2 hover:border-ink-2 focus-visible:border-raven focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-raven/25 md:text-sm"
+          className="h-12 w-full min-w-0 border-0 bg-transparent p-0 font-display text-2xl font-semibold tracking-[-0.02em] text-ink caret-raven outline-none font-stretch-semi-expanded placeholder:text-ink-2/50 focus:outline-none! focus-visible:outline-none! md:h-14 md:text-[32px] [&::-webkit-search-cancel-button]:hidden"
         />
       </form>
 
-      {showPreviewPanel && (
-        <div
-          id={listId}
-          className="absolute inset-x-0 top-full z-50 mt-1.5 max-h-96 overflow-y-auto rounded-md border border-rule bg-surface text-ink shadow-[0_12px_32px_-12px_oklch(0.2_0.02_165/0.25)]"
-        >
-          {previewLoading && <p className="px-3 py-3 text-sm text-ink-2">Searching…</p>}
+      <p id={statusId} role="status" className="sr-only">
+        {status}
+      </p>
 
-          {!previewLoading && preview?.items?.length === 0 && (
-            <p className="px-3 py-3 text-sm text-ink-2">
-              No products match “{trimmed}”. Try a brand or a shorter name.
+      <div ref={listRef} onKeyDown={(e) => moveFocus(e, 'list')} className="mt-6 md:mt-8 md:pl-10">
+        {!searching ? (
+          quickLinks.length > 0 ? (
+            <>
+              <p id={`${statusId}-quick`} className="mb-2 text-xs text-ink-2">
+                Quick links
+              </p>
+              <ul aria-labelledby={`${statusId}-quick`}>
+                {quickLinks.map((l, i) => (
+                  <li
+                    key={l.href + l.label}
+                    className="animate-in fade-in-0 slide-in-from-top-1 fill-mode-both duration-300"
+                    style={{ animationDelay: `${60 + i * 35}ms` }}
+                  >
+                    <Link
+                      href={l.href}
+                      onClick={onNavigate}
+                      className="group flex min-h-10 items-center gap-2.5 text-[15px] font-medium text-ink transition-colors hover:text-raven"
+                    >
+                      <ArrowRight
+                        aria-hidden
+                        className="size-3.5 text-ink-2 transition-transform duration-300 group-hover:translate-x-0.5"
+                      />
+                      {l.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : null
+        ) : (
+          <>
+            <p aria-hidden className="mb-2 text-xs text-ink-2">
+              {previewLoading ? 'Searching…' : preview?.total ? 'Products' : 'No matches'}
             </p>
-          )}
 
-          {!previewLoading &&
-            preview?.items.map((product) => (
-              <Link
-                key={product.id}
-                href={`/products/${product.slug}`}
-                onClick={closePreview}
-                className="flex items-center gap-3 border-b border-rule px-3 py-2.5 text-sm last:border-b-0 hover:bg-field focus-visible:bg-field"
+            {!previewLoading && preview?.items.length === 0 ? (
+              <p className="text-[15px] text-ink-2">
+                Nothing matches “{trimmed}”. Try a brand or a shorter name.
+              </p>
+            ) : null}
+
+            {!previewLoading && preview?.items.length ? (
+              <ul
+                aria-label="Matching products"
+                className="max-h-[50dvh] overflow-y-auto overscroll-contain"
               >
-                <div className="relative size-11 shrink-0 overflow-hidden rounded-sm bg-field">
-                  {product.imageUrl ? (
-                    <Image
-                      src={product.imageUrl}
-                      alt=""
-                      width={44}
-                      height={44}
-                      className="size-full object-contain p-1 mix-blend-multiply dark:mix-blend-normal"
-                    />
-                  ) : null}
-                </div>
+                {preview.items.map((product, i) => (
+                  <li
+                    key={product.id}
+                    className="animate-in fade-in-0 fill-mode-both duration-300"
+                    style={{ animationDelay: `${i * 30}ms` }}
+                  >
+                    <Link
+                      href={`/products/${product.slug}`}
+                      onClick={onNavigate}
+                      className="group flex items-center gap-3.5 py-2"
+                    >
+                      <div className="relative size-10 shrink-0 overflow-hidden rounded-md bg-field">
+                        {product.imageUrl ? (
+                          <Image
+                            src={product.imageUrl}
+                            alt=""
+                            width={40}
+                            height={40}
+                            className="size-full object-contain p-1 mix-blend-multiply dark:mix-blend-normal"
+                          />
+                        ) : null}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-[15px] font-medium leading-snug transition-colors group-hover:text-raven">
+                          {product.name}
+                        </p>
+                        <p className="truncate text-xs text-ink-2">{product.brand.name}</p>
+                      </div>
+                      <p className="shrink-0 whitespace-nowrap text-sm tabular-nums text-ink-2">
+                        {formatBDT(product.priceCents)}
+                      </p>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
 
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-xs text-ink-2">{product.brand.name}</p>
-                  <p className="truncate font-medium leading-snug">{product.name}</p>
-                </div>
-                <p className="shrink-0 whitespace-nowrap font-display text-sm font-semibold tabular-nums font-stretch-semi-expanded">
-                  {formatBDT(product.priceCents)}
-                </p>
+            {!previewLoading && preview && preview.total > preview.items.length ? (
+              <Link
+                href={`/products?q=${encodeURIComponent(trimmed)}`}
+                prefetch={false}
+                onClick={onNavigate}
+                className="group mt-3 inline-flex min-h-10 items-center gap-2 text-[15px] font-medium text-raven-ink"
+              >
+                See all {preview.total} results
+                <ArrowRight
+                  aria-hidden
+                  className="size-4 transition-transform duration-300 group-hover:translate-x-0.5"
+                />
               </Link>
-            ))}
-
-          {!previewLoading && preview && preview.total > preview.items.length && (
-            <Link
-              href={`/products?q=${encodeURIComponent(trimmed)}`}
-              prefetch={false}
-              onClick={closePreview}
-              className={cn(
-                'block border-t border-rule px-3 py-2.5 text-center text-sm font-medium text-raven-ink hover:bg-field',
-              )}
-            >
-              See all {preview.total} results
-            </Link>
-          )}
-        </div>
-      )}
+            ) : null}
+          </>
+        )}
+      </div>
     </div>
   );
 }

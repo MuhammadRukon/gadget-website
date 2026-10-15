@@ -39,9 +39,8 @@ export function HomeMotion({ children }: Readonly<{ children: ReactNode }>) {
           const { motion, md, lg } = ctx.conditions as Record<string, boolean>;
           if (!motion) return;
           const ease = 'expo.out';
-          // Pinned panels start below the sticky storefront header, not under it.
-          const headerOffset = () =>
-            (document.querySelector('header.sticky') as HTMLElement | null)?.offsetHeight ?? 0;
+          // Pinned panels start below the header in its compact, scrolled-down shape (a 48px bar).
+          const headerOffset = () => 48;
 
           // Banner: the image settles out of a slow zoom as you scroll past it. The statement
           // itself never animates: it is the first thing people read and it must not flash.
