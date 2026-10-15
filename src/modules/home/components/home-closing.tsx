@@ -16,13 +16,13 @@ export function HomeClosing({ closing }: Readonly<{ closing: typeof HOME_CLOSING
       <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
         <a
           href={closing.whatsapp.href}
-          className="inline-flex h-12 items-center rounded-full bg-solder px-6 text-[15px] font-medium text-on-solder transition-colors hover:bg-solder-ink"
+          className="inline-flex h-12 items-center rounded-full bg-raven px-6 text-[15px] font-medium text-on-raven transition-colors hover:bg-raven-ink"
         >
           {closing.whatsapp.label}
         </a>
         <Link
           href={closing.contact.href}
-          className="inline-flex h-12 items-center px-3 text-[15px] font-medium text-solder-ink underline"
+          className="inline-flex h-12 items-center px-3 text-[15px] font-medium text-raven-ink underline"
         >
           {closing.contact.label}
         </Link>

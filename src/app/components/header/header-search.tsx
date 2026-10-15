@@ -65,7 +65,7 @@ export function HeaderSearch() {
           maxLength={100}
           aria-expanded={showPreviewPanel}
           aria-controls={showPreviewPanel ? listId : undefined}
-          className="h-full w-full rounded-md border border-rule-strong bg-surface pl-9 pr-3 text-[15px] text-ink outline-none transition-colors placeholder:text-ink-2 hover:border-ink-2 focus-visible:border-solder focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-solder/25 md:text-sm"
+          className="h-full w-full rounded-md border border-rule-strong bg-surface pl-9 pr-3 text-[15px] text-ink outline-none transition-colors placeholder:text-ink-2 hover:border-ink-2 focus-visible:border-raven focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-raven/25 md:text-sm"
         />
       </form>
 
@@ -118,7 +118,7 @@ export function HeaderSearch() {
               prefetch={false}
               onClick={closePreview}
               className={cn(
-                'block border-t border-rule px-3 py-2.5 text-center text-sm font-medium text-solder-ink hover:bg-field',
+                'block border-t border-rule px-3 py-2.5 text-center text-sm font-medium text-raven-ink hover:bg-field',
               )}
             >
               See all {preview.total} results

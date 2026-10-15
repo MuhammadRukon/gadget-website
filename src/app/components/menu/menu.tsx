@@ -43,7 +43,7 @@ Menu.Item = function MenuItem({ category }: MenuItemProps) {
     <NavigationMenuItem>
       <NavigationMenuLink
         asChild
-        className="h-11 rounded-none bg-transparent px-3 text-sm font-medium text-ink hover:bg-transparent hover:text-solder-ink focus:bg-transparent"
+        className="h-11 rounded-none bg-transparent px-3 text-sm font-medium text-ink hover:bg-transparent hover:text-raven-ink focus:bg-transparent"
       >
         <Link href={categoryHref(category)}>{category.name}</Link>
       </NavigationMenuLink>
@@ -55,7 +55,7 @@ Menu.ItemWithBrand = function MenuItemWithBrand({ category }: MenuItemProps) {
   return (
     <NavigationMenuItem>
       <NavigationMenuTrigger
-        className="h-11 rounded-none bg-transparent px-3 text-sm font-medium text-ink hover:bg-transparent hover:text-solder-ink focus:bg-transparent data-[state=open]:bg-transparent data-[state=open]:text-solder-ink"
+        className="h-11 rounded-none bg-transparent px-3 text-sm font-medium text-ink hover:bg-transparent hover:text-raven-ink focus:bg-transparent data-[state=open]:bg-transparent data-[state=open]:text-raven-ink"
         asChild
       >
         <Link href={categoryHref(category)}>{category.name}</Link>

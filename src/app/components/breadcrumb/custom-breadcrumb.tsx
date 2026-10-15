@@ -47,7 +47,7 @@ export function CustomBreadcrumb({ items }: Readonly<BreadcrumbProps>) {
               {index === items.length - 1 ? (
                 <BreadcrumbPage className="text-ink">{item.label}</BreadcrumbPage>
               ) : (
-                <BreadcrumbLink href={item.href ?? '#'} className="hover:text-solder-ink">
+                <BreadcrumbLink href={item.href ?? '#'} className="hover:text-raven-ink">
                   {item.label}
                 </BreadcrumbLink>
               )}

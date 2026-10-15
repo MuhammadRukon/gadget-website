@@ -14,7 +14,7 @@ A second audience is the shop admin (owner and staff), who run catalog, orders, 
 
 ## Product Purpose
 
-"Cryptech" is a gadget/electronics e-commerce MVP for the Bangladesh market. Customers browse and filter a catalog, build a guest or logged-in cart, check out with local payment methods, track orders and leave verified-purchase reviews and warranty requests. Success is a real shop that takes orders and payments safely and can be run day to day by a small team.
+"Ravyntech" is a gadget/electronics e-commerce MVP for the Bangladesh market. Customers browse and filter a catalog, build a guest or logged-in cart, check out with local payment methods, track orders and leave verified-purchase reviews and warranty requests. Success is a real shop that takes orders and payments safely and can be run day to day by a small team.
 
 ## Positioning
 
@@ -33,11 +33,11 @@ A curated gadget catalog rather than an everything-marketplace. Positioning beyo
 - Admins: products, categories, brands, coupons, orders, payment verification, warranty workflow, users, 30-day analytics.
 - Copy is English only for now; Bangla and multi-currency display are later roadmap items.
 - Cost-sensitive: free tier first, ISR on public pages, no heavy client JS or paid infrastructure.
-- Undecided: the shop's core differentiator beyond curation, and whether existing logo and name are fixed.
+- Undecided: the shop's core differentiator beyond curation.
 
 ## Brand Commitments
 
-Product name is "Cryptech". Existing assets live in `public/` (logo.png, banner.webp, earphone.svg, smartwatch.svg). Whether these are final is not confirmed.
+Name: "Ravyntech" (renamed from Cryptech in October 2026; the legal entity is Ravyntech Ltd). Personality: a raven, clever and technical. Mark: the angular raven head in `public/brand/ravyntech-mark.png` (full lockup `public/brand/ravyntech-logo.png`); the wordmark is set as live text, RAVYN in ink and TECH in the brand blue-gray. Brand colour: blue-gray #424952. The bank-transfer account name stays "Gadget Cryptech Ltd." until the bank account itself is renamed. Other assets in `public/`: banner.webp, earphone.svg, smartwatch.svg.
 
 ## Evidence on Hand
 

@@ -45,12 +45,12 @@ export function ScrollStory({ story }: Readonly<{ story: HomeStory }>) {
             </ol>
 
             <div className="mt-8 hidden h-px w-full max-w-sm bg-paper/15" data-story-track>
-              <div data-story-progress className="h-px w-full origin-left bg-solder-soft" />
+              <div data-story-progress className="h-px w-full origin-left bg-raven-soft" />
             </div>
 
             <Link
               href={story.cta.href}
-              className="group mt-8 inline-flex h-12 items-center gap-2 rounded-full bg-paper px-6 text-[15px] font-medium text-ink transition-colors hover:bg-solder-soft"
+              className="group mt-8 inline-flex h-12 items-center gap-2 rounded-full bg-paper px-6 text-[15px] font-medium text-ink transition-colors hover:bg-raven-soft"
             >
               {story.cta.label}
               <ArrowRight

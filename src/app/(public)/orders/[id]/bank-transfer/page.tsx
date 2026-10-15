@@ -17,6 +17,7 @@ import { useOrderDetail } from '@/modules/orders/hooks';
 const BANK_DETAILS = {
   bank: 'Brac Bank Limited',
   branch: 'Gulshan Branch',
+  // Must match the bank's records exactly; update only when the account itself is renamed.
   accountName: 'Gadget Cryptech Ltd.',
   accountNumber: '1501-201-XXXX-001',
   routing: '060272836',

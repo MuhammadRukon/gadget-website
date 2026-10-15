@@ -1,9 +1,9 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Contact Us | Cryptech',
+  title: 'Contact Us | Ravyntech',
   description:
-    'Get in touch with Cryptech Ltd — phone, WhatsApp, email, and our Dhaka head office address. Support for orders, deliveries, payments, and warranty claims.',
+    'Get in touch with Ravyntech Ltd — phone, WhatsApp, email, and our Dhaka head office address. Support for orders, deliveries, payments, and warranty claims.',
 };
 
 export default function ContactPage() {

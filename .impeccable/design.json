@@ -1,15 +1,15 @@
 {
   "schemaVersion": 2,
   "generatedAt": "2026-10-15T20:05:35.303Z",
-  "title": "Design System: Cryptech Storefront",
+  "title": "Design System: Ravyntech Storefront",
   "scope": "Customer storefront only (.sf scope). Admin dashboard keeps default shadcn tokens.",
   "extensions": {
     "colorMeta": {
       "paper": {
         "role": "neutral",
         "displayName": "Cool Paper",
-        "canonical": "oklch(0.968 0.004 140)",
-        "dark": "oklch(0.175 0.008 165)",
+        "canonical": "oklch(0.968 0.003 250)",
+        "dark": "oklch(0.17 0.008 255)",
         "tonalRamp": [
           "oklch(0.15 0.004 140)",
           "oklch(0.26 0.004 140)",
@@ -24,8 +24,8 @@
       "surface": {
         "role": "neutral",
         "displayName": "Sheet White",
-        "canonical": "oklch(0.995 0.002 140)",
-        "dark": "oklch(0.21 0.009 165)",
+        "canonical": "oklch(0.995 0.002 250)",
+        "dark": "oklch(0.205 0.01 255)",
         "tonalRamp": [
           "oklch(0.15 0.002 140)",
           "oklch(0.26 0.002 140)",
@@ -40,8 +40,8 @@
       "field": {
         "role": "neutral",
         "displayName": "Photo Field",
-        "canonical": "oklch(0.935 0.007 145)",
-        "dark": "oklch(0.245 0.01 165)",
+        "canonical": "oklch(0.935 0.006 250)",
+        "dark": "oklch(0.24 0.012 255)",
         "tonalRamp": [
           "oklch(0.15 0.007 145)",
           "oklch(0.26 0.007 145)",
@@ -56,8 +56,8 @@
       "ink": {
         "role": "neutral",
         "displayName": "Ink",
-        "canonical": "oklch(0.2 0.012 165)",
-        "dark": "oklch(0.95 0.006 150)",
+        "canonical": "oklch(0.19 0.012 255)",
+        "dark": "oklch(0.95 0.004 250)",
         "tonalRamp": [
           "oklch(0.15 0.012 165)",
           "oklch(0.26 0.012 165)",
@@ -72,8 +72,8 @@
       "ink-2": {
         "role": "neutral",
         "displayName": "Graphite",
-        "canonical": "oklch(0.45 0.012 165)",
-        "dark": "oklch(0.74 0.01 155)",
+        "canonical": "oklch(0.46 0.014 255)",
+        "dark": "oklch(0.74 0.01 250)",
         "tonalRamp": [
           "oklch(0.15 0.012 165)",
           "oklch(0.26 0.012 165)",
@@ -88,8 +88,8 @@
       "rule": {
         "role": "neutral",
         "displayName": "Hairline",
-        "canonical": "oklch(0.875 0.008 150)",
-        "dark": "oklch(0.32 0.01 165)",
+        "canonical": "oklch(0.875 0.007 250)",
+        "dark": "oklch(0.32 0.012 255)",
         "tonalRamp": [
           "oklch(0.15 0.008 150)",
           "oklch(0.26 0.008 150)",
@@ -104,8 +104,8 @@
       "rule-strong": {
         "role": "neutral",
         "displayName": "Strong Hairline",
-        "canonical": "oklch(0.78 0.01 155)",
-        "dark": "oklch(0.42 0.012 165)",
+        "canonical": "oklch(0.78 0.01 250)",
+        "dark": "oklch(0.42 0.014 255)",
         "tonalRamp": [
           "oklch(0.15 0.01 155)",
           "oklch(0.26 0.01 155)",
@@ -117,11 +117,11 @@
           "oklch(0.95 0.01 155)"
         ]
       },
-      "solder": {
+      "raven": {
         "role": "primary",
-        "displayName": "Solder Mask Green",
-        "canonical": "oklch(0.47 0.105 162)",
-        "dark": "oklch(0.72 0.12 162)",
+        "displayName": "Raven Mask Blue-gray",
+        "canonical": "oklch(0.402 0.018 255)",
+        "dark": "oklch(0.8 0.03 255)",
         "tonalRamp": [
           "oklch(0.15 0.105 162)",
           "oklch(0.26 0.105 162)",
@@ -133,11 +133,11 @@
           "oklch(0.95 0.105 162)"
         ]
       },
-      "solder-ink": {
+      "raven-ink": {
         "role": "primary",
-        "displayName": "Deep Solder",
-        "canonical": "oklch(0.39 0.095 162)",
-        "dark": "oklch(0.8 0.11 162)",
+        "displayName": "Deep Raven",
+        "canonical": "oklch(0.32 0.02 255)",
+        "dark": "oklch(0.87 0.025 255)",
         "tonalRamp": [
           "oklch(0.15 0.095 162)",
           "oklch(0.26 0.095 162)",
@@ -149,11 +149,11 @@
           "oklch(0.95 0.095 162)"
         ]
       },
-      "solder-soft": {
+      "raven-soft": {
         "role": "primary",
-        "displayName": "Solder Wash",
-        "canonical": "oklch(0.93 0.035 162)",
-        "dark": "oklch(0.3 0.045 162)",
+        "displayName": "Raven Wash",
+        "canonical": "oklch(0.93 0.012 255)",
+        "dark": "oklch(0.3 0.02 255)",
         "tonalRamp": [
           "oklch(0.15 0.035 162)",
           "oklch(0.26 0.035 162)",
@@ -165,11 +165,11 @@
           "oklch(0.95 0.035 162)"
         ]
       },
-      "on-solder": {
+      "on-raven": {
         "role": "primary",
-        "displayName": "On Solder",
-        "canonical": "oklch(0.985 0.005 160)",
-        "dark": "oklch(0.18 0.03 165)",
+        "displayName": "On Raven",
+        "canonical": "oklch(0.985 0.003 255)",
+        "dark": "oklch(0.18 0.012 255)",
         "tonalRamp": [
           "oklch(0.15 0.005 160)",
           "oklch(0.26 0.005 160)",
@@ -237,7 +237,7 @@
       },
       "wordmark": {
         "displayName": "Wordmark",
-        "purpose": "Uppercase Cryptech wordmark in the header (24px in the footer)."
+        "purpose": "Uppercase Ravyntech wordmark in the header (24px in the footer)."
       }
     },
     "shadows": [
@@ -255,12 +255,12 @@
     "focus": [
       {
         "name": "focus-ring",
-        "value": "outline: 2px solid var(--sf-solder); outline-offset: 2px",
+        "value": "outline: 2px solid var(--sf-raven); outline-offset: 2px",
         "purpose": "Default :focus-visible for everything inside .sf."
       },
       {
         "name": "field-focus",
-        "value": "border-color: var(--sf-solder); box-shadow: 0 0 0 2px oklch(0.47 0.105 162 / 0.25)",
+        "value": "border-color: var(--sf-raven); box-shadow: 0 0 0 2px oklch(0.47 0.105 162 / 0.25)",
         "purpose": "Inputs, selects and price fields."
       }
     ],
@@ -273,7 +273,7 @@
       {
         "name": "field-tint",
         "value": "background-color 300ms",
-        "purpose": "Product image field tints to solder-soft on card hover."
+        "purpose": "Product image field tints to raven-soft on card hover."
       },
       {
         "name": "pop",
@@ -341,7 +341,7 @@
     ],
     "accessibility": [
       "Minimum 44px target on every interactive element; buy and checkout buttons 48px.",
-      "Focus: 2px solid solder outline at 2px offset (scope default).",
+      "Focus: 2px solid raven outline at 2px offset (scope default).",
       "State never by colour alone: stock dot plus words, struck label plus \"Out of stock\", \"Was\" before struck prices for screen readers.",
       "Skip-to-content link as the first focusable element.",
       "Reduced motion honoured across .sf."
@@ -352,9 +352,9 @@
       "name": "Primary Button",
       "kind": "button",
       "refersTo": "button-primary",
-      "description": "Solder-green action; 44px minimum, 48px full width for add to cart and checkout.",
+      "description": "Raven-blue-gray action; 44px minimum, 48px full width for add to cart and checkout.",
       "html": "<button class=\"ds-btn-primary\">Add to cart</button>",
-      "css": ".ds-btn-primary { background: var(--sf-solder, oklch(0.47 0.105 162)); color: var(--sf-on-solder, oklch(0.985 0.005 160)); height: 48px; padding: 0 24px; border: none; border-radius: 4px; font: 500 15px/1 \"Google Sans\", Arial, sans-serif; cursor: pointer; transition: background-color 100ms, transform 100ms; } .ds-btn-primary:hover { background: var(--sf-solder-ink, oklch(0.39 0.095 162)); } .ds-btn-primary:active { transform: scale(0.98); } .ds-btn-primary:focus-visible { outline: 2px solid var(--sf-solder, oklch(0.47 0.105 162)); outline-offset: 2px; } .ds-btn-primary:disabled { opacity: 0.5; pointer-events: none; }"
+      "css": ".ds-btn-primary { background: var(--sf-raven, oklch(0.402 0.018 255)); color: var(--sf-on-raven, oklch(0.985 0.003 255)); height: 48px; padding: 0 24px; border: none; border-radius: 4px; font: 500 15px/1 \"Google Sans\", Arial, sans-serif; cursor: pointer; transition: background-color 100ms, transform 100ms; } .ds-btn-primary:hover { background: var(--sf-raven-ink, oklch(0.32 0.02 255)); } .ds-btn-primary:active { transform: scale(0.98); } .ds-btn-primary:focus-visible { outline: 2px solid var(--sf-raven, oklch(0.402 0.018 255)); outline-offset: 2px; } .ds-btn-primary:disabled { opacity: 0.5; pointer-events: none; }"
     },
     {
       "name": "Outline Button",
@@ -362,7 +362,7 @@
       "refersTo": "button-outline",
       "description": "Pagination and the mobile Filters trigger.",
       "html": "<a class=\"ds-btn-outline\" href=\"#\">Next <svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M5 12h14\"/><path d=\"m12 5 7 7-7 7\"/></svg></a>",
-      "css": ".ds-btn-outline { display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 16px; background: var(--sf-surface, oklch(0.995 0.002 140)); color: var(--sf-ink, oklch(0.2 0.012 165)); border: 1px solid var(--sf-rule-strong, oklch(0.78 0.01 155)); border-radius: 4px; font: 500 14px/1 \"Google Sans\", Arial, sans-serif; text-decoration: none; transition: border-color 150ms; } .ds-btn-outline:hover { border-color: var(--sf-ink-2, oklch(0.45 0.012 165)); } .ds-btn-outline:focus-visible { outline: 2px solid var(--sf-solder, oklch(0.47 0.105 162)); outline-offset: 2px; }"
+      "css": ".ds-btn-outline { display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 16px; background: var(--sf-surface, oklch(0.995 0.002 250)); color: var(--sf-ink, oklch(0.19 0.012 255)); border: 1px solid var(--sf-rule-strong, oklch(0.78 0.01 250)); border-radius: 4px; font: 500 14px/1 \"Google Sans\", Arial, sans-serif; text-decoration: none; transition: border-color 150ms; } .ds-btn-outline:hover { border-color: var(--sf-ink-2, oklch(0.46 0.014 255)); } .ds-btn-outline:focus-visible { outline: 2px solid var(--sf-raven, oklch(0.402 0.018 255)); outline-offset: 2px; }"
     },
     {
       "name": "Search Field",
@@ -370,7 +370,7 @@
       "refersTo": "input-field",
       "description": "Persistent header search; same field spec as filter and sort inputs.",
       "html": "<label class=\"ds-search\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"11\" cy=\"11\" r=\"8\"/><path d=\"m21 21-4.3-4.3\"/></svg><input type=\"search\" aria-label=\"Search products\" placeholder=\"Search phones, laptops, brands\"></label>",
-      "css": ".ds-search { position: relative; display: flex; align-items: center; width: 100%; max-width: 36rem; } .ds-search svg { position: absolute; left: 12px; color: var(--sf-ink-2, oklch(0.45 0.012 165)); pointer-events: none; } .ds-search input { width: 100%; height: 44px; padding: 0 12px 0 36px; background: var(--sf-surface, oklch(0.995 0.002 140)); color: var(--sf-ink, oklch(0.2 0.012 165)); border: 1px solid var(--sf-rule-strong, oklch(0.78 0.01 155)); border-radius: 4px; font: 400 15px \"Google Sans\", Arial, sans-serif; caret-color: var(--sf-solder, oklch(0.47 0.105 162)); outline: none; transition: border-color 150ms, box-shadow 150ms; } .ds-search input::placeholder { color: var(--sf-ink-2, oklch(0.45 0.012 165)); } .ds-search input:hover { border-color: var(--sf-ink-2, oklch(0.45 0.012 165)); } .ds-search input:focus-visible { border-color: var(--sf-solder, oklch(0.47 0.105 162)); box-shadow: 0 0 0 2px oklch(0.47 0.105 162 / 0.25); }"
+      "css": ".ds-search { position: relative; display: flex; align-items: center; width: 100%; max-width: 36rem; } .ds-search svg { position: absolute; left: 12px; color: var(--sf-ink-2, oklch(0.46 0.014 255)); pointer-events: none; } .ds-search input { width: 100%; height: 44px; padding: 0 12px 0 36px; background: var(--sf-surface, oklch(0.995 0.002 250)); color: var(--sf-ink, oklch(0.19 0.012 255)); border: 1px solid var(--sf-rule-strong, oklch(0.78 0.01 250)); border-radius: 4px; font: 400 15px \"Google Sans\", Arial, sans-serif; caret-color: var(--sf-raven, oklch(0.402 0.018 255)); outline: none; transition: border-color 150ms, box-shadow 150ms; } .ds-search input::placeholder { color: var(--sf-ink-2, oklch(0.46 0.014 255)); } .ds-search input:hover { border-color: var(--sf-ink-2, oklch(0.46 0.014 255)); } .ds-search input:focus-visible { border-color: var(--sf-raven, oklch(0.402 0.018 255)); box-shadow: 0 0 0 2px oklch(0.47 0.105 162 / 0.25); }"
     },
     {
       "name": "Category Chips",
@@ -378,15 +378,15 @@
       "refersTo": "chip-category",
       "description": "Mobile category index rail; the last chip inverts to ink.",
       "html": "<div class=\"ds-chips\"><a class=\"ds-chip\" href=\"#\">Phones <span>12</span></a><a class=\"ds-chip\" href=\"#\">Audio <span>8</span></a><a class=\"ds-chip ds-chip-all\" href=\"#\">All 40</a></div>",
-      "css": ".ds-chips { display: flex; gap: 8px; } .ds-chip { display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 16px; border-radius: 9999px; background: var(--sf-surface, oklch(0.995 0.002 140)); border: 1px solid var(--sf-rule-strong, oklch(0.78 0.01 155)); color: var(--sf-ink, oklch(0.2 0.012 165)); font: 500 14px \"Google Sans\", Arial, sans-serif; text-decoration: none; } .ds-chip span { font-size: 12px; color: var(--sf-ink-2, oklch(0.45 0.012 165)); font-variant-numeric: tabular-nums; } .ds-chip:hover { border-color: var(--sf-ink-2, oklch(0.45 0.012 165)); } .ds-chip:focus-visible { outline: 2px solid var(--sf-solder, oklch(0.47 0.105 162)); outline-offset: 2px; } .ds-chip-all { background: var(--sf-ink, oklch(0.2 0.012 165)); color: var(--sf-paper, oklch(0.968 0.004 140)); border-color: transparent; }"
+      "css": ".ds-chips { display: flex; gap: 8px; } .ds-chip { display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 16px; border-radius: 9999px; background: var(--sf-surface, oklch(0.995 0.002 250)); border: 1px solid var(--sf-rule-strong, oklch(0.78 0.01 250)); color: var(--sf-ink, oklch(0.19 0.012 255)); font: 500 14px \"Google Sans\", Arial, sans-serif; text-decoration: none; } .ds-chip span { font-size: 12px; color: var(--sf-ink-2, oklch(0.46 0.014 255)); font-variant-numeric: tabular-nums; } .ds-chip:hover { border-color: var(--sf-ink-2, oklch(0.46 0.014 255)); } .ds-chip:focus-visible { outline: 2px solid var(--sf-raven, oklch(0.402 0.018 255)); outline-offset: 2px; } .ds-chip-all { background: var(--sf-ink, oklch(0.19 0.012 255)); color: var(--sf-paper, oklch(0.968 0.003 250)); border-color: transparent; }"
     },
     {
       "name": "Header with Facts Strip",
       "kind": "nav",
       "refersTo": "header",
       "description": "Ink facts strip over the sticky paper header: wordmark, search, account, cart with count.",
-      "html": "<div class=\"ds-hdr\"><p class=\"ds-facts\"><span><b>Free delivery</b> from Tk 5,000</span><span aria-hidden=\"true\">/</span><span>Delivery Tk 60 in Dhaka, Tk 120 elsewhere</span></p><div class=\"ds-bar\"><span class=\"ds-wordmark\">Cryptech</span><a class=\"ds-hbtn\" href=\"#\">Sign in</a><a class=\"ds-hbtn\" href=\"#\">Cart <span class=\"ds-count\">2</span></a></div></div>",
-      "css": ".ds-hdr { background: var(--sf-paper, oklch(0.968 0.004 140)); color: var(--sf-ink, oklch(0.2 0.012 165)); font-family: \"Google Sans\", Arial, sans-serif; } .ds-facts { display: flex; align-items: center; gap: 20px; height: 36px; margin: 0; padding: 0 16px; background: var(--sf-ink, oklch(0.2 0.012 165)); color: var(--sf-paper, oklch(0.968 0.004 140)); font-size: 12px; white-space: nowrap; overflow-x: auto; } .ds-bar { display: flex; align-items: center; gap: 4px; height: 64px; padding: 0 16px; border-bottom: 1px solid var(--sf-rule, oklch(0.875 0.008 150)); } .ds-wordmark { margin-right: auto; font: 700 17px/1 Archivo, sans-serif; font-stretch: 125%; letter-spacing: 0.02em; text-transform: uppercase; } .ds-hbtn { display: inline-flex; align-items: center; gap: 8px; height: 44px; min-width: 44px; padding: 0 10px; border-radius: 4px; color: inherit; text-decoration: none; font-size: 14px; font-weight: 500; transition: background-color 150ms; } .ds-hbtn:hover { background: var(--sf-field, oklch(0.935 0.007 145)); } .ds-hbtn:focus-visible { outline: 2px solid var(--sf-solder, oklch(0.47 0.105 162)); outline-offset: 2px; } .ds-count { display: inline-flex; align-items: center; justify-content: center; height: 20px; min-width: 20px; padding: 0 6px; border-radius: 9999px; background: var(--sf-solder, oklch(0.47 0.105 162)); color: var(--sf-on-solder, oklch(0.985 0.005 160)); font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; animation: ds-pop 320ms cubic-bezier(0.16, 1, 0.3, 1); } @keyframes ds-pop { from { transform: scale(0.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }"
+      "html": "<div class=\"ds-hdr\"><p class=\"ds-facts\"><span><b>Free delivery</b> from Tk 5,000</span><span aria-hidden=\"true\">/</span><span>Delivery Tk 60 in Dhaka, Tk 120 elsewhere</span></p><div class=\"ds-bar\"><span class=\"ds-wordmark\">Ravyntech</span><a class=\"ds-hbtn\" href=\"#\">Sign in</a><a class=\"ds-hbtn\" href=\"#\">Cart <span class=\"ds-count\">2</span></a></div></div>",
+      "css": ".ds-hdr { background: var(--sf-paper, oklch(0.968 0.003 250)); color: var(--sf-ink, oklch(0.19 0.012 255)); font-family: \"Google Sans\", Arial, sans-serif; } .ds-facts { display: flex; align-items: center; gap: 20px; height: 36px; margin: 0; padding: 0 16px; background: var(--sf-ink, oklch(0.19 0.012 255)); color: var(--sf-paper, oklch(0.968 0.003 250)); font-size: 12px; white-space: nowrap; overflow-x: auto; } .ds-bar { display: flex; align-items: center; gap: 4px; height: 64px; padding: 0 16px; border-bottom: 1px solid var(--sf-rule, oklch(0.875 0.007 250)); } .ds-wordmark { margin-right: auto; font: 700 17px/1 Archivo, sans-serif; font-stretch: 125%; letter-spacing: 0.02em; text-transform: uppercase; } .ds-hbtn { display: inline-flex; align-items: center; gap: 8px; height: 44px; min-width: 44px; padding: 0 10px; border-radius: 4px; color: inherit; text-decoration: none; font-size: 14px; font-weight: 500; transition: background-color 150ms; } .ds-hbtn:hover { background: var(--sf-field, oklch(0.935 0.006 250)); } .ds-hbtn:focus-visible { outline: 2px solid var(--sf-raven, oklch(0.402 0.018 255)); outline-offset: 2px; } .ds-count { display: inline-flex; align-items: center; justify-content: center; height: 20px; min-width: 20px; padding: 0 6px; border-radius: 9999px; background: var(--sf-raven, oklch(0.402 0.018 255)); color: var(--sf-on-raven, oklch(0.985 0.003 255)); font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; animation: ds-pop 320ms cubic-bezier(0.16, 1, 0.3, 1); } @keyframes ds-pop { from { transform: scale(0.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }"
     },
     {
       "name": "Product Card",
@@ -394,15 +394,15 @@
       "refersTo": "product-image-field",
       "description": "Frameless card: tinted photo field, brand, name, one-line spec run, hairline, price and stock mark.",
       "html": "<article class=\"ds-card\"><div class=\"ds-field\"><span class=\"ds-sale\">−12%</span></div><p class=\"ds-brand\">Xiaomi</p><h3 class=\"ds-name\"><a href=\"#\">Redmi Note 13 Pro</a></h3><p class=\"ds-specs\">8 GB · 256 GB · 6.67 in</p><div class=\"ds-foot\"><span class=\"ds-price\">Tk 32,999</span><span class=\"ds-stock\"><i></i>In stock</span></div></article>",
-      "css": ".ds-card { position: relative; width: 220px; font-family: \"Google Sans\", Arial, sans-serif; color: var(--sf-ink, oklch(0.2 0.012 165)); } .ds-field { position: relative; aspect-ratio: 4 / 5; border-radius: 4px; background: var(--sf-field, oklch(0.935 0.007 145)); transition: background-color 300ms; } .ds-card:hover .ds-field { background: var(--sf-solder-soft, oklch(0.93 0.035 162)); } .ds-sale { position: absolute; left: 10px; top: 10px; padding: 2px 6px; border-radius: 2px; background: var(--sf-sale, oklch(0.53 0.19 28)); color: #fff; font-size: 11px; font-weight: 600; } .ds-brand { margin: 12px 0 0; font-size: 12px; color: var(--sf-ink-2, oklch(0.45 0.012 165)); } .ds-name { margin: 6px 0 0; font-size: 14px; font-weight: 500; line-height: 1.375; } .ds-name a { color: inherit; text-decoration: none; outline: none; } .ds-name a::after { content: \"\"; position: absolute; inset: 0; border-radius: 4px; } .ds-name a:focus-visible::after { outline: 2px solid var(--sf-solder, oklch(0.47 0.105 162)); outline-offset: 2px; } .ds-specs { margin: 6px 0 0; font-size: 12px; color: var(--sf-ink-2, oklch(0.45 0.012 165)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .ds-foot { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 6px; padding-top: 10px; border-top: 1px solid var(--sf-rule, oklch(0.875 0.008 150)); } .ds-price { font: 600 15px Archivo, sans-serif; font-stretch: 112.5%; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; white-space: nowrap; } .ds-stock { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; color: var(--sf-solder-ink, oklch(0.39 0.095 162)); } .ds-stock i { width: 6px; height: 6px; border-radius: 9999px; background: var(--sf-solder, oklch(0.47 0.105 162)); }"
+      "css": ".ds-card { position: relative; width: 220px; font-family: \"Google Sans\", Arial, sans-serif; color: var(--sf-ink, oklch(0.19 0.012 255)); } .ds-field { position: relative; aspect-ratio: 4 / 5; border-radius: 4px; background: var(--sf-field, oklch(0.935 0.006 250)); transition: background-color 300ms; } .ds-card:hover .ds-field { background: var(--sf-raven-soft, oklch(0.93 0.012 255)); } .ds-sale { position: absolute; left: 10px; top: 10px; padding: 2px 6px; border-radius: 2px; background: var(--sf-sale, oklch(0.53 0.19 28)); color: #fff; font-size: 11px; font-weight: 600; } .ds-brand { margin: 12px 0 0; font-size: 12px; color: var(--sf-ink-2, oklch(0.46 0.014 255)); } .ds-name { margin: 6px 0 0; font-size: 14px; font-weight: 500; line-height: 1.375; } .ds-name a { color: inherit; text-decoration: none; outline: none; } .ds-name a::after { content: \"\"; position: absolute; inset: 0; border-radius: 4px; } .ds-name a:focus-visible::after { outline: 2px solid var(--sf-raven, oklch(0.402 0.018 255)); outline-offset: 2px; } .ds-specs { margin: 6px 0 0; font-size: 12px; color: var(--sf-ink-2, oklch(0.46 0.014 255)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .ds-foot { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 6px; padding-top: 10px; border-top: 1px solid var(--sf-rule, oklch(0.875 0.007 250)); } .ds-price { font: 600 15px Archivo, sans-serif; font-stretch: 112.5%; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; white-space: nowrap; } .ds-stock { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; color: var(--sf-raven-ink, oklch(0.32 0.02 255)); } .ds-stock i { width: 6px; height: 6px; border-radius: 9999px; background: var(--sf-raven, oklch(0.402 0.018 255)); }"
     },
     {
       "name": "Variant Selector",
       "kind": "custom",
       "refersTo": "variant-option-selected",
-      "description": "Option tiles; selected gets solder wash and ring, out of stock is struck through.",
+      "description": "Option tiles; selected gets raven wash and ring, out of stock is struck through.",
       "html": "<div class=\"ds-variants\"><button class=\"ds-var\" aria-pressed=\"true\"><b>8 GB / 256 GB</b><span>Tk 32,999</span></button><button class=\"ds-var\" aria-pressed=\"false\"><b>12 GB / 512 GB</b><span>Tk 38,999</span></button><button class=\"ds-var ds-var-out\" aria-pressed=\"false\"><b>4 GB / 128 GB</b><span>Out of stock</span></button></div>",
-      "css": ".ds-variants { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; font-family: \"Google Sans\", Arial, sans-serif; } .ds-var { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; min-height: 56px; padding: 8px 12px; border-radius: 4px; border: 1px solid var(--sf-rule-strong, oklch(0.78 0.01 155)); background: var(--sf-surface, oklch(0.995 0.002 140)); color: var(--sf-ink, oklch(0.2 0.012 165)); text-align: left; cursor: pointer; transition: border-color 150ms, background-color 150ms; } .ds-var b { font-size: 14px; font-weight: 500; } .ds-var span { margin-top: 2px; font-size: 12px; color: var(--sf-ink-2, oklch(0.45 0.012 165)); font-variant-numeric: tabular-nums; } .ds-var:hover { border-color: var(--sf-ink-2, oklch(0.45 0.012 165)); } .ds-var[aria-pressed=\"true\"] { border-color: var(--sf-solder, oklch(0.47 0.105 162)); background: var(--sf-solder-soft, oklch(0.93 0.035 162)); box-shadow: 0 0 0 1px var(--sf-solder, oklch(0.47 0.105 162)); } .ds-var:focus-visible { outline: 2px solid var(--sf-solder, oklch(0.47 0.105 162)); outline-offset: 2px; } .ds-var-out { color: var(--sf-ink-2, oklch(0.45 0.012 165)); } .ds-var-out b { text-decoration: line-through; }"
+      "css": ".ds-variants { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; font-family: \"Google Sans\", Arial, sans-serif; } .ds-var { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; min-height: 56px; padding: 8px 12px; border-radius: 4px; border: 1px solid var(--sf-rule-strong, oklch(0.78 0.01 250)); background: var(--sf-surface, oklch(0.995 0.002 250)); color: var(--sf-ink, oklch(0.19 0.012 255)); text-align: left; cursor: pointer; transition: border-color 150ms, background-color 150ms; } .ds-var b { font-size: 14px; font-weight: 500; } .ds-var span { margin-top: 2px; font-size: 12px; color: var(--sf-ink-2, oklch(0.46 0.014 255)); font-variant-numeric: tabular-nums; } .ds-var:hover { border-color: var(--sf-ink-2, oklch(0.46 0.014 255)); } .ds-var[aria-pressed=\"true\"] { border-color: var(--sf-raven, oklch(0.402 0.018 255)); background: var(--sf-raven-soft, oklch(0.93 0.012 255)); box-shadow: 0 0 0 1px var(--sf-raven, oklch(0.402 0.018 255)); } .ds-var:focus-visible { outline: 2px solid var(--sf-raven, oklch(0.402 0.018 255)); outline-offset: 2px; } .ds-var-out { color: var(--sf-ink-2, oklch(0.46 0.014 255)); } .ds-var-out b { text-decoration: line-through; }"
     },
     {
       "name": "Spec Ledger",
@@ -410,14 +410,14 @@
       "refersTo": "spec-ledger",
       "description": "Signature move: ruled two-column datasheet of terms and values with tabular figures.",
       "html": "<section class=\"ds-ledger\"><h2>Specifications</h2><dl><div><dt>RAM</dt><dd>8 GB</dd></div><div><dt>Storage</dt><dd>256 GB</dd></div><div><dt>Delivery, Dhaka</dt><dd class=\"ds-fig\">Tk 60</dd></div><div><dt>SKU</dt><dd class=\"ds-mono\">RN13P-8-256-BLK</dd></div></dl></section>",
-      "css": ".ds-ledger { max-width: 32rem; font-family: \"Google Sans\", Arial, sans-serif; color: var(--sf-ink, oklch(0.2 0.012 165)); } .ds-ledger h2 { margin: 0 0 12px; font: 600 18px Archivo, sans-serif; font-stretch: 112.5%; } .ds-ledger dl { margin: 0; border-top: 1px solid var(--sf-ink, oklch(0.2 0.012 165)); font-size: 14px; } .ds-ledger dl > div { display: grid; grid-template-columns: minmax(7rem, 38%) 1fr; gap: 16px; padding: 10px 0; border-bottom: 1px solid var(--sf-rule, oklch(0.875 0.008 150)); } .ds-ledger dt { color: var(--sf-ink-2, oklch(0.45 0.012 165)); } .ds-ledger dd { margin: 0; font-variant-numeric: tabular-nums; } .ds-ledger .ds-fig { font-family: Archivo, sans-serif; font-weight: 600; font-stretch: 112.5%; } .ds-ledger .ds-mono { font-family: ui-monospace, monospace; font-size: 13px; }"
+      "css": ".ds-ledger { max-width: 32rem; font-family: \"Google Sans\", Arial, sans-serif; color: var(--sf-ink, oklch(0.19 0.012 255)); } .ds-ledger h2 { margin: 0 0 12px; font: 600 18px Archivo, sans-serif; font-stretch: 112.5%; } .ds-ledger dl { margin: 0; border-top: 1px solid var(--sf-ink, oklch(0.19 0.012 255)); font-size: 14px; } .ds-ledger dl > div { display: grid; grid-template-columns: minmax(7rem, 38%) 1fr; gap: 16px; padding: 10px 0; border-bottom: 1px solid var(--sf-rule, oklch(0.875 0.007 250)); } .ds-ledger dt { color: var(--sf-ink-2, oklch(0.46 0.014 255)); } .ds-ledger dd { margin: 0; font-variant-numeric: tabular-nums; } .ds-ledger .ds-fig { font-family: Archivo, sans-serif; font-weight: 600; font-stretch: 112.5%; } .ds-ledger .ds-mono { font-family: ui-monospace, monospace; font-size: 13px; }"
     }
   ],
   "narrative": {
     "northStar": "The Spec Sheet",
-    "overview": "The shop reads like a well-made product datasheet: exact, calm, measured. Every surface is a sheet of cool paper ruled with hairlines, set in a wide engineering display face, with near-black ink for facts and a single solder-mask green for the things you act on. Information is the decoration. Prices, stock, delivery fees, warranty terms and payment methods are set as real, ruled facts rather than being hidden behind banners, and nothing is shown that the data does not back.\n\nDensity is moderate and even, tuned for phones in bright light on slow networks: generous 44px targets, short line lengths, no heavy imagery beyond the product photos themselves, which sit on tinted fields so a mixed catalogue of white-background shots reads as one set. The world explicitly rejects the category default of a decorative hero banner over identical card grids; the home page opens on a wide headline, a ruled category index and one real product at full scale.",
+    "overview": "The shop reads like a well-made product datasheet: exact, calm, measured. Every surface is a sheet of cool paper ruled with hairlines, set in a wide engineering display face, with near-black ink for facts and a single raven-mask blue-gray for the things you act on. Information is the decoration. Prices, stock, delivery fees, warranty terms and payment methods are set as real, ruled facts rather than being hidden behind banners, and nothing is shown that the data does not back.\n\nDensity is moderate and even, tuned for phones in bright light on slow networks: generous 44px targets, short line lengths, no heavy imagery beyond the product photos themselves, which sit on tinted fields so a mixed catalogue of white-background shots reads as one set. The world explicitly rejects the category default of a decorative hero banner over identical card grids; the home page opens on a wide headline, a ruled category index and one real product at full scale.",
     "keyCharacteristics": [
-      "Cool paper ground, near-black ink, one solder-green accent; sale red only on real discounts.",
+      "Cool paper ground, near-black ink, one raven-blue-gray accent; sale red only on real discounts.",
       "Archivo set wide (125% / 112.5% width) for headings, prices and model names; Google Sans for everything read.",
       "Tabular figures everywhere in the storefront scope.",
       "Hairline rules instead of boxes; a heavier ink rule opens each section.",
@@ -426,8 +426,8 @@
     ],
     "rules": [
       {
-        "name": "The One Green Rule",
-        "body": "Solder green marks what you can act on or what is selected, and nothing else. Headings, borders and decoration stay ink and hairline.",
+        "name": "The One Blue-Gray Rule",
+        "body": "Raven blue-gray marks what you can act on or what is selected, and nothing else. Headings, borders and decoration stay ink and hairline.",
         "section": "colors"
       },
       {
@@ -467,9 +467,9 @@
       }
     ],
     "dos": [
-      "Do scope every storefront page under `.sf` and take colour from the `--sf-*` roles (via `bg-paper`, `text-ink-2`, `border-rule`, `bg-solder` ...).",
+      "Do scope every storefront page under `.sf` and take colour from the `--sf-*` roles (via `bg-paper`, `text-ink-2`, `border-rule`, `bg-raven` ...).",
       "Do give every interactive element a 44px minimum target (`h-11` / `min-h-11`); buy and checkout buttons are 48px.",
-      "Do rely on the scope's focus ring: 2px solid solder outline, 2px offset. When a control replaces it (inputs), use a solder border plus a 2px 25% solder ring.",
+      "Do rely on the scope's focus ring: 2px solid raven outline, 2px offset. When a control replaces it (inputs), use a raven border plus a 2px 25% raven ring.",
       "Do set facts as a spec ledger (ruled term/value rows with tabular figures) and under products as a one-line \" · \" spec run.",
       "Do put every product photo on the Photo Field with `object-contain` and an inset, and show the \"Photo coming soon\" plate with the brand set wide when there is no photo.",
       "Do set prices with the Price component: wide Archivo, tabular, no wrap between \"Tk\" and the amount, struck original with a screen-reader \"Was\".",
@@ -479,7 +479,7 @@
     "donts": [
       "Don't add a decorative hero banner or a carousel; the home page opens on a headline, the category index and one real product.",
       "Don't show invented proof, counts, delivery times, stock numbers or discounts; every fact on the page is read from data or settings.",
-      "Don't use solder green for headings, borders or decoration, and don't use sale red for anything except a real price reduction or a validation error.",
+      "Don't use raven blue-gray for headings, borders or decoration, and don't use sale red for anything except a real price reduction or a validation error.",
       "Don't wrap groups in bordered or shadowed cards where a hairline will do; shadows belong only to floating layers.",
       "Don't set prices or model names in the body face, or push Archivo past 700 weight.",
       "Don't put product photos on bare paper or crop them to fill.",

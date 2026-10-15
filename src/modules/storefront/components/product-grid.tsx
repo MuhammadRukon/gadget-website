@@ -29,7 +29,7 @@ export function ProductGrid({
           Try a wider price range, another brand, or include out-of-stock items.
         </p>
         {clearHref ? (
-          <Link href={clearHref} className="text-sm font-medium text-solder-ink underline">
+          <Link href={clearHref} className="text-sm font-medium text-raven-ink underline">
             Clear all filters
           </Link>
         ) : null}

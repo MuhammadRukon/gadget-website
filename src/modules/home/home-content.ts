@@ -38,7 +38,7 @@ export interface HomeTile {
   href: string;
   /** Optional drawing; tiles without one are set as type. */
   drawing?: string;
-  tone: 'ink' | 'field' | 'solder';
+  tone: 'ink' | 'field' | 'raven';
 }
 
 export interface HomeStep {
@@ -50,7 +50,7 @@ export interface HomeStep {
 export const HOME_BANNER: HomeBanner = {
   image: '/banner.webp',
   alt: 'Phones, smartwatches and other gadgets arranged on a reflective table',
-  title: 'Gadgets, picked one by one.',
+  title: 'Sharp eyes for good tech.',
   subtitle: 'Phones, laptops and accessories with the price, stock and warranty on every page.',
   primary: { label: 'Shop all products', href: '/products' },
   secondary: { label: 'Browse phones', href: '/category/phones' },
@@ -99,7 +99,7 @@ export const HOME_TILES: HomeTile[] = [
     blurb: 'Smartwatches and fitness bands.',
     href: '/products?q=watch',
     drawing: '/smartwatch.svg',
-    tone: 'solder',
+    tone: 'raven',
   },
   {
     title: 'Audio',

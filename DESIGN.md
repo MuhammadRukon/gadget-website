@@ -1,19 +1,20 @@
 ---
-name: Cryptech Storefront
+name: Ravyntech Storefront
 description: A gadget shop for Bangladesh that reads like a well-made product datasheet; exact, calm, measured.
 colors:
-  paper: "oklch(0.968 0.004 140)"
-  surface: "oklch(0.995 0.002 140)"
-  field: "oklch(0.935 0.007 145)"
-  ink: "oklch(0.2 0.012 165)"
-  ink-2: "oklch(0.45 0.012 165)"
-  rule: "oklch(0.875 0.008 150)"
-  rule-strong: "oklch(0.78 0.01 155)"
-  solder: "oklch(0.47 0.105 162)"
-  solder-ink: "oklch(0.39 0.095 162)"
-  solder-soft: "oklch(0.93 0.035 162)"
-  on-solder: "oklch(0.985 0.005 160)"
+  paper: "oklch(0.968 0.003 250)"
+  surface: "oklch(0.995 0.002 250)"
+  field: "oklch(0.935 0.006 250)"
+  ink: "oklch(0.19 0.012 255)"
+  ink-2: "oklch(0.46 0.014 255)"
+  rule: "oklch(0.875 0.007 250)"
+  rule-strong: "oklch(0.78 0.01 250)"
+  raven: "oklch(0.402 0.018 255)"
+  raven-ink: "oklch(0.32 0.02 255)"
+  raven-soft: "oklch(0.93 0.012 255)"
+  on-raven: "oklch(0.985 0.003 255)"
   sale: "oklch(0.53 0.19 28)"
+  eye: "oklch(0.7 0.15 235)"
 typography:
   display:
     fontFamily: "Archivo, Google Sans, sans-serif"
@@ -100,18 +101,18 @@ spacing:
   target: "44px"
 components:
   button-primary:
-    backgroundColor: "{colors.solder}"
-    textColor: "{colors.on-solder}"
+    backgroundColor: "{colors.raven}"
+    textColor: "{colors.on-raven}"
     typography: "{typography.body-sm}"
     rounded: "{rounded.md}"
     padding: "0 16px"
     height: "44px"
   button-primary-hover:
-    backgroundColor: "{colors.solder-ink}"
-    textColor: "{colors.on-solder}"
+    backgroundColor: "{colors.raven-ink}"
+    textColor: "{colors.on-raven}"
   button-primary-purchase:
-    backgroundColor: "{colors.solder}"
-    textColor: "{colors.on-solder}"
+    backgroundColor: "{colors.raven}"
+    textColor: "{colors.on-raven}"
     rounded: "{rounded.md}"
     height: "48px"
     width: "100%"
@@ -147,22 +148,22 @@ components:
     padding: "8px 12px"
     height: "56px"
   variant-option-selected:
-    backgroundColor: "{colors.solder-soft}"
+    backgroundColor: "{colors.raven-soft}"
     textColor: "{colors.ink}"
     rounded: "{rounded.md}"
   product-image-field:
     backgroundColor: "{colors.field}"
     rounded: "{rounded.md}"
   product-image-field-hover:
-    backgroundColor: "{colors.solder-soft}"
+    backgroundColor: "{colors.raven-soft}"
   sale-badge:
     backgroundColor: "{colors.sale}"
     textColor: "oklch(1 0 0)"
     rounded: "{rounded.sm}"
     padding: "2px 6px"
   cart-count:
-    backgroundColor: "{colors.solder}"
-    textColor: "{colors.on-solder}"
+    backgroundColor: "{colors.raven}"
+    textColor: "{colors.on-raven}"
     rounded: "{rounded.full}"
     height: "20px"
   facts-strip:
@@ -180,7 +181,7 @@ components:
     padding: "48px 0"
 ---
 
-# Design System: Cryptech Storefront
+# Design System: Ravyntech Storefront
 
 Scope: the customer storefront only (everything under the `.sf` scope: home, listings, product page, cart, checkout, account, auth, policy pages). The admin dashboard keeps the default shadcn tokens and is not governed by this file.
 
@@ -188,12 +189,12 @@ Scope: the customer storefront only (everything under the `.sf` scope: home, lis
 
 **Creative North Star: "The Spec Sheet"**
 
-The shop reads like a well-made product datasheet: exact, calm, measured. Every surface is a sheet of cool paper ruled with hairlines, set in a wide engineering display face, with near-black ink for facts and a single solder-mask green for the things you act on. Information is the decoration. Prices, stock, delivery fees, warranty terms and payment methods are set as real, ruled facts rather than being hidden behind banners, and nothing is shown that the data does not back.
+The shop reads like a well-made product datasheet: exact, calm, measured. Every surface is a sheet of cool paper ruled with hairlines, set in a wide engineering display face, with near-black ink for facts and a single raven-mask blue-gray for the things you act on. Information is the decoration. Prices, stock, delivery fees, warranty terms and payment methods are set as real, ruled facts rather than being hidden behind banners, and nothing is shown that the data does not back.
 
 Density is moderate and even, tuned for phones in bright light on slow networks: generous 44px targets, short line lengths, no heavy imagery beyond the product photos themselves, which sit on tinted fields so a mixed catalogue of white-background shots reads as one set. The world explicitly rejects the category default of a decorative hero banner over identical card grids; the home page opens on a wide headline, a ruled category index and one real product at full scale.
 
 **Key Characteristics:**
-- Cool paper ground, near-black ink, one solder-green accent; sale red only on real discounts.
+- Cool paper ground, near-black ink, one raven-blue-gray accent; sale red only on real discounts.
 - Archivo set wide (125% / 112.5% width) for headings, prices and model names; Google Sans for everything read.
 - Tabular figures everywhere in the storefront scope.
 - Hairline rules instead of boxes; a heavier ink rule opens each section.
@@ -202,13 +203,13 @@ Density is moderate and even, tuned for phones in bright light on slow networks:
 
 ## Colors
 
-A near-monochrome cool-green neutral set with one deliberate solder-mask green and one reserved red.
+A near-monochrome cool-blue-gray neutral set with one deliberate raven-mask blue-gray and one reserved red.
 
 ### Primary
-- **Solder Mask Green** (`solder`): the action colour. Primary buttons, the selected variant ring, the in-stock dot, the cart count, focus outlines, text selection and caret, the free-delivery progress fill, active filter dots.
-- **Deep Solder** (`solder-ink`): the green as text and as the hover state of green fills. Links in running UI ("All 24 products", "See all"), the "In stock" word, hover colour of category rows and footer links.
-- **Solder Wash** (`solder-soft`): the selected variant background and the hover tint of a product image field.
-- **On Solder** (`on-solder`): text on green fills.
+- **Raven Mask Blue-gray** (`raven`): the action colour. Primary buttons, the selected variant ring, the in-stock dot, the cart count, focus outlines, text selection and caret, the free-delivery progress fill, active filter dots.
+- **Deep Raven** (`raven-ink`): the blue-gray as text and as the hover state of blue-gray fills. Links in running UI ("All 24 products", "See all"), the "In stock" word, hover colour of category rows and footer links.
+- **Raven Wash** (`raven-soft`): the selected variant background and the hover tint of a product image field.
+- **On Raven** (`on-raven`): text on blue-gray fills.
 
 ### Secondary
 - **Discount Red** (`sale`): only for a real reduction against a stored original price: the "−N%" badge on a card, "Save Tk X" beside a price, and filter validation errors. Never decorative, never for urgency.
@@ -222,10 +223,10 @@ A near-monochrome cool-green neutral set with one deliberate solder-mask green a
 - **Hairline** (`rule`): every divider and ledger row line.
 - **Strong Hairline** (`rule-strong`): control borders (inputs, chips, outline buttons, unselected variant tiles).
 
-Dark mode (`.dark`) re-points the same roles: paper `oklch(0.175 0.008 165)`, surface `oklch(0.21 0.009 165)`, field `oklch(0.245 0.01 165)`, ink `oklch(0.95 0.006 150)`, ink-2 `oklch(0.74 0.01 155)`, rule `oklch(0.32 0.01 165)`, rule-strong `oklch(0.42 0.012 165)`, solder `oklch(0.72 0.12 162)`, solder-ink `oklch(0.8 0.11 162)`, solder-soft `oklch(0.3 0.045 162)`, on-solder `oklch(0.18 0.03 165)`, sale `oklch(0.7 0.16 28)`. Photos drop `mix-blend-multiply` in dark mode.
+Dark mode (`.dark`) re-points the same roles: paper `oklch(0.17 0.008 255)`, surface `oklch(0.205 0.01 255)`, field `oklch(0.24 0.012 255)`, ink `oklch(0.95 0.004 250)`, ink-2 `oklch(0.74 0.01 250)`, rule `oklch(0.32 0.012 255)`, rule-strong `oklch(0.42 0.014 255)`, raven `oklch(0.8 0.03 255)`, raven-ink `oklch(0.87 0.025 255)`, raven-soft `oklch(0.3 0.02 255)`, on-raven `oklch(0.18 0.012 255)`, sale `oklch(0.7 0.16 28)`. Photos drop `mix-blend-multiply` in dark mode.
 
 ### Named Rules
-**The One Green Rule.** Solder green marks what you can act on or what is selected, and nothing else. Headings, borders and decoration stay ink and hairline.
+**The One Blue-Gray Rule.** Raven blue-gray marks what you can act on or what is selected, and nothing else. Headings, borders and decoration stay ink and hairline.
 
 **The Real Discount Rule.** Sale red appears only when the current price is below a stored original price. No red for "hot", "limited" or countdowns.
 
@@ -283,47 +284,47 @@ The world is flat. Depth comes from tone (paper → surface → field) and from 
 
 ## Shapes
 
-Small, precise corners. The `.sf` scope sets the base radius to 6px, which yields 2px (badges, filter rows, search thumbnails), 4px (buttons, inputs, selects, variant tiles, product image fields, dropdowns) and 6px (the featured product panel, main product gallery image, sheet top corners). Pills (full radius) are reserved for chips: category chips, removable active-filter chips, and the cart count. Product photos are `object-contain` with ~8% inset on their field, so silhouettes float, never crop. Stock dots are 6px circles: filled green for in stock, an empty graphite ring for out of stock.
+Small, precise corners. The `.sf` scope sets the base radius to 6px, which yields 2px (badges, filter rows, search thumbnails), 4px (buttons, inputs, selects, variant tiles, product image fields, dropdowns) and 6px (the featured product panel, main product gallery image, sheet top corners). Pills (full radius) are reserved for chips: category chips, removable active-filter chips, and the cart count. Product photos are `object-contain` with ~8% inset on their field, so silhouettes float, never crop. Stock dots are 6px circles: filled blue-gray for in stock, an empty graphite ring for out of stock.
 
 ## Components
 
 ### Buttons
 Quiet, exact, never decorative.
 - **Shape:** gently squared (4px).
-- **Primary:** Solder Green fill, On Solder text, 14-15px medium. Height 44px minimum in storefront use; the add-to-cart and checkout buttons are 48px and full width.
-- **Hover / Focus / Active:** fill deepens to Deep Solder; `:focus-visible` draws a 2px solder outline at 2px offset (from the `.sf` scope); press scales to 0.98 over 100ms. Disabled is 50% opacity with the label changed to the reason ("Out of stock").
+- **Primary:** Raven Blue-gray fill, On Raven text, 14-15px medium. Height 44px minimum in storefront use; the add-to-cart and checkout buttons are 48px and full width.
+- **Hover / Focus / Active:** fill deepens to Deep Raven; `:focus-visible` draws a 2px raven outline at 2px offset (from the `.sf` scope); press scales to 0.98 over 100ms. Disabled is 50% opacity with the label changed to the reason ("Out of stock").
 - **Outline:** Sheet White fill, Strong Hairline border, ink text, 44px high; border darkens to Graphite on hover. Used for pagination and the mobile Filters trigger.
-- **Text link action:** Deep Solder 14px medium with an arrow, at least 44px tall ("All 24 products ->").
+- **Text link action:** Deep Raven 14px medium with an arrow, at least 44px tall ("All 24 products ->").
 
 ### Chips
 - **Category chip (mobile index):** 44px pill, Sheet White, Strong Hairline border, name plus a Graphite count. The final "All N" chip inverts to Ink with Paper text.
 - **Active filter chip:** 44px pill, Sheet White, Strong Hairline border, label plus a 14px x; border darkens on hover.
 
 ### Cards / Containers
-- **Product card:** no frame. A 4:5 Photo Field (16:10 for a feature card) with 4px corners, then Graphite brand label, two-line clamped name (14px medium; feature cards use the Title face at 20px), the one-line spec run, then a hairline and the price row with the stock mark. The whole card is one link via a stretched pseudo-element; focus draws the solder outline around it. Hover tints the field to Solder Wash over 300ms. A discount shows a 2px-corner red "−N%" badge at the field's top left.
+- **Product card:** no frame. A 4:5 Photo Field (16:10 for a feature card) with 4px corners, then Graphite brand label, two-line clamped name (14px medium; feature cards use the Title face at 20px), the one-line spec run, then a hairline and the price row with the stock mark. The whole card is one link via a stretched pseudo-element; focus draws the raven outline around it. Hover tints the field to Raven Wash over 300ms. A discount shows a 2px-corner red "−N%" badge at the field's top left.
 - **Product row:** compact 96px / 120px square field beside brand, name, spec run, price and stock; used in divided lists beside a feature card.
 - **Featured product:** one product at full scale on a 6px-corner Photo Field, with a Sheet White text panel ruled off from the photo; carries the large price, saving, warranty and a solid "View product" pseudo-button.
-- **Order summary:** Sheet White card with 16px padding, Title heading, ruled subtotal in wide figures, a 4px free-delivery progress bar in solder with the remaining amount spelled out.
+- **Order summary:** Sheet White card with 16px padding, Title heading, ruled subtotal in wide figures, a 4px free-delivery progress bar in raven with the remaining amount spelled out.
 
 ### Inputs / Fields
-- **Style:** Sheet White fill, Strong Hairline 1px border, 4px corners, 44px high (search is 40px on desktop), 14-15px text with a solder caret. Search has a 16px leading icon in Graphite.
+- **Style:** Sheet White fill, Strong Hairline 1px border, 4px corners, 44px high (search is 40px on desktop), 14-15px text with a raven caret. Search has a 16px leading icon in Graphite.
 - **Hover:** border to Graphite.
-- **Focus:** border turns Solder Green with a 2px 25% solder ring.
+- **Focus:** border turns Raven Blue-gray with a 2px 25% raven ring.
 - **Error:** border and helper text in Discount Red, with the message in words ("Minimum is higher than maximum.").
 
 ### Navigation
 - **Facts strip:** 36px Ink band, 12px Paper text, items separated by slashes; scrolls horizontally on phones rather than wrapping.
-- **Header:** sticky Paper bar with a single bottom hairline. Logo plus the Archivo uppercase wordmark (hidden below 360px). Account and cart are 44px icon-plus-label targets (labels become screen-reader only under 640px), hovering to a Photo Field wash. The cart count is a 20px solder pill that pops in.
-- **Category nav (desktop):** 44px row of 14px medium links, hover to Deep Solder.
+- **Header:** sticky Paper bar with a single bottom hairline. Logo plus the Archivo uppercase wordmark (hidden below 360px). Account and cart are 44px icon-plus-label targets (labels become screen-reader only under 640px), hovering to a Photo Field wash. The cart count is a 20px raven pill that pops in.
+- **Category nav (desktop):** 44px row of 14px medium links, hover to Deep Raven.
 - **Category index (home, desktop):** a ruled list under a 1px ink top rule: 56px rows with the name in the 20px Title face, a Graphite count, and a trailing arrow that nudges 4px right on hover.
-- **Footer:** Sheet White, 48px vertical padding, four columns from 1024px; the brand column carries a small delivery/payment ledger. All links are 44px-tall targets, hover to Deep Solder with underline.
+- **Footer:** Sheet White, 48px vertical padding, four columns from 1024px; the brand column carries a small delivery/payment ledger. All links are 44px-tall targets, hover to Deep Raven with underline.
 - **Pagination:** outline buttons for Previous / Next around a tabular "1–24 of 120" count, over a top hairline.
 
 ### Variant Selector
-Tiles in a 2 / 3 column grid, 56px minimum, 4px corners, label over a tabular price. Unselected: Sheet White with Strong Hairline. Selected: Solder Wash fill, solder border plus a 1px solder ring, announced with `aria-pressed`. Out of stock: Graphite text, label struck through, price replaced by "Out of stock".
+Tiles in a 2 / 3 column grid, 56px minimum, 4px corners, label over a tabular price. Unselected: Sheet White with Strong Hairline. Selected: Raven Wash fill, raven border plus a 1px raven ring, announced with `aria-pressed`. Out of stock: Graphite text, label struck through, price replaced by "Out of stock".
 
 ### Stock Mark
-A 6px dot plus words, never colour alone: "In stock" in Deep Solder with a filled solder dot, "Out of stock" in Graphite with an empty ring. 12px medium (14px on the product page).
+A 6px dot plus words, never colour alone: "In stock" in Deep Raven with a filled raven dot, "Out of stock" in Graphite with an empty ring. 12px medium (14px on the product page).
 
 ### The Spec Ledger (signature)
 The world's signature move. Facts are set as a ruled two-column datasheet: a term column (Graphite, min 7-8rem or 38%) and a value column, each row 10-12px tall in padding with a hairline beneath, the whole ledger opened by an ink rule. It carries variant attributes and SKU (mono 13px) on the product page, the delivery / payment / warranty / returns terms beside the buy button, the "What you know before you pay" block on home, and the footer's delivery facts. Every product card and row echoes it as a single spec run: the key attributes joined with " · " in 12px Graphite, truncated to one line. Values that are numbers use tabular, and prices in a ledger use the wide figure face.
@@ -334,9 +335,9 @@ Short and functional. Arrows nudge 4px right over 300ms ease-out on hover; image
 ## Do's and Don'ts
 
 ### Do:
-- **Do** scope every storefront page under `.sf` and take colour from the `--sf-*` roles (via `bg-paper`, `text-ink-2`, `border-rule`, `bg-solder` ...).
+- **Do** scope every storefront page under `.sf` and take colour from the `--sf-*` roles (via `bg-paper`, `text-ink-2`, `border-rule`, `bg-raven` ...).
 - **Do** give every interactive element a 44px minimum target (`h-11` / `min-h-11`); buy and checkout buttons are 48px.
-- **Do** rely on the scope's focus ring: 2px solid solder outline, 2px offset. When a control replaces it (inputs), use a solder border plus a 2px 25% solder ring.
+- **Do** rely on the scope's focus ring: 2px solid raven outline, 2px offset. When a control replaces it (inputs), use a raven border plus a 2px 25% raven ring.
 - **Do** set facts as a spec ledger (ruled term/value rows with tabular figures) and under products as a one-line " · " spec run.
 - **Do** put every product photo on the Photo Field with `object-contain` and an inset, and show the "Photo coming soon" plate with the brand set wide when there is no photo.
 - **Do** set prices with the Price component: wide Archivo, tabular, no wrap between "Tk" and the amount, struck original with a screen-reader "Was".
@@ -346,8 +347,13 @@ Short and functional. Arrows nudge 4px right over 300ms ease-out on hover; image
 ### Don't:
 - **Don't** add a decorative hero banner or a carousel; the home page opens on a headline, the category index and one real product.
 - **Don't** show invented proof, counts, delivery times, stock numbers or discounts; every fact on the page is read from data or settings.
-- **Don't** use solder green for headings, borders or decoration, and don't use sale red for anything except a real price reduction or a validation error.
+- **Don't** use raven blue-gray for headings, borders or decoration, and don't use sale red for anything except a real price reduction or a validation error.
 - **Don't** wrap groups in bordered or shadowed cards where a hairline will do; shadows belong only to floating layers.
 - **Don't** set prices or model names in the body face, or push Archivo past 700 weight.
 - **Don't** put product photos on bare paper or crop them to fill.
 - **Don't** apply the `--sf-*` palette or `.sf` overrides to the admin dashboard.
+
+
+## Brand update (October 2026)
+
+The shop is now **Ravyntech**: a raven, clever and technical. The action colour is the brand blue-gray **#424952** (`raven`, oklch(0.402 0.018 255)); paper, ink and rules are cool neutrals tinted toward the same hue. **Eye** (`--sf-eye`, oklch(0.7 0.15 235)) is the raven's eye from the logo: a small live signal only (in-stock dot, cart count), never text and never a fill larger than a badge. The mark lives in `public/brand/ravyntech-mark.png`; the wordmark is live Archivo text, RAVYN in ink and TECH in raven.

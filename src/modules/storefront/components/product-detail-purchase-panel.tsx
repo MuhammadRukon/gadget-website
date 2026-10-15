@@ -99,7 +99,7 @@ export function ProductDetailPurchasePanel({
                   className={cn(
                     'relative flex min-h-14 flex-col items-start justify-center rounded-md border px-3 py-2 text-left transition-colors',
                     active
-                      ? 'border-solder bg-solder-soft ring-1 ring-solder'
+                      ? 'border-raven bg-raven-soft ring-1 ring-raven'
                       : 'border-rule-strong bg-surface hover:border-ink-2',
                     !v.inStock && 'text-ink-2',
                   )}
@@ -132,7 +132,7 @@ export function ProductDetailPurchasePanel({
         />
         <p className="min-h-6 text-sm" aria-live="polite">
           {added ? (
-            <span className="inline-flex items-center gap-1.5 text-solder-ink">
+            <span className="inline-flex items-center gap-1.5 text-raven-ink">
               <Check aria-hidden className="size-4" />
               Added.{' '}
               <Link href="/cart" className="font-medium underline">
@@ -193,7 +193,7 @@ export function ProductDetailPurchasePanel({
           {warrantyMonths > 0 ? `${warrantyMonths} months` : 'No warranty listed'}
         </TermRow>
         <TermRow term="Returns">
-          <Link href="/refund-policy" className="underline hover:text-solder-ink">
+          <Link href="/refund-policy" className="underline hover:text-raven-ink">
             Refund and return policy
           </Link>
         </TermRow>

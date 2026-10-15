@@ -8,7 +8,7 @@ import type { HomeTile } from '../home-content';
 const TONE: Record<HomeTile['tone'], string> = {
   ink: 'bg-ink text-paper',
   field: 'bg-field text-ink',
-  solder: 'bg-solder text-on-solder',
+  raven: 'bg-raven text-on-raven',
 };
 
 // Bento placement for up to five tiles: one large lead, one wide, two small, one wide.

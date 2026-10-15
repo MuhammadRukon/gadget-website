@@ -33,7 +33,7 @@ export function ProductCard({
           sizes={sizes}
           priority={priority}
           className={cn(
-            'rounded-md transition-[background-color] duration-300 group-hover:bg-solder-soft',
+            'rounded-md transition-[background-color] duration-300 group-hover:bg-raven-soft',
             feature ? 'aspect-[16/10]' : 'aspect-[4/5]',
           )}
         />
@@ -59,7 +59,7 @@ export function ProductCard({
         >
           <Link
             href={`/products/${product.slug}`}
-            className="outline-none after:absolute after:inset-0 after:rounded-md focus-visible:after:outline-2 focus-visible:after:outline-offset-2 focus-visible:after:outline-solder"
+            className="outline-none after:absolute after:inset-0 after:rounded-md focus-visible:after:outline-2 focus-visible:after:outline-offset-2 focus-visible:after:outline-raven"
           >
             {product.name}
           </Link>

@@ -40,9 +40,7 @@ export function ProductDetailGallery({ productName, brand, images }: ProductDeta
                 aria-current={activeImage === idx}
                 className={cn(
                   'relative block size-16 overflow-hidden rounded-md bg-field ring-offset-2 ring-offset-paper transition-shadow',
-                  activeImage === idx
-                    ? 'ring-2 ring-solder'
-                    : 'hover:ring-1 hover:ring-rule-strong',
+                  activeImage === idx ? 'ring-2 ring-raven' : 'hover:ring-1 hover:ring-rule-strong',
                 )}
               >
                 <Image

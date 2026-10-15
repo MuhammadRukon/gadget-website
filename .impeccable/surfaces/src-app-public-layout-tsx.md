@@ -16,7 +16,7 @@ Constraints: no invented proof, prices, stock counts, delivery times or discount
 
 THESIS: The shop reads like a well-made product datasheet: exact, calm, measured. It refuses the category default of a decorative hero banner over identical card grids.
 
-OWN-WORLD: Cool paper ground (#F3F4F1 family), near-black ink, one solder-mask green accent for actions, selection and price emphasis; sale red only for real discounts. Archivo (wide/expanded widths) for display, prices and model names with tabular figures; Google Sans for body. Hairline rules instead of boxes, 6-8px radii, product images on tinted fields. Signature move: the spec ledger, key variant attributes set as a ruled two-column datasheet with tabular figures, echoed in a one-line spec run under each product card.
+OWN-WORLD: Cool paper ground (#F3F4F1 family), near-black ink, one blue-gray accent (#424952, raven) for actions, selection and price emphasis; sale red only for real discounts. Archivo (wide/expanded widths) for display, prices and model names with tabular figures; Google Sans for body. Hairline rules instead of boxes, 6-8px radii, product images on tinted fields. Signature move: the spec ledger, key variant attributes set as a ruled two-column datasheet with tabular figures, echoed in a one-line spec run under each product card.
 
 STORY: Visitor sees immediately what is sold, how delivery and payment work in Bangladesh, and one product worth looking at; trusts it because every fact shown is real; reaches a product in one tap.
 

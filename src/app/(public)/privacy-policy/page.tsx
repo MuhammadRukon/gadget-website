@@ -1,9 +1,9 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Privacy Policy | Cryptech',
+  title: 'Privacy Policy | Ravyntech',
   description:
-    'How Cryptech Ltd collects, uses, and protects your personal information when you shop with us.',
+    'How Ravyntech Ltd collects, uses, and protects your personal information when you shop with us.',
 };
 
 export default function PrivacyPolicyPage() {
@@ -12,7 +12,7 @@ export default function PrivacyPolicyPage() {
       <h1>Privacy Policy</h1>
       <p className="text-muted-foreground">Effective date: 18 July 2026</p>
       <p>
-        This policy explains what personal information Cryptech Ltd (&quot;we&quot;,
+        This policy explains what personal information Ravyntech Ltd (&quot;we&quot;,
         &quot;us&quot;) collects when you use this website, why we collect it, and how we handle
         it.
       </p>
@@ -71,7 +71,7 @@ export default function PrivacyPolicyPage() {
       </p>
       <h2>Contact</h2>
       <p>
-        Cryptech Ltd, Tali Office Road, Hazaribagh, Dhaka-1209 —{' '}
+        Ravyntech Ltd, Tali Office Road, Hazaribagh, Dhaka-1209 —{' '}
         <a className="text-primary hover:underline" href="mailto:muhammad.rukon242@gmail.com">
           muhammad.rukon242@gmail.com
         </a>

@@ -43,7 +43,7 @@ export function CartPanel() {
             <span
               aria-hidden
               key={itemCount}
-              className="flex h-5 min-w-5 animate-[sf-pop_320ms_cubic-bezier(0.16,1,0.3,1)] items-center justify-center rounded-full bg-solder px-1.5 text-[11px] font-semibold leading-none text-on-solder tabular-nums max-sm:absolute max-sm:right-0.5 max-sm:top-0.5"
+              className="flex h-5 min-w-5 animate-[sf-pop_320ms_cubic-bezier(0.16,1,0.3,1)] items-center justify-center rounded-full bg-eye px-1.5 text-[11px] font-semibold leading-none text-ink tabular-nums max-sm:absolute max-sm:right-0.5 max-sm:top-0.5"
             >
               {itemCount > 99 ? '99+' : itemCount}
             </span>
@@ -81,7 +81,7 @@ function CartPanelContent() {
               Your cart is empty
             </p>
             <SheetClose asChild>
-              <Link href="/products" className="text-sm font-medium text-solder-ink underline">
+              <Link href="/products" className="text-sm font-medium text-raven-ink underline">
                 Browse all products
               </Link>
             </SheetClose>

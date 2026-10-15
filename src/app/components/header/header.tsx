@@ -46,7 +46,7 @@ export function Header({ menu }: Readonly<HeaderProps>): JSX.Element {
         <nav aria-label="Categories" className="-mx-3 hidden h-11 items-center md:flex">
           <Link
             href="/products"
-            className="flex h-11 items-center px-3 text-sm font-medium text-ink hover:text-solder-ink"
+            className="flex h-11 items-center px-3 text-sm font-medium text-ink hover:text-raven-ink"
           >
             All products
           </Link>

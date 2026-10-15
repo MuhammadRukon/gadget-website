@@ -29,14 +29,14 @@ export function HomeBanner({ banner }: Readonly<{ banner: HomeBannerContent }>) 
         <div data-banner-sub className="mt-7 flex flex-wrap items-center justify-center gap-3">
           <Link
             href={banner.primary.href}
-            className="inline-flex h-12 items-center gap-2 rounded-full bg-solder px-6 text-[15px] font-medium text-on-solder transition-colors hover:bg-solder-ink"
+            className="inline-flex h-12 items-center gap-2 rounded-full bg-raven px-6 text-[15px] font-medium text-on-raven transition-colors hover:bg-raven-ink"
           >
             {banner.primary.label}
           </Link>
           {banner.secondary ? (
             <Link
               href={banner.secondary.href}
-              className="group inline-flex h-12 items-center gap-1.5 px-3 text-[15px] font-medium text-solder-ink"
+              className="group inline-flex h-12 items-center gap-1.5 px-3 text-[15px] font-medium text-raven-ink"
             >
               {banner.secondary.label}
               <ArrowRight

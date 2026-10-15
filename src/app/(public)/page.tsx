@@ -27,7 +27,7 @@ import {
 } from '@/modules/home/home-content';
 
 export const metadata = {
-  title: 'Cryptech - gadgets & electronics',
+  title: { absolute: 'Ravyntech - gadgets & electronics in Bangladesh' },
   description: 'A short list of phones, laptops and accessories, delivered across Bangladesh.',
   alternates: { canonical: '/' },
 };
@@ -93,7 +93,7 @@ export default async function HomePage() {
                     <li key={c.id} className="border-b border-rule">
                       <Link
                         href={`/category/${c.slug}`}
-                        className="group flex h-14 items-center gap-4 transition-colors hover:text-solder-ink"
+                        className="group flex h-14 items-center gap-4 transition-colors hover:text-raven-ink"
                       >
                         <span className="font-display text-xl font-semibold font-stretch-semi-expanded">
                           {c.name}
@@ -208,7 +208,7 @@ export default async function HomePage() {
                 Term listed on each product; claims from your delivered order
               </LedgerRow>
               <LedgerRow term="Returns">
-                <Link href="/refund-policy" className="underline hover:text-solder-ink">
+                <Link href="/refund-policy" className="underline hover:text-raven-ink">
                   Refund and return policy
                 </Link>
               </LedgerRow>
@@ -260,7 +260,7 @@ function FeaturedProduct({ product }: Readonly<{ product: PublicProductSummary }
               <p className="mt-1 text-xs text-ink-2">{product.warrantyMonths}-month warranty</p>
             ) : null}
           </div>
-          <span className="inline-flex h-11 items-center gap-2 rounded-md bg-solder px-4 text-sm font-medium text-on-solder transition-colors group-hover:bg-solder-ink">
+          <span className="inline-flex h-11 items-center gap-2 rounded-md bg-raven px-4 text-sm font-medium text-on-raven transition-colors group-hover:bg-raven-ink">
             View product
             <ArrowUpRight aria-hidden className="size-4" />
           </span>
@@ -295,7 +295,7 @@ function CategoryShowcase({
           <li className="border-b border-rule">
             <Link
               href={`/category/${category.slug}`}
-              className="group flex h-16 items-center justify-between gap-4 font-display text-lg font-semibold font-stretch-semi-expanded hover:text-solder-ink"
+              className="group flex h-16 items-center justify-between gap-4 font-display text-lg font-semibold font-stretch-semi-expanded hover:text-raven-ink"
             >
               Every {category.name.toLowerCase()} product
               <ArrowRight
@@ -319,7 +319,7 @@ function ProductRow({ product }: Readonly<{ product: PublicProductSummary }>) {
         alt={product.name}
         brand={product.brand.name}
         sizes="120px"
-        className="aspect-square rounded-md transition-colors duration-300 group-hover:bg-solder-soft [&_span:first-child]:text-sm"
+        className="aspect-square rounded-md transition-colors duration-300 group-hover:bg-raven-soft [&_span:first-child]:text-sm"
       />
       <div className="min-w-0 space-y-1">
         <p className="text-xs text-ink-2">{product.brand.name}</p>
@@ -356,7 +356,7 @@ function SectionHead({
       </h2>
       <Link
         href={href}
-        className="inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-solder-ink hover:underline"
+        className="inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-raven-ink hover:underline"
       >
         {linkLabel}
         <ArrowRight aria-hidden className="size-4" />

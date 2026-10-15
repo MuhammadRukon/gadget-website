@@ -34,7 +34,7 @@ export default function CartPage() {
           <p className="text-sm text-muted-foreground">
             Items you add from a product page will show up here.
           </p>
-          <Link href="/products" className="text-sm font-medium text-solder-ink underline">
+          <Link href="/products" className="text-sm font-medium text-raven-ink underline">
             Browse all products
           </Link>
         </div>

@@ -44,7 +44,7 @@ export function BuyingSteps({ steps }: Readonly<{ steps: HomeStep[] }>) {
                 {step.link ? (
                   <Link
                     href={step.link.href}
-                    className="group mt-6 inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-solder-ink"
+                    className="group mt-6 inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-raven-ink"
                   >
                     {step.link.label}
                     <ArrowRight

@@ -1,9 +1,9 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Terms and Conditions | Cryptech',
+  title: 'Terms and Conditions | Ravyntech',
   description:
-    'Terms and conditions for ordering from Cryptech Ltd — pricing, payment methods, delivery, cancellations, and warranty.',
+    'Terms and conditions for ordering from Ravyntech Ltd — pricing, payment methods, delivery, cancellations, and warranty.',
 };
 
 export default function TermsPage() {
@@ -12,7 +12,7 @@ export default function TermsPage() {
       <h1>Terms and Conditions</h1>
       <p className="text-muted-foreground">Effective date: 18 July 2026</p>
       <p>
-        These terms govern purchases made from Cryptech Ltd through this website. By placing an
+        These terms govern purchases made from Ravyntech Ltd through this website. By placing an
         order you agree to them.
       </p>
       <h2>Orders and pricing</h2>

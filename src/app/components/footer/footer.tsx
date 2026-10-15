@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import Link from 'next/link';
 import { JSX } from 'react';
 
@@ -12,7 +13,7 @@ const HELP_LINKS: [string, string][] = [
   ['Refund and return policy', '/refund-policy'],
   ['Terms and conditions', '/terms'],
   ['Privacy policy', '/privacy-policy'],
-  ['About Cryptech', '/about'],
+  ['About Ravyntech', '/about'],
 ];
 
 interface FooterProps {
@@ -28,8 +29,17 @@ export function Footer({ menu, facts }: Readonly<FooterProps>): JSX.Element {
       <Container>
         <div className="grid gap-x-10 gap-y-10 py-12 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1.2fr]">
           <div className="space-y-4">
-            <p className="font-display text-2xl font-bold uppercase leading-none font-stretch-expanded">
-              Cryptech
+            <p className="flex items-center gap-2.5 font-display text-2xl font-bold uppercase leading-none font-stretch-expanded">
+              <Image
+                src="/brand/ravyntech-mark.png"
+                alt=""
+                width={54}
+                height={36}
+                className="h-9 w-auto"
+              />
+              <span>
+                Ravyn<span className="text-raven">tech</span>
+              </span>
             </p>
             <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 border-t border-rule pt-4 text-[13px]">
               <dt className="text-ink-2">Dhaka</dt>
@@ -53,7 +63,7 @@ export function Footer({ menu, facts }: Readonly<FooterProps>): JSX.Element {
               <li>
                 <Link
                   href="/products"
-                  className="inline-flex min-h-11 items-center hover:text-solder-ink hover:underline"
+                  className="inline-flex min-h-11 items-center hover:text-raven-ink hover:underline"
                 >
                   All products
                 </Link>
@@ -62,7 +72,7 @@ export function Footer({ menu, facts }: Readonly<FooterProps>): JSX.Element {
                 <li key={c.id}>
                   <Link
                     href={`/category/${c.slug}`}
-                    className="inline-flex min-h-11 items-center hover:text-solder-ink hover:underline"
+                    className="inline-flex min-h-11 items-center hover:text-raven-ink hover:underline"
                   >
                     {c.name}
                   </Link>
@@ -78,7 +88,7 @@ export function Footer({ menu, facts }: Readonly<FooterProps>): JSX.Element {
                 <li key={href}>
                   <Link
                     href={href}
-                    className="inline-flex min-h-11 items-center hover:text-solder-ink hover:underline"
+                    className="inline-flex min-h-11 items-center hover:text-raven-ink hover:underline"
                   >
                     {label}
                   </Link>
@@ -93,7 +103,7 @@ export function Footer({ menu, facts }: Readonly<FooterProps>): JSX.Element {
               <p>
                 <a
                   href="whatsapp://send?phone=+8801815780053"
-                  className="hover:text-solder-ink hover:underline"
+                  className="hover:text-raven-ink hover:underline"
                 >
                   +01815780053
                 </a>
@@ -102,7 +112,7 @@ export function Footer({ menu, facts }: Readonly<FooterProps>): JSX.Element {
               <p>
                 <a
                   href="mailto:muhammad.rukon242@gmail.com"
-                  className="break-all hover:text-solder-ink hover:underline"
+                  className="break-all hover:text-raven-ink hover:underline"
                 >
                   muhammad.rukon242@gmail.com
                 </a>
@@ -110,7 +120,7 @@ export function Footer({ menu, facts }: Readonly<FooterProps>): JSX.Element {
               <p className="text-ink-2">Tali Office Road, Hazaribagh, Dhaka-1209</p>
               <Link
                 href="/contact"
-                className="inline-flex min-h-11 items-center font-medium text-solder-ink underline"
+                className="inline-flex min-h-11 items-center font-medium text-raven-ink underline"
               >
                 Complaint or advice
               </Link>
@@ -119,7 +129,7 @@ export function Footer({ menu, facts }: Readonly<FooterProps>): JSX.Element {
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-rule py-5 text-xs text-ink-2">
-          <p>© {new Date().getFullYear()} Cryptech Ltd. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} Ravyntech Ltd. All rights reserved.</p>
           <p>All prices in Bangladeshi Taka.</p>
         </div>
       </Container>

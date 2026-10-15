@@ -38,18 +38,20 @@
   --sidebar-border: oklch(0.92 0.004 286.32);
   --sidebar-ring: oklch(0.705 0.015 286.067);
 
-  /* Storefront "spec sheet" world: cool paper, ink, solder-mask green. */
-  --sf-paper: oklch(0.968 0.004 140);
-  --sf-surface: oklch(0.995 0.002 140);
-  --sf-field: oklch(0.935 0.007 145);
-  --sf-ink: oklch(0.2 0.012 165);
-  --sf-ink-2: oklch(0.45 0.012 165);
-  --sf-rule: oklch(0.875 0.008 150);
-  --sf-rule-strong: oklch(0.78 0.01 155);
-  --sf-solder: oklch(0.47 0.105 162);
-  --sf-solder-ink: oklch(0.39 0.095 162);
-  --sf-solder-soft: oklch(0.93 0.035 162);
-  --sf-on-solder: oklch(0.985 0.005 160);
+  /* Storefront "spec sheet" world: cool paper, ink, Ravyntech blue-gray (#424952). */
+  --sf-paper: oklch(0.968 0.003 250);
+  --sf-surface: oklch(0.995 0.002 250);
+  --sf-field: oklch(0.935 0.006 250);
+  --sf-ink: oklch(0.19 0.012 255);
+  --sf-ink-2: oklch(0.46 0.014 255);
+  --sf-rule: oklch(0.875 0.007 250);
+  --sf-rule-strong: oklch(0.78 0.01 250);
+  --sf-raven: oklch(0.402 0.018 255);
+  --sf-raven-ink: oklch(0.32 0.02 255);
+  --sf-raven-soft: oklch(0.93 0.012 255);
+  --sf-on-raven: oklch(0.985 0.003 255);
+  /* The raven's eye: a small live signal (stock dot, cart count), never text. */
+  --sf-eye: oklch(0.7 0.15 235);
   --sf-sale: oklch(0.53 0.19 28);
 }
 
@@ -91,17 +93,18 @@
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.552 0.016 285.938);
 
-  --sf-paper: oklch(0.175 0.008 165);
-  --sf-surface: oklch(0.21 0.009 165);
-  --sf-field: oklch(0.245 0.01 165);
-  --sf-ink: oklch(0.95 0.006 150);
-  --sf-ink-2: oklch(0.74 0.01 155);
-  --sf-rule: oklch(0.32 0.01 165);
-  --sf-rule-strong: oklch(0.42 0.012 165);
-  --sf-solder: oklch(0.72 0.12 162);
-  --sf-solder-ink: oklch(0.8 0.11 162);
-  --sf-solder-soft: oklch(0.3 0.045 162);
-  --sf-on-solder: oklch(0.18 0.03 165);
+  --sf-paper: oklch(0.17 0.008 255);
+  --sf-surface: oklch(0.205 0.01 255);
+  --sf-field: oklch(0.24 0.012 255);
+  --sf-ink: oklch(0.95 0.004 250);
+  --sf-ink-2: oklch(0.74 0.01 250);
+  --sf-rule: oklch(0.32 0.012 255);
+  --sf-rule-strong: oklch(0.42 0.014 255);
+  --sf-raven: oklch(0.8 0.03 255);
+  --sf-raven-ink: oklch(0.87 0.025 255);
+  --sf-raven-soft: oklch(0.3 0.02 255);
+  --sf-on-raven: oklch(0.18 0.012 255);
+  --sf-eye: oklch(0.76 0.14 235);
   --sf-sale: oklch(0.7 0.16 28);
 }
 
@@ -117,8 +120,8 @@
   --card-foreground: var(--sf-ink);
   --popover: var(--sf-surface);
   --popover-foreground: var(--sf-ink);
-  --primary: var(--sf-solder);
-  --primary-foreground: var(--sf-on-solder);
+  --primary: var(--sf-raven);
+  --primary-foreground: var(--sf-on-raven);
   --secondary: var(--sf-field);
   --secondary-foreground: var(--sf-ink);
   --muted: var(--sf-field);
@@ -127,7 +130,7 @@
   --accent-foreground: var(--sf-ink);
   --border: var(--sf-rule);
   --input: var(--sf-rule-strong);
-  --ring: var(--sf-solder);
+  --ring: var(--sf-raven);
   --radius: 0.375rem;
   background-color: var(--sf-paper);
   color: var(--sf-ink);
@@ -135,12 +138,12 @@
 }
 
 .sf ::selection {
-  background: var(--sf-solder);
-  color: var(--sf-on-solder);
+  background: var(--sf-raven);
+  color: var(--sf-on-raven);
 }
 
 .sf :focus-visible {
-  outline: 2px solid var(--sf-solder);
+  outline: 2px solid var(--sf-raven);
   outline-offset: 2px;
 }
 
@@ -151,7 +154,7 @@
 
 .sf input,
 .sf textarea {
-  caret-color: var(--sf-solder);
+  caret-color: var(--sf-raven);
 }
 
 body {
@@ -208,11 +211,12 @@ body {
   --color-ink-2: var(--sf-ink-2);
   --color-rule: var(--sf-rule);
   --color-rule-strong: var(--sf-rule-strong);
-  --color-solder: var(--sf-solder);
-  --color-solder-ink: var(--sf-solder-ink);
-  --color-solder-soft: var(--sf-solder-soft);
-  --color-on-solder: var(--sf-on-solder);
+  --color-raven: var(--sf-raven);
+  --color-raven-ink: var(--sf-raven-ink);
+  --color-raven-soft: var(--sf-raven-soft);
+  --color-on-raven: var(--sf-on-raven);
   --color-sale: var(--sf-sale);
+  --color-eye: var(--sf-eye);
 }
 
 @layer base {

@@ -3,6 +3,7 @@
  * whether the client asks for a session on load; it is never used for
  * authorization (every API still calls requireSession()). No PII.
  */
+// Pre-rename key, kept so existing browsers keep their saved state.
 const KEY = 'Cryptech.authHint';
 
 /** null on the server or when storage is blocked: the hint is only an optimization. */

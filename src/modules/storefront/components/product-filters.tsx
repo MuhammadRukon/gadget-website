@@ -202,7 +202,7 @@ function OptionButton({
         aria-hidden
         className={cn(
           'size-2 shrink-0 rounded-full border',
-          active ? 'border-solder bg-solder' : 'border-rule-strong',
+          active ? 'border-raven bg-raven' : 'border-rule-strong',
         )}
       />
       {children}
@@ -238,7 +238,7 @@ function PriceRange({
             placeholder="Min"
             value={min}
             onChange={(e) => setMin(e.target.value.replace(/[^\d]/g, ''))}
-            className="h-11 w-full min-w-0 rounded-md border border-rule-strong bg-surface px-3 text-sm tabular-nums outline-none focus-visible:border-solder focus-visible:ring-2 focus-visible:ring-solder/25"
+            className="h-11 w-full min-w-0 rounded-md border border-rule-strong bg-surface px-3 text-sm tabular-nums outline-none focus-visible:border-raven focus-visible:ring-2 focus-visible:ring-raven/25"
           />
           <span aria-hidden className="text-ink-2">
             –
@@ -250,7 +250,7 @@ function PriceRange({
             value={max}
             onChange={(e) => setMax(e.target.value.replace(/[^\d]/g, ''))}
             aria-invalid={invalid}
-            className="h-11 w-full min-w-0 rounded-md border border-rule-strong bg-surface px-3 text-sm tabular-nums outline-none focus-visible:border-solder focus-visible:ring-2 focus-visible:ring-solder/25 aria-invalid:border-sale"
+            className="h-11 w-full min-w-0 rounded-md border border-rule-strong bg-surface px-3 text-sm tabular-nums outline-none focus-visible:border-raven focus-visible:ring-2 focus-visible:ring-raven/25 aria-invalid:border-sale"
           />
         </div>
         {invalid ? <p className="text-xs text-sale">Minimum is higher than maximum.</p> : null}
@@ -326,7 +326,7 @@ export function ListingToolbar({
               <SlidersHorizontal aria-hidden className="size-4" />
               Filters
               {chips.length > 0 ? (
-                <span className="rounded-full bg-solder px-1.5 text-[11px] text-on-solder tabular-nums">
+                <span className="rounded-full bg-raven px-1.5 text-[11px] text-on-raven tabular-nums">
                   {chips.length}
                 </span>
               ) : null}
@@ -356,7 +356,7 @@ export function ListingToolbar({
             onChange={(e) =>
               f.setParam('sort', e.target.value === 'newest' ? null : e.target.value)
             }
-            className="h-11 rounded-md border border-rule-strong bg-surface px-3 text-sm outline-none focus-visible:border-solder focus-visible:ring-2 focus-visible:ring-solder/25"
+            className="h-11 rounded-md border border-rule-strong bg-surface px-3 text-sm outline-none focus-visible:border-raven focus-visible:ring-2 focus-visible:ring-raven/25"
           >
             {SORTS.map((s) => (
               <option key={s.value} value={s.value}>
@@ -386,7 +386,7 @@ export function ListingToolbar({
             <button
               type="button"
               onClick={f.clearAll}
-              className="h-11 px-2 text-sm font-medium text-solder-ink underline"
+              className="h-11 px-2 text-sm font-medium text-raven-ink underline"
             >
               Clear all
             </button>

@@ -66,7 +66,7 @@ export function ProductDetail({
           <header className="space-y-2 border-b border-ink pb-5">
             <Link
               href={`/brand/${product.brand.slug}`}
-              className="inline-flex min-h-8 items-center text-sm text-ink-2 hover:text-solder-ink hover:underline"
+              className="inline-flex min-h-8 items-center text-sm text-ink-2 hover:text-raven-ink hover:underline"
             >
               {product.brand.name}
             </Link>
@@ -111,7 +111,7 @@ export function ProductDetail({
                 <span key={c.id}>
                   <Link
                     href={`/category/${c.slug}`}
-                    className="text-ink underline hover:text-solder-ink"
+                    className="text-ink underline hover:text-raven-ink"
                   >
                     {c.name}
                   </Link>
@@ -142,7 +142,7 @@ export function ProductDetail({
             </h2>
             <Link
               href={`/category/${category.slug}`}
-              className="inline-flex min-h-11 items-center text-sm font-medium text-solder-ink hover:underline"
+              className="inline-flex min-h-11 items-center text-sm font-medium text-raven-ink hover:underline"
             >
               See all
             </Link>
