@@ -3,6 +3,7 @@ import './globals.css';
 import { Providers } from '@/components/providers';
 import { Analytics } from '@vercel/analytics/next';
 import localFont from 'next/font/local';
+import { Archivo } from 'next/font/google';
 
 import { env } from '@/env';
 
@@ -25,11 +26,19 @@ const googleSans = localFont({
   variable: '--font-google-sans',
 });
 
+// Display face for the storefront: variable width axis for wide headings, prices and model names.
+const archivo = Archivo({
+  subsets: ['latin'],
+  axes: ['wdth'],
+  display: 'swap',
+  variable: '--font-archivo',
+});
+
 export const metadata: Metadata = {
   metadataBase: new URL(env.NEXT_PUBLIC_APP_URL),
   title: {
-    default: 'Cryptech',
-    template: '%s | Cryptech',
+    default: 'Ravyntech',
+    template: '%s | Ravyntech',
   },
   description: 'Modern gadgets and electronics ecommerce platform.',
   twitter: {
@@ -46,14 +55,14 @@ const siteJsonLd = [
   {
     '@context': 'https://schema.org',
     '@type': 'Organization',
-    name: 'Cryptech',
+    name: 'Ravyntech',
     url: env.NEXT_PUBLIC_APP_URL,
-    logo: `${env.NEXT_PUBLIC_APP_URL}/logo.png`,
+    logo: `${env.NEXT_PUBLIC_APP_URL}/brand/ravyntech-logo.png`,
   },
   {
     '@context': 'https://schema.org',
     '@type': 'WebSite',
-    name: 'Cryptech',
+    name: 'Ravyntech',
     url: env.NEXT_PUBLIC_APP_URL,
     potentialAction: {
       '@type': 'SearchAction',
@@ -69,7 +78,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning className={`${googleSans.variable}`}>
+    <html
+      lang="en"
+      suppressHydrationWarning
+      className={`${googleSans.variable} ${archivo.variable}`}
+    >
       <body suppressHydrationWarning className="antialiased">
         <script
           type="application/ld+json"

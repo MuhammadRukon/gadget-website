@@ -202,11 +202,11 @@ describe('deferred store writes', () => {
 });
 
 describe('upstashStore', () => {
-  it('times out a hung request after 250ms', async () => {
+  it('times out a hung request after 500ms', async () => {
     const redis = { get: () => new Promise(() => {}) } as never;
     const p = upstashStore(redis).get('k');
     const assertion = expect(p).rejects.toThrow(/timeout/i);
-    await vi.advanceTimersByTimeAsync(251);
+    await vi.advanceTimersByTimeAsync(501);
     await assertion;
   });
 

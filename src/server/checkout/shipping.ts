@@ -10,9 +10,9 @@ export interface ShippingInput {
   itemCount: number;
 }
 
-const FREE_THRESHOLD = 500_000;
-const INSIDE_DHAKA = 6_000;
-const OUTSIDE_DHAKA = 12_000;
+export const FREE_THRESHOLD = 500_000;
+export const INSIDE_DHAKA = 6_000;
+export const OUTSIDE_DHAKA = 12_000;
 
 const DHAKA_KEYWORDS = ['dhaka', 'ঢাকা'];
 

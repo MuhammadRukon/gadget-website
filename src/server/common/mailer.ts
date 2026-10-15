@@ -71,16 +71,16 @@ function layout(title: string, bodyHtml: string): string {
   return `<div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:0 auto;color:#1a1a1a">
   <h2 style="margin:24px 0 16px">${title}</h2>
   ${bodyHtml}
-  <p style="margin-top:32px;font-size:12px;color:#777">Cryptech Ltd &middot; Tali Office Road, Hazaribagh, Dhaka-1209</p>
+  <p style="margin-top:32px;font-size:12px;color:#777">Ravyntech Ltd &middot; Tali Office Road, Hazaribagh, Dhaka-1209</p>
 </div>`;
 }
 
 export function verificationEmail(code: string, verifyUrl: string): MailContent {
   return {
-    subject: 'Verify your Cryptech account',
+    subject: 'Verify your Ravyntech account',
     html: layout(
       'Verify your email',
-      `<p>Welcome to Cryptech! Enter this code on the verification page to activate your account:</p>
+      `<p>Welcome to Ravyntech! Enter this code on the verification page to activate your account:</p>
 <p style="margin:24px 0;font-size:28px;font-weight:bold;letter-spacing:6px">${code}</p>
 <p>Or click the button below to verify instantly:</p>
 <p style="margin:24px 0"><a href="${verifyUrl}" style="background:#111;color:#fff;padding:10px 18px;text-decoration:none;border-radius:6px">Verify my email</a></p>
@@ -91,7 +91,7 @@ export function verificationEmail(code: string, verifyUrl: string): MailContent 
 
 export function passwordResetEmail(resetUrl: string): MailContent {
   return {
-    subject: 'Reset your Cryptech password',
+    subject: 'Reset your Ravyntech password',
     html: layout(
       'Reset your password',
       `<p>We received a request to reset your password. Click the button below to choose a new one. This link expires soon and can only be used once.</p>
@@ -104,10 +104,10 @@ export function passwordResetEmail(resetUrl: string): MailContent {
 
 export function passwordChangedEmail(): MailContent {
   return {
-    subject: 'Your Cryptech password was changed',
+    subject: 'Your Ravyntech password was changed',
     html: layout(
       'Your password was changed',
-      `<p>The password for your Cryptech account was just changed.</p>
+      `<p>The password for your Ravyntech account was just changed.</p>
 <p>If you made this change, no action is needed. If you did <strong>not</strong> change your password, reset it immediately and contact us — someone may have access to your account.</p>
 <p style="margin:24px 0"><a href="${(process.env.NEXT_PUBLIC_APP_URL ?? '').replace(/\/$/, '')}/forgot-password" style="background:#111;color:#fff;padding:10px 18px;text-decoration:none;border-radius:6px">Reset my password</a></p>`,
     ),

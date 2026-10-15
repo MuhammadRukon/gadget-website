@@ -1,9 +1,11 @@
 import { Container } from '../components/container/container';
 import { Footer } from '../components/footer/footer';
+import { FactsStrip } from '../components/header/facts-strip';
 import { Header } from '../components/header/header';
 import type { MenuCategory } from '../components/menu/menu.types';
 
 import { catalogService } from '@/server/catalog/catalog.service';
+import { storefrontFactsService } from '@/server/storefront/storefront-facts.service';
 
 /**
  * Public storefront shell. Loads navigation data (categories, brands)
@@ -28,14 +30,21 @@ async function loadMenu(): Promise<MenuCategory[]> {
 }
 
 export default async function PublicLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  const menu = await loadMenu();
+  const [menu, facts] = await Promise.all([loadMenu(), storefrontFactsService.get()]);
   return (
-    <>
+    <div className="sf flex min-h-dvh flex-col">
+      <a
+        href="#main"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[60] focus:rounded-md focus:bg-ink focus:px-3 focus:py-2 focus:text-paper"
+      >
+        Skip to content
+      </a>
+      <FactsStrip facts={facts} />
       <Header menu={menu} />
-      <main>
+      <main id="main" className="flex-1">
         <Container>{children}</Container>
       </main>
-      <Footer />
-    </>
+      <Footer menu={menu} facts={facts} />
+    </div>
   );
 }

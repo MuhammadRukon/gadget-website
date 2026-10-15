@@ -31,6 +31,7 @@ interface GuestCartState {
 
 type PersistedGuestCart = Pick<GuestCartState, 'lines' | 'lastValidatedAt'>;
 
+// Pre-rename key, kept so existing browsers keep their saved state.
 const STORAGE_KEY = 'Cryptech.guestCart';
 // Same bounds the hydrate request accepts, so a stored line can never cause a 422.
 const storedLineSchema = guestCartLineSchema.extend({
