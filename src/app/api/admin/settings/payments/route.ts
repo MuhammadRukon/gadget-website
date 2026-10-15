@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { PaymentMethod } from '@prisma/client';
 
+import { revalidateStorefrontFacts } from '@/app/api/_lib/revalidate';
 import { paymentSettingsInputSchema } from '@/contracts/payment-settings';
 import { jsonError, requireAdminSession } from '@/server/common/http';
 import { gatewayConfigured } from '@/server/payments/gateway-creds';
@@ -36,6 +37,7 @@ export async function PUT(request: Request) {
     const admin = await requireAdminSession();
     const input = paymentSettingsInputSchema.parse(await request.json());
     const settings = await paymentSettingsService.update(admin.id, input);
+    revalidateStorefrontFacts();
     return NextResponse.json(
       { settings, gatewayConfigured: gatewayStatus() },
       { headers: NO_STORE },

@@ -7,6 +7,8 @@ import { CodFeeType, PaymentMethod } from '@prisma/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/auth', () => ({ auth: vi.fn() }));
+// Route purges the storefront layout after a save; next/cache needs a request context.
+vi.mock('@/app/api/_lib/revalidate', () => ({ revalidateStorefrontFacts: vi.fn() }));
 
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';

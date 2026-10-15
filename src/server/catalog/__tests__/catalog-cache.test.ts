@@ -27,7 +27,7 @@ import { ConflictError } from '@/server/common/errors';
 import { catalogService } from '../catalog.service';
 
 const SHELL_KEY = buildKey('cat', 'shell', 'v1');
-const KEY_RE = /^gw:[a-z]+:cat:((list|search):v1:[0-9a-f]{40}|shell:v1)$/;
+const KEY_RE = /^gw:[a-z]+:cat:((list|search):v2:[0-9a-f]{40}|shell:v1)$/;
 
 const row = (i: number, name = `Phone ${i}`) => ({
   id: `p${i}`,

@@ -26,19 +26,28 @@ export function CartPanel() {
   return (
     <Sheet>
       <SheetTrigger asChild>
-        <button type="button" aria-label="Open cart" className="relative cursor-pointer">
-          <ShoppingCart size={18} />
+        <button
+          type="button"
+          aria-label={
+            itemCount > 0
+              ? `Open cart, ${itemCount} item${itemCount === 1 ? '' : 's'}`
+              : 'Open cart'
+          }
+          className="relative flex size-11 cursor-pointer items-center justify-center rounded-md text-ink transition-colors hover:text-raven"
+        >
+          <ShoppingCart size={19} aria-hidden />
           {itemCount > 0 && (
             <span
-              aria-label={`${itemCount} items in cart`}
-              className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-none text-primary-foreground"
+              aria-hidden
+              key={itemCount}
+              className="flex animate-[sf-pop_320ms_cubic-bezier(0.16,1,0.3,1)] items-center justify-center rounded-full bg-eye text-[11px] font-semibold leading-none text-ink tabular-nums absolute right-0 top-0.5 h-[18px] min-w-[18px] px-1"
             >
               {itemCount > 99 ? '99+' : itemCount}
             </span>
           )}
         </button>
       </SheetTrigger>
-      <SheetContent className="flex flex-col gap-0">
+      <SheetContent className="sf flex w-full flex-col gap-0 sm:max-w-md">
         <CartPanelContent />
       </SheetContent>
     </Sheet>
@@ -55,7 +64,7 @@ function CartPanelContent() {
       <SheetHeader>
         <SheetTitle>Cart</SheetTitle>
         <SheetDescription>
-          {isEmpty ? 'You cart items.' : cartHeaderLabel(cartAvailability(cart.lines))}
+          {isEmpty ? 'Nothing added yet.' : cartHeaderLabel(cartAvailability(cart.lines))}
         </SheetDescription>
       </SheetHeader>
 
@@ -64,17 +73,18 @@ function CartPanelContent() {
         {isLoading ? (
           <CartLinesLoading authenticated={isAuthenticated} compact />
         ) : isEmpty ? (
-          <p className="py-10 text-center text-sm text-muted-foreground">
-            Your cart is empty.{' '}
+          <div className="flex flex-col items-start gap-3 border-y border-rule py-10">
+            <p className="font-display text-lg font-semibold font-stretch-semi-expanded">
+              Your cart is empty
+            </p>
             <SheetClose asChild>
-              <Link href="/products" className="underline">
-                Browse products
+              <Link href="/products" className="text-sm font-medium text-raven-ink underline">
+                Browse all products
               </Link>
             </SheetClose>
-            .
-          </p>
+          </div>
         ) : (
-          <ul className="divide-y">
+          <ul className="divide-y divide-rule">
             {cart?.lines.map((line) => (
               <li key={line.itemId}>
                 <CartLineItem line={line} compact priceLoading={isPriceLoading} />
@@ -93,19 +103,20 @@ function CartPanelContent() {
             priceLoading={isPriceLoading}
           />
         )}
-        <div className="flex w-full gap-2">
-          <SheetClose asChild>
-            <Button asChild className="flex-1" disabled={isEmpty}>
-              <Link href="/checkout">Proceed to checkout</Link>
-            </Button>
-          </SheetClose>
-
-          <SheetClose asChild>
-            <Button asChild variant="outline" className="flex-1" disabled={isEmpty}>
-              <Link href="/cart">View cart</Link>
-            </Button>
-          </SheetClose>
-        </div>
+        {isEmpty ? null : (
+          <div className="flex w-full flex-col gap-2">
+            <SheetClose asChild>
+              <Button asChild size="lg" className="h-12 w-full">
+                <Link href="/checkout">Checkout</Link>
+              </Button>
+            </SheetClose>
+            <SheetClose asChild>
+              <Button asChild variant="outline" size="lg" className="h-11 w-full">
+                <Link href="/cart">View full cart</Link>
+              </Button>
+            </SheetClose>
+          </div>
+        )}
       </SheetFooter>
     </>
   );

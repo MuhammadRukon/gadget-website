@@ -34,17 +34,32 @@ export function CategorySidebar({ items }: AppSidebarProps) {
   return (
     <Sheet>
       <SheetTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label="Open menu">
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="Open menu"
+          className="size-11 hover:bg-field"
+        >
           <Menu className="size-5" />
         </Button>
       </SheetTrigger>
 
-      <SheetContent side="left" className="w-80 p-0 gap-0">
-        <SheetHeader className=" px-4 py-3">
-          <SheetTitle>Categories</SheetTitle>
+      <SheetContent side="left" className="sf w-[85vw] max-w-80 gap-0 p-0">
+        <SheetHeader className="border-b border-rule px-4 py-4">
+          <SheetTitle className="font-display text-lg font-semibold font-stretch-semi-expanded">
+            Shop by category
+          </SheetTitle>
         </SheetHeader>
 
-        <nav className="overflow-y-auto">
+        <nav aria-label="Categories" className="overflow-y-auto py-2">
+          <SheetClose asChild>
+            <Link
+              href="/products"
+              className="flex h-12 items-center px-4 text-[15px] font-medium hover:bg-field"
+            >
+              All products
+            </Link>
+          </SheetClose>
           {items.map((category) => (
             <CategoryItem key={category.id} category={category} />
           ))}
@@ -63,7 +78,10 @@ function CategoryItem({ category }: Readonly<{ category: MenuCategory }>) {
     <div>
       <div className="flex items-center">
         <SheetClose asChild>
-          <Link href={categoryHref(category)} className="flex-1 px-4 py-2 text-sm hover:bg-accent">
+          <Link
+            href={categoryHref(category)}
+            className="flex h-12 flex-1 items-center px-4 text-[15px] hover:bg-field"
+          >
             {category.name}
           </Link>
         </SheetClose>
@@ -72,8 +90,9 @@ function CategoryItem({ category }: Readonly<{ category: MenuCategory }>) {
           <button
             type="button"
             onClick={() => setOpen((v) => !v)}
-            className="flex h-10 w-10 items-center justify-center hover:bg-accent"
-            aria-label={open ? 'Collapse' : 'Expand'}
+            className="flex size-12 items-center justify-center text-ink-2 hover:bg-field"
+            aria-expanded={open}
+            aria-label={`${open ? 'Hide' : 'Show'} ${category.name} brands`}
           >
             {open ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
           </button>
@@ -87,10 +106,13 @@ function CategoryItem({ category }: Readonly<{ category: MenuCategory }>) {
         )}
       >
         <div className="overflow-hidden">
-          <div className="ml-4 border-l">
+          <div className="ml-4 border-l border-rule">
             {category.brands.map((brand) => (
               <SheetClose asChild key={brand.id}>
-                <Link href={brandHref(brand)} className="block px-4 py-2 text-sm hover:bg-accent">
+                <Link
+                  href={brandHref(brand)}
+                  className="flex h-11 items-center px-4 text-sm text-ink-2 hover:bg-field hover:text-ink"
+                >
                   {brand.name}
                 </Link>
               </SheetClose>

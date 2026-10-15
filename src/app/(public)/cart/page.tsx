@@ -2,7 +2,6 @@
 
 import Link from 'next/link';
 
-import { Card, CardContent } from '@/components/ui/card';
 import { CartLineItem, CartLinesLoading } from '@/app/components/cart/cart-line-item';
 import { CartNotices } from '@/app/components/cart/cart-notices';
 import { CartSummary } from '@/app/components/cart/cart-summary';
@@ -13,8 +12,10 @@ export default function CartPage() {
   const { cart, isLoading, isPriceLoading, isAuthenticated } = useCart();
 
   return (
-    <section className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 py-6">
-      <h1 className="text-2xl font-semibold lg:col-span-2 ">Your cart</h1>
+    <section className="grid grid-cols-1 gap-6 pb-8 pt-6 lg:grid-cols-[1fr_340px] lg:gap-10">
+      <h1 className="font-display text-[clamp(1.9rem,4.5vw,3rem)] font-bold leading-none tracking-[-0.025em] font-stretch-expanded lg:col-span-2">
+        Your cart
+      </h1>
       <div className="lg:col-span-2 space-y-1 empty:hidden">
         {cart && cart.lines.length > 0 ? (
           <p className="text-sm text-muted-foreground">
@@ -26,15 +27,17 @@ export default function CartPage() {
       {isLoading ? (
         <CartLinesLoading authenticated={isAuthenticated} />
       ) : !cart || cart.lines.length === 0 ? (
-        <Card>
-          <CardContent className="p-8 text-center text-muted-foreground">
-            Your cart is empty.{' '}
-            <Link href="/products" className="underline">
-              Browse products
-            </Link>
-            .
-          </CardContent>
-        </Card>
+        <div className="flex flex-col items-start gap-3 border-y border-border py-12">
+          <p className="font-display text-xl font-semibold font-stretch-semi-expanded">
+            Your cart is empty
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Items you add from a product page will show up here.
+          </p>
+          <Link href="/products" className="text-sm font-medium text-raven-ink underline">
+            Browse all products
+          </Link>
+        </div>
       ) : (
         <ul className="space-y-3">
           {cart.lines.map((line) => (
@@ -45,7 +48,7 @@ export default function CartPage() {
         </ul>
       )}
 
-      <aside className="lg:sticky lg:top-4 lg:self-start">
+      <aside className="lg:sticky lg:top-24 lg:self-start">
         <CartSummary cart={cart} authenticated={isAuthenticated} priceLoading={isPriceLoading} />
       </aside>
     </section>

@@ -73,7 +73,7 @@ function LoginContent() {
 
   return (
     <AuthCard
-      title="Login to your account"
+      title="Sign in"
       description="Enter your email below to sign in."
       footer={
         <p className="text-sm text-muted-foreground text-center">
@@ -93,7 +93,12 @@ function LoginContent() {
               <FormItem>
                 <FormLabel>Email</FormLabel>
                 <FormControl>
-                  <Input type="email" autoComplete="email" placeholder="m@example.com" {...field} />
+                  <Input
+                    type="email"
+                    autoComplete="email"
+                    placeholder="you@example.com"
+                    {...field}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -118,7 +123,7 @@ function LoginContent() {
             )}
           />
           <Button type="submit" className="w-full" disabled={isSubmitting}>
-            {isSubmitting ? <Loader /> : 'Login'}
+            {isSubmitting ? <Loader /> : 'Sign in'}
           </Button>
         </form>
       </Form>

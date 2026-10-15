@@ -10,11 +10,11 @@ export type LogoProps = {
 };
 
 export function Logo({
-  alt = 'Cryptech Logo',
+  alt = 'Ravyntech Logo',
   width = 100,
   height = 100,
   className,
-  src = '/logo.png',
+  src = '/brand/ravyntech-mark.png',
 }: Readonly<LogoProps>) {
   return (
     <Link href="/">

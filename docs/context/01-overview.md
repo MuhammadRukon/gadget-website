@@ -2,7 +2,7 @@
 
 ## What this is
 
-**Cryptech** — a full-stack e-commerce MVP for gadgets/electronics targeting the Bangladesh market. Customers browse a catalog, manage a cart (guest or logged-in), check out with local payment methods (COD, bKash, SSLCommerz, bank transfer), track orders, leave verified-purchase reviews, and file warranty requests. Admins manage catalog, orders, payments, coupons, warranty, and users from a dashboard with an analytics overview.
+**Ravyntech** — a full-stack e-commerce MVP for gadgets/electronics targeting the Bangladesh market. Customers browse a catalog, manage a cart (guest or logged-in), check out with local payment methods (COD, bKash, SSLCommerz, bank transfer), track orders, leave verified-purchase reviews, and file warranty requests. Admins manage catalog, orders, payments, coupons, warranty, and users from a dashboard with an analytics overview.
 
 ## Tech stack
 

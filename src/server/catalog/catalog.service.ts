@@ -87,9 +87,15 @@ function toPublicProductSummary(p: {
   slug: string;
   name: string;
   isPopular: boolean;
+  warrantyMonths: number;
   brand: { id: string; name: string; slug: string };
   images: { url: string }[];
-  variants: { sellingPriceCents: number; discountCents: number; stock: number }[];
+  variants: {
+    sellingPriceCents: number;
+    discountCents: number;
+    stock: number;
+    attributes: Prisma.JsonValue;
+  }[];
   _count: { variants: number };
 }): PublicProductSummary {
   const variant = p.variants[0];
@@ -111,7 +117,17 @@ function toPublicProductSummary(p: {
     originalPriceCents: pricing.originalPriceCents,
     inStock: p._count.variants > 0,
     isPopular: p.isPopular,
+    warrantyMonths: p.warrantyMonths,
+    specs: specValues(variant?.attributes),
   };
+}
+
+/** Up to three attribute values of the listed (cheapest) variant, for the card's spec line. */
+function specValues(attributes: Prisma.JsonValue | undefined): string[] {
+  if (!attributes || typeof attributes !== 'object' || Array.isArray(attributes)) return [];
+  return Object.values(attributes)
+    .filter((v): v is string => typeof v === 'string' && v.trim().length > 0)
+    .slice(0, 3);
 }
 
 function ensureUniqueSkus(variants: VariantInput[]) {
@@ -152,13 +168,15 @@ export const catalogService = {
   async createBrand(input: BrandInput) {
     const slug = slugify(input.slug || input.name);
     try {
-      return await invalidatingShell(catalogRepo.createBrand({
-        name: input.name,
-        slug,
-        logoUrl: input.logoUrl ?? null,
-        isPopular: input.isPopular ?? false,
-        status: brandStatusOrDefault(input),
-      }));
+      return await invalidatingShell(
+        catalogRepo.createBrand({
+          name: input.name,
+          slug,
+          logoUrl: input.logoUrl ?? null,
+          isPopular: input.isPopular ?? false,
+          status: brandStatusOrDefault(input),
+        }),
+      );
     } catch (err) {
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
         throw new ConflictError(`A brand with this ${uniqueConstraintField(err)} already exists`);
@@ -170,13 +188,15 @@ export const catalogService = {
   async updateBrand(id: string, input: BrandInput) {
     const slug = slugify(input.slug || input.name);
     try {
-      return await invalidatingShell(catalogRepo.updateBrand(id, {
-        name: input.name,
-        slug,
-        logoUrl: input.logoUrl ?? null,
-        isPopular: input.isPopular ?? false,
-        status: brandStatusOrDefault(input),
-      }));
+      return await invalidatingShell(
+        catalogRepo.updateBrand(id, {
+          name: input.name,
+          slug,
+          logoUrl: input.logoUrl ?? null,
+          isPopular: input.isPopular ?? false,
+          status: brandStatusOrDefault(input),
+        }),
+      );
     } catch (err) {
       if (err instanceof Prisma.PrismaClientKnownRequestError) {
         if (err.code === 'P2002') {
@@ -213,14 +233,16 @@ export const catalogService = {
   async createCategory(input: CategoryInput) {
     const slug = slugify(input.slug || input.name);
     try {
-      return await invalidatingShell(catalogRepo.createCategory({
-        name: input.name,
-        slug,
-        iconUrl: input.iconUrl ?? null,
-        isPopular: input.isPopular ?? false,
-        status: categoryStatusOrDefault(input),
-        parent: input.parentId ? { connect: { id: input.parentId } } : undefined,
-      }));
+      return await invalidatingShell(
+        catalogRepo.createCategory({
+          name: input.name,
+          slug,
+          iconUrl: input.iconUrl ?? null,
+          isPopular: input.isPopular ?? false,
+          status: categoryStatusOrDefault(input),
+          parent: input.parentId ? { connect: { id: input.parentId } } : undefined,
+        }),
+      );
     } catch (err) {
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
         throw new ConflictError(
@@ -234,14 +256,16 @@ export const catalogService = {
   async updateCategory(id: string, input: CategoryInput) {
     const slug = slugify(input.slug || input.name);
     try {
-      return await invalidatingShell(catalogRepo.updateCategory(id, {
-        name: input.name,
-        slug,
-        iconUrl: input.iconUrl ?? null,
-        isPopular: input.isPopular ?? false,
-        status: categoryStatusOrDefault(input),
-        parent: input.parentId ? { connect: { id: input.parentId } } : { disconnect: true },
-      }));
+      return await invalidatingShell(
+        catalogRepo.updateCategory(id, {
+          name: input.name,
+          slug,
+          iconUrl: input.iconUrl ?? null,
+          isPopular: input.isPopular ?? false,
+          status: categoryStatusOrDefault(input),
+          parent: input.parentId ? { connect: { id: input.parentId } } : { disconnect: true },
+        }),
+      );
     } catch (err) {
       if (err instanceof Prisma.PrismaClientKnownRequestError) {
         if (err.code === 'P2002') {
@@ -465,7 +489,10 @@ export const catalogService = {
   /** Categories + brands for the storefront menu/sidebars, one cache entry. */
   async getCatalogShell() {
     return cached({ key: SHELL_KEY(), ttlSec: 300 }, async () => {
-      const [categories, brands] = await Promise.all([this.listPublicCategories(), this.listPublicBrands()]);
+      const [categories, brands] = await Promise.all([
+        this.listPublicCategories(),
+        this.listPublicBrands(),
+      ]);
       return { categories, brands };
     });
   },
@@ -541,10 +568,10 @@ export const catalogService = {
       sort: rest.sort ?? 'newest',
     };
     // shortcut: TTL-only invalidation, <=60-120s stale, upgrade to a version key if admins need instant search updates
-    // bump v1 when the cached DTO shape changes (entries live 60-300s)
+    // bump the version when the cached DTO shape changes (entries live 60-300s)
     return cached(
       {
-        key: buildKey('cat', q ? 'search' : 'list', 'v1', stableHash(canonical)),
+        key: buildKey('cat', q ? 'search' : 'list', 'v2', stableHash(canonical)),
         ttlSec: q ? 120 : 60,
         ttlFor: (page) => (page.items.length === 0 ? 30 : q ? 120 : 60),
       },
@@ -568,8 +595,10 @@ export const catalogService = {
             ? where.variants.some
             : {}),
           isActive: true,
-          ...(query.minPrice !== undefined ? { sellingPriceCents: { gte: query.minPrice } } : {}),
-          ...(query.maxPrice !== undefined ? { sellingPriceCents: { lte: query.maxPrice } } : {}),
+          sellingPriceCents: {
+            ...(query.minPrice !== undefined ? { gte: query.minPrice } : {}),
+            ...(query.maxPrice !== undefined ? { lte: query.maxPrice } : {}),
+          },
         },
       };
     }
@@ -586,6 +615,7 @@ export const catalogService = {
           name: true,
           description: true,
           isPopular: true,
+          warrantyMonths: true,
           brand: { select: { id: true, name: true, slug: true } },
           images: { orderBy: { sortOrder: 'asc' }, take: 1 },
           variants: {
@@ -596,6 +626,7 @@ export const catalogService = {
               sellingPriceCents: true,
               discountCents: true,
               stock: true,
+              attributes: true,
             },
           },
           _count: {
@@ -666,6 +697,7 @@ export const catalogService = {
           slug: true,
           name: true,
           isPopular: true,
+          warrantyMonths: true,
           brand: { select: { id: true, name: true, slug: true } },
           images: { orderBy: { sortOrder: 'asc' }, take: 1 },
           variants: {
@@ -676,6 +708,7 @@ export const catalogService = {
               sellingPriceCents: true,
               discountCents: true,
               stock: true,
+              attributes: true,
             },
           },
           _count: {

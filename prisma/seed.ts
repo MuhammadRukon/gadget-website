@@ -1,5 +1,5 @@
 /**
- * Dev seed for Cryptech ecommerce.
+ * Dev seed for Ravyntech ecommerce.
  *
  * - Creates an admin and a regular customer (passwords from env or fallback).
  * - Creates a small set of categories + brands + published products with

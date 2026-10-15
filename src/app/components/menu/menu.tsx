@@ -41,7 +41,10 @@ export function Menu({ menu }: Readonly<{ menu: MenuCategory[] }>) {
 Menu.Item = function MenuItem({ category }: MenuItemProps) {
   return (
     <NavigationMenuItem>
-      <NavigationMenuLink asChild className="h-full px-3 py-1.5">
+      <NavigationMenuLink
+        asChild
+        className="h-11 rounded-none bg-transparent px-3 text-sm font-medium text-ink hover:bg-transparent hover:text-raven-ink focus:bg-transparent"
+      >
         <Link href={categoryHref(category)}>{category.name}</Link>
       </NavigationMenuLink>
     </NavigationMenuItem>
@@ -51,11 +54,15 @@ Menu.Item = function MenuItem({ category }: MenuItemProps) {
 Menu.ItemWithBrand = function MenuItemWithBrand({ category }: MenuItemProps) {
   return (
     <NavigationMenuItem>
-      <NavigationMenuTrigger className="p-2.5 px-3.5 h-full" asChild>
+      <NavigationMenuTrigger
+        className="h-11 rounded-none bg-transparent px-3 text-sm font-medium text-ink hover:bg-transparent hover:text-raven-ink focus:bg-transparent data-[state=open]:bg-transparent data-[state=open]:text-raven-ink"
+        asChild
+      >
         <Link href={categoryHref(category)}>{category.name}</Link>
       </NavigationMenuTrigger>
-      <NavigationMenuContent className="absolute p-0 z-50 bg-background min-w-fit ">
-        <ul className="min-w-fit sm:min-w-[150px]">
+      <NavigationMenuContent className="sf absolute z-50 min-w-fit rounded-md border border-rule bg-surface p-1.5">
+        <p className="px-3 pb-1 pt-1.5 text-xs text-ink-2">Brands</p>
+        <ul className="min-w-fit sm:min-w-[180px]">
           {category.brands.map((brand) => (
             <ListItem key={brand.id} brand={brand} />
           ))}
@@ -68,7 +75,7 @@ Menu.ItemWithBrand = function MenuItemWithBrand({ category }: MenuItemProps) {
 function ListItem({ brand }: Readonly<{ brand: MenuBrand }>) {
   return (
     <li>
-      <NavigationMenuLink className="py-2 px-4 h-full" asChild>
+      <NavigationMenuLink className="rounded-sm px-3 py-2 text-sm hover:bg-field" asChild>
         <Link href={brandHref(brand)}>{brand.name}</Link>
       </NavigationMenuLink>
     </li>

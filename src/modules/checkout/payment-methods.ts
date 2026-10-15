@@ -9,6 +9,14 @@ export const PAYMENT_METHOD_INFO: Record<PaymentMethod, { label: string }> = {
 };
 
 /** COD if enabled, otherwise the first enabled method. */
+/** Compact names for storefront facts (strip, footer, product page). */
+export const PAYMENT_METHOD_SHORT_LABEL: Record<PaymentMethod, string> = {
+  COD: 'Cash on delivery',
+  BKASH: 'bKash',
+  SSLCOMMERZ: 'Cards & mobile banking',
+  BANK_TRANSFER: 'Bank transfer',
+};
+
 export function defaultPaymentMethod(methods: readonly PaymentMethod[]): PaymentMethod | null {
   if (methods.includes('COD')) return 'COD';
   return methods[0] ?? null;

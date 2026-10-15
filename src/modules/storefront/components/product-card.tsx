@@ -1,51 +1,82 @@
-import Image from 'next/image';
 import Link from 'next/link';
 
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
-import { formatBDT } from '@/server/common/money';
 import type { PublicProductSummary } from '@/contracts/catalog';
 import { cn, getDiscountPercentString } from '@/lib/utils';
+import { Price } from './price';
+import { ProductImage } from './product-image';
+import { StockMark } from './stock-mark';
 
-export function ProductCard({ product }: Readonly<{ product: PublicProductSummary }>) {
-  const hasDiscount = product.priceCents < product.originalPriceCents;
+interface ProductCardProps {
+  product: PublicProductSummary;
+  /** Above-the-fold cards load eagerly. */
+  priority?: boolean;
+  sizes?: string;
+  /** Feature cards (one large product in a group) use a landscape photo field. */
+  feature?: boolean;
+}
+
+export function ProductCard({
+  product,
+  priority,
+  sizes = '(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw',
+  feature,
+}: Readonly<ProductCardProps>) {
+  const discount = product.priceCents < product.originalPriceCents;
 
   return (
-    <Link href={`/products/${product.slug}`} className="block group relative">
-      {hasDiscount && (
-        <p className="text-white bg-red-500 w-fit absolute top-4 right-4 z-20 px-1.5">
-          {getDiscountPercentString(product.priceCents, product.originalPriceCents)} OFF
-        </p>
-      )}
-      <Card className="h-full overflow-hidden transition-shadow group-hover:shadow-md p-0 gap-0">
-        <div className="relative aspect-square bg-muted">
-          <Image
-            src={product.imageUrl ? product.imageUrl : '/logo.png'}
-            alt={product.name}
-            fill
-            sizes="(max-width: 768px) 50vw, 25vw"
-            className={cn('object-cover', !product.imageUrl && 'p-10')}
-          />
-
-          {!product.inStock && (
-            <Badge variant="secondary" className="absolute top-2 left-2">
-              Out of stock
-            </Badge>
+    <article className="group relative flex h-full flex-col">
+      <div className="relative">
+        <ProductImage
+          src={product.imageUrl}
+          alt={product.name}
+          brand={product.brand.name}
+          sizes={sizes}
+          priority={priority}
+          className={cn(
+            'rounded-md transition-[background-color] duration-300 group-hover:bg-raven-soft',
+            feature ? 'aspect-[16/10]' : 'aspect-[4/5]',
           )}
+        />
+        {discount ? (
+          <span className="absolute left-2.5 top-2.5 rounded-sm bg-sale px-1.5 py-0.5 text-[11px] font-semibold text-white tabular-nums">
+            −
+            {getDiscountPercentString(product.priceCents, product.originalPriceCents).replace(
+              '~',
+              '',
+            )}
+          </span>
+        ) : null}
+      </div>
+
+      <div className="flex flex-1 flex-col gap-1.5 pt-3">
+        {/* Mobile 2-up rows: the spec line takes up spare height and the price block has a fixed height, so rules align. */}
+        <p className="text-xs text-ink-2">{product.brand.name}</p>
+        <h3
+          className={cn(
+            'line-clamp-2 font-medium leading-snug text-ink',
+            feature ? 'font-display text-xl font-semibold font-stretch-semi-expanded' : 'text-sm',
+          )}
+        >
+          <Link
+            href={`/products/${product.slug}`}
+            className="outline-none after:absolute after:inset-0 after:rounded-md focus-visible:after:outline-2 focus-visible:after:outline-offset-2 focus-visible:after:outline-raven"
+          >
+            {product.name}
+          </Link>
+        </h3>
+        <p className="h-4 truncate text-xs leading-4 text-ink-2 max-sm:mb-auto">
+          {product.specs.join(' · ')}
+        </p>
+        <div className="flex flex-col gap-1 border-t border-rule pt-2.5 sm:mt-auto sm:flex-row sm:flex-wrap sm:items-end sm:justify-between sm:gap-x-3">
+          <Price
+            cents={product.priceCents}
+            originalCents={product.originalPriceCents}
+            size={feature ? 'md' : 'sm'}
+            className="max-sm:min-h-[2.75rem] max-sm:flex-col max-sm:items-start max-sm:justify-start max-sm:gap-0.5"
+          />
+          <StockMark inStock={product.inStock} />
         </div>
-        <CardContent className="space-y-1 p-4">
-          <p className="text-xs text-muted-foreground">{product.brand.name}</p>
-          <h3 className="text-sm font-medium line-clamp-2 leading-snug">{product.name}</h3>
-          <div className="flex items-baseline gap-2">
-            <span className="font-semibold">{formatBDT(product.priceCents)}</span>
-            {hasDiscount ? (
-              <span className="text-xs text-muted-foreground line-through">
-                {formatBDT(product.originalPriceCents)}
-              </span>
-            ) : null}
-          </div>
-        </CardContent>
-      </Card>
-    </Link>
+      </div>
+    </article>
   );
 }

@@ -11,7 +11,7 @@ export interface CacheStore {
   incrWindow(key: string, windowMs: number): Promise<{ count: number; pttlMs: number }>;
 }
 
-const TIMEOUT_MS = 250;
+const TIMEOUT_MS = 500; // cold instances pay DNS+TLS on the first call; 250ms tripped the breaker on every burst
 const MAX_PAYLOAD_BYTES = 100 * 1024;
 const BREAKER_THRESHOLD = 5;
 const BREAKER_OPEN_MS = 30_000;
