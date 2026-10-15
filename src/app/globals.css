@@ -296,3 +296,12 @@ body {
     letter-spacing: -0.015em;
   }
 }
+
+@keyframes sf-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}

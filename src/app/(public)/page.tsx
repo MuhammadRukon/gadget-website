@@ -11,6 +11,20 @@ import { Price } from '@/modules/storefront/components/price';
 import { ProductCard } from '@/modules/storefront/components/product-card';
 import { ProductImage } from '@/modules/storefront/components/product-image';
 import { StockMark } from '@/modules/storefront/components/stock-mark';
+import { BrandMarquee } from '@/modules/home/components/brand-marquee';
+import { BuyingSteps } from '@/modules/home/components/buying-steps';
+import { CategoryBento } from '@/modules/home/components/category-bento';
+import { HomeBanner } from '@/modules/home/components/home-banner';
+import { HomeClosing } from '@/modules/home/components/home-closing';
+import { HomeMotion } from '@/modules/home/components/home-motion';
+import { ScrollStory } from '@/modules/home/components/scroll-story';
+import {
+  HOME_BANNER,
+  HOME_CLOSING,
+  HOME_STEPS,
+  HOME_STORY,
+  HOME_TILES,
+} from '@/modules/home/home-content';
 
 export const metadata = {
   title: 'Cryptech - gadgets & electronics',
@@ -31,11 +45,17 @@ async function loadHome() {
     topCategories.map((c) => catalogService.listPublicProducts({ categorySlug: c.slug, limit: 4 })),
   );
   const categories = topCategories.map((c, i) => ({ ...c, page: categoryPages[i] }));
-  return { newest: newest.items, totalProducts: newest.total, categories, facts };
+  return {
+    newest: newest.items,
+    totalProducts: newest.total,
+    categories,
+    brands: shell.brands,
+    facts,
+  };
 }
 
 export default async function HomePage() {
-  const { newest, totalProducts, categories, facts } = await loadHome();
+  const { newest, totalProducts, categories, brands, facts } = await loadHome();
   const featured =
     newest.find((p) => p.isPopular && p.inStock) ?? newest.find((p) => p.inStock) ?? newest[0];
   // A short list should not repeat itself: each product appears once on the page where the catalog allows.
@@ -47,143 +67,157 @@ export default async function HomePage() {
   const codOn = facts.methods.includes('COD');
 
   return (
-    <div className="pb-6">
-      <h1 className="sr-only">Cryptech, gadgets and electronics in Bangladesh</h1>
+    <HomeMotion>
+      <div className="pb-6">
+        <HomeBanner banner={HOME_BANNER} />
 
-      {/* Opening: promise + category index beside one product at full scale. */}
-      <section className="grid grid-cols-1 gap-8 pt-6 md:pt-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:gap-12">
-        <div className="flex min-w-0 flex-col">
-          <p className="font-display text-[clamp(2.1rem,5.4vw,4rem)] font-bold leading-[0.95] tracking-[-0.025em] font-stretch-expanded text-balance">
-            A short list of good gadgets.
-          </p>
-          <p className="mt-4 max-w-md text-[15px] leading-relaxed text-ink-2">
-            Phones, laptops and accessories with the price, stock and warranty on every page.
-            Delivered across Bangladesh
-            {codOn ? ', and you can pay when it arrives.' : '.'}
-          </p>
+        {/* Category index beside one product at full scale. */}
+        <section
+          aria-label="Featured"
+          data-reveal
+          className="mt-20 grid grid-cols-1 gap-8 md:mt-28 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:gap-12"
+        >
+          <div className="flex min-w-0 flex-col">
+            <h2 className="font-display text-[clamp(2.1rem,5.4vw,4rem)] font-bold leading-[0.95] tracking-[-0.025em] font-stretch-expanded text-balance">
+              Our pick, and where to look next.
+            </h2>
+            <p className="mt-4 max-w-md text-[15px] leading-relaxed text-ink-2">
+              Delivered across Bangladesh{codOn ? ', and you can pay when it arrives' : ''}. Pick a
+              category to see everything in it.
+            </p>
 
-          {categories.length > 0 ? (
-            <nav aria-label="Shop by category" className="mt-8 lg:mt-12">
-              <ul className="border-t border-ink max-md:hidden">
-                {categories.map((c) => (
-                  <li key={c.id} className="border-b border-rule">
-                    <Link
-                      href={`/category/${c.slug}`}
-                      className="group flex h-14 items-center gap-4 transition-colors hover:text-solder-ink"
-                    >
-                      <span className="font-display text-xl font-semibold font-stretch-semi-expanded">
+            {categories.length > 0 ? (
+              <nav aria-label="Shop by category" className="mt-8 lg:mt-12">
+                <ul className="border-t border-ink max-md:hidden">
+                  {categories.map((c) => (
+                    <li key={c.id} className="border-b border-rule">
+                      <Link
+                        href={`/category/${c.slug}`}
+                        className="group flex h-14 items-center gap-4 transition-colors hover:text-solder-ink"
+                      >
+                        <span className="font-display text-xl font-semibold font-stretch-semi-expanded">
+                          {c.name}
+                        </span>
+                        <span className="text-xs text-ink-2 tabular-nums">
+                          {c.page.total} {c.page.total === 1 ? 'product' : 'products'}
+                        </span>
+                        <ArrowRight
+                          aria-hidden
+                          className="ml-auto size-4 transition-transform duration-300 ease-out group-hover:translate-x-1"
+                        />
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+                <ul className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] md:hidden">
+                  {categories.map((c) => (
+                    <li key={c.id} className="shrink-0">
+                      <Link
+                        href={`/category/${c.slug}`}
+                        className="flex h-11 items-center gap-2 rounded-full border border-rule-strong bg-surface px-4 text-sm font-medium"
+                      >
                         {c.name}
-                      </span>
-                      <span className="text-xs text-ink-2 tabular-nums">
-                        {c.page.total} {c.page.total === 1 ? 'product' : 'products'}
-                      </span>
-                      <ArrowRight
-                        aria-hidden
-                        className="ml-auto size-4 transition-transform duration-300 ease-out group-hover:translate-x-1"
-                      />
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-              <ul className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] md:hidden">
-                {categories.map((c) => (
-                  <li key={c.id} className="shrink-0">
+                        <span className="text-xs text-ink-2 tabular-nums">{c.page.total}</span>
+                      </Link>
+                    </li>
+                  ))}
+                  <li className="shrink-0">
                     <Link
-                      href={`/category/${c.slug}`}
-                      className="flex h-11 items-center gap-2 rounded-full border border-rule-strong bg-surface px-4 text-sm font-medium"
+                      href="/products"
+                      className="flex h-11 items-center rounded-full bg-ink px-4 text-sm font-medium text-paper"
                     >
-                      {c.name}
-                      <span className="text-xs text-ink-2 tabular-nums">{c.page.total}</span>
+                      All {totalProducts}
                     </Link>
                   </li>
-                ))}
-                <li className="shrink-0">
-                  <Link
-                    href="/products"
-                    className="flex h-11 items-center rounded-full bg-ink px-4 text-sm font-medium text-paper"
-                  >
-                    All {totalProducts}
-                  </Link>
-                </li>
-              </ul>
-            </nav>
-          ) : null}
-        </div>
+                </ul>
+              </nav>
+            ) : null}
+          </div>
 
-        {featured ? <FeaturedProduct product={featured} /> : null}
-      </section>
+          {featured ? <FeaturedProduct product={featured} /> : null}
+        </section>
 
-      {rail.length > 0 ? (
-        <section aria-labelledby="new-in" className="mt-16 md:mt-24">
-          <SectionHead
-            id="new-in"
-            title="New in"
-            href="/products"
-            linkLabel={`All ${totalProducts} products`}
+        <BrandMarquee brands={brands} />
+
+        {rail.length > 0 ? (
+          <section aria-labelledby="new-in" className="mt-16 md:mt-24">
+            <SectionHead
+              id="new-in"
+              title="New in"
+              href="/products"
+              linkLabel={`All ${totalProducts} products`}
+            />
+            <div
+              className={cn(
+                '-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2 [scrollbar-width:thin] sm:mx-0 sm:grid sm:grid-cols-3 sm:gap-x-6 sm:gap-y-8 sm:overflow-visible sm:px-0',
+                rail.length >= 4 ? 'lg:grid-cols-4' : 'lg:grid-cols-3',
+              )}
+            >
+              {rail.map((p) => (
+                <div key={p.id} className="w-[46%] shrink-0 snap-start sm:w-auto">
+                  <ProductCard product={p} />
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        <ScrollStory story={HOME_STORY} />
+
+        <CategoryBento tiles={HOME_TILES} />
+
+        {showcase ? (
+          <CategoryShowcase
+            category={{ ...showcase, page: { ...showcase.page, items: showcase.unseen } }}
           />
-          <div
-            className={cn(
-              '-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2 [scrollbar-width:thin] sm:mx-0 sm:grid sm:grid-cols-3 sm:gap-x-6 sm:gap-y-8 sm:overflow-visible sm:px-0',
-              rail.length >= 4 ? 'lg:grid-cols-4' : 'lg:grid-cols-3',
-            )}
-          >
-            {rail.map((p) => (
-              <div key={p.id} className="w-[46%] shrink-0 snap-start sm:w-auto">
-                <ProductCard product={p} />
-              </div>
-            ))}
+        ) : null}
+
+        <BuyingSteps steps={HOME_STEPS} />
+
+        <section aria-labelledby="how-buying-works" data-reveal className="mt-16 md:mt-24">
+          <div className="grid gap-x-10 gap-y-6 border-t-2 border-ink pt-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)]">
+            <h2
+              id="how-buying-works"
+              className="self-start font-display lg:sticky lg:top-32 text-2xl font-bold leading-tight tracking-[-0.02em] font-stretch-expanded md:text-[32px]"
+            >
+              What you know before you pay
+            </h2>
+            <dl className="text-sm">
+              <LedgerRow term="Delivery, Dhaka">
+                <span className="font-display font-semibold tabular-nums font-stretch-semi-expanded">
+                  {formatBDT(facts.shipping.insideDhakaCents)}
+                </span>
+              </LedgerRow>
+              <LedgerRow term="Delivery, elsewhere">
+                <span className="font-display font-semibold tabular-nums font-stretch-semi-expanded">
+                  {formatBDT(facts.shipping.outsideDhakaCents)}
+                </span>
+              </LedgerRow>
+              <LedgerRow term="Free delivery">
+                Orders from{' '}
+                <span className="font-display font-semibold tabular-nums font-stretch-semi-expanded">
+                  {formatBDT(facts.shipping.freeFromCents)}
+                </span>
+              </LedgerRow>
+              <LedgerRow term="Payment">
+                {facts.methods.length > 0
+                  ? `${facts.methods.map((m) => PAYMENT_METHOD_SHORT_LABEL[m]).join(', ')}, with the total confirmed before you order`
+                  : 'Methods and the total are shown at checkout'}
+              </LedgerRow>
+              <LedgerRow term="Warranty">
+                Term listed on each product; claims from your delivered order
+              </LedgerRow>
+              <LedgerRow term="Returns">
+                <Link href="/refund-policy" className="underline hover:text-solder-ink">
+                  Refund and return policy
+                </Link>
+              </LedgerRow>
+            </dl>
           </div>
         </section>
-      ) : null}
-
-      {showcase ? (
-        <CategoryShowcase
-          category={{ ...showcase, page: { ...showcase.page, items: showcase.unseen } }}
-        />
-      ) : null}
-
-      <section aria-labelledby="how-buying-works" className="mt-16 md:mt-24">
-        <div className="grid gap-x-10 gap-y-6 border-t-2 border-ink pt-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)]">
-          <h2
-            id="how-buying-works"
-            className="self-start font-display lg:sticky lg:top-32 text-2xl font-bold leading-tight tracking-[-0.02em] font-stretch-expanded md:text-[32px]"
-          >
-            What you know before you pay
-          </h2>
-          <dl className="text-sm">
-            <LedgerRow term="Delivery, Dhaka">
-              <span className="font-display font-semibold tabular-nums font-stretch-semi-expanded">
-                {formatBDT(facts.shipping.insideDhakaCents)}
-              </span>
-            </LedgerRow>
-            <LedgerRow term="Delivery, elsewhere">
-              <span className="font-display font-semibold tabular-nums font-stretch-semi-expanded">
-                {formatBDT(facts.shipping.outsideDhakaCents)}
-              </span>
-            </LedgerRow>
-            <LedgerRow term="Free delivery">
-              Orders from{' '}
-              <span className="font-display font-semibold tabular-nums font-stretch-semi-expanded">
-                {formatBDT(facts.shipping.freeFromCents)}
-              </span>
-            </LedgerRow>
-            <LedgerRow term="Payment">
-              {facts.methods.length > 0
-                ? `${facts.methods.map((m) => PAYMENT_METHOD_SHORT_LABEL[m]).join(', ')}, with the total confirmed before you order`
-                : 'Methods and the total are shown at checkout'}
-            </LedgerRow>
-            <LedgerRow term="Warranty">
-              Term listed on each product; claims from your delivered order
-            </LedgerRow>
-            <LedgerRow term="Returns">
-              <Link href="/refund-policy" className="underline hover:text-solder-ink">
-                Refund and return policy
-              </Link>
-            </LedgerRow>
-          </dl>
-        </div>
-      </section>
-    </div>
+        <HomeClosing closing={HOME_CLOSING} />
+      </div>
+    </HomeMotion>
   );
 }
 
