@@ -14,20 +14,24 @@ interface ReviewsSectionProps {
 
 export function ReviewsSection({ productId, summary, initialReviews }: ReviewsSectionProps) {
   return (
-    <section className="space-y-4">
-      <header className="flex items-baseline justify-between">
-        <h2 className="text-xl font-semibold">Customer reviews</h2>
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <RatingStars value={summary.average} />
-          <span>
-            {summary.average.toFixed(1)} · {summary.count} review
-            {summary.count === 1 ? '' : 's'}
-          </span>
-        </div>
+    <section className="space-y-5">
+      <header className="flex flex-wrap items-baseline justify-between gap-3">
+        <h2 className="font-display text-2xl font-bold tracking-[-0.02em] font-stretch-expanded">
+          Customer reviews
+        </h2>
+        {summary.count > 0 ? (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <RatingStars value={summary.average} />
+            <span className="tabular-nums">
+              {summary.average.toFixed(1)} · {summary.count} review
+              {summary.count === 1 ? '' : 's'}
+            </span>
+          </div>
+        ) : null}
       </header>
 
       {initialReviews.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
+        <p className="max-w-prose text-sm text-muted-foreground">
           No reviews yet. Be the first to share what you think after your delivery arrives.
         </p>
       ) : (

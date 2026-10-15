@@ -3,6 +3,7 @@ import './globals.css';
 import { Providers } from '@/components/providers';
 import { Analytics } from '@vercel/analytics/next';
 import localFont from 'next/font/local';
+import { Archivo } from 'next/font/google';
 
 import { env } from '@/env';
 
@@ -23,6 +24,14 @@ const googleSans = localFont({
   ],
   display: 'swap',
   variable: '--font-google-sans',
+});
+
+// Display face for the storefront: variable width axis for wide headings, prices and model names.
+const archivo = Archivo({
+  subsets: ['latin'],
+  axes: ['wdth'],
+  display: 'swap',
+  variable: '--font-archivo',
 });
 
 export const metadata: Metadata = {
@@ -69,7 +78,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning className={`${googleSans.variable}`}>
+    <html
+      lang="en"
+      suppressHydrationWarning
+      className={`${googleSans.variable} ${archivo.variable}`}
+    >
       <body suppressHydrationWarning className="antialiased">
         <script
           type="application/ld+json"

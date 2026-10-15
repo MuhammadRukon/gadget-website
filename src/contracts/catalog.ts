@@ -129,6 +129,9 @@ export interface PublicProductSummary {
   originalPriceCents: number;
   inStock: boolean;
   isPopular: boolean;
+  warrantyMonths: number;
+  /** Up to three attribute values of the listed variant (e.g. "16 GB", "512 GB"). */
+  specs: string[];
 }
 
 export interface PublicProductPage {

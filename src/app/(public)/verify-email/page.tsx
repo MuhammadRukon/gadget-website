@@ -155,7 +155,7 @@ function VerifyEmailContent() {
                   <Input
                     type="email"
                     autoComplete="email"
-                    placeholder="m@example.com"
+                    placeholder="you@example.com"
                     {...field}
                     value={field.value ?? ''}
                   />

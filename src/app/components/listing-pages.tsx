@@ -37,7 +37,10 @@ export function productsMetadata(live?: ListingSearchParams): Metadata {
   };
 }
 
-export async function categoryMetadata(slug: string, live?: ListingSearchParams): Promise<Metadata> {
+export async function categoryMetadata(
+  slug: string,
+  live?: ListingSearchParams,
+): Promise<Metadata> {
   const cat = await getCategoryBySlug(slug);
   if (!cat) return { title: 'Category not found' };
   return {
@@ -68,7 +71,10 @@ export async function publishedSlugs(kind: 'category' | 'brand'): Promise<{ slug
         : await catalogService.listPublicBrands();
     return rows.map(({ slug }) => ({ slug }));
   } catch (err) {
-    log.warn('publishedSlugs failed', { kind, error: err instanceof Error ? err.message : String(err) });
+    log.warn('publishedSlugs failed', {
+      kind,
+      error: err instanceof Error ? err.message : String(err),
+    });
     return [];
   }
 }
@@ -83,7 +89,9 @@ export async function publishedProductSlugs(limit = 100): Promise<{ slug: string
       select: { slug: true },
     });
   } catch (err) {
-    log.warn('publishedProductSlugs failed', { error: err instanceof Error ? err.message : String(err) });
+    log.warn('publishedProductSlugs failed', {
+      error: err instanceof Error ? err.message : String(err),
+    });
     return [];
   }
 }
@@ -103,7 +111,8 @@ export async function ProductsListing({ query = {} }: Readonly<{ query?: Product
       brands={brands}
       categories={categories}
       page={page}
-      title="All products"
+      title={query.q ? `Results for “${query.q}”` : 'All products'}
+      basePath="/products"
       breadcrumbItems={[{ label: 'Home', href: '/' }, { label: 'All products' }]}
     />
   );
@@ -122,9 +131,10 @@ export async function CategoryListing({
     <CommonListPage
       brands={brands}
       categories={categories}
-      brand={category}
+      scope={{ kind: 'category', slug: category.slug }}
       page={page}
       title={category.name}
+      basePath={`/category/${category.slug}`}
       breadcrumbItems={[{ label: 'Home', href: '/' }, { label: category.name }]}
     />
   );
@@ -143,9 +153,10 @@ export async function BrandListing({
     <CommonListPage
       brands={brands}
       categories={categories}
-      brand={brand}
+      scope={{ kind: 'brand', slug: brand.slug }}
       page={page}
       title={brand.name}
+      basePath={`/brand/${brand.slug}`}
       breadcrumbItems={[{ label: 'Home', href: '/' }, { label: brand.name }]}
     />
   );

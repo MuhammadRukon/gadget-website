@@ -4,6 +4,7 @@ import { cache } from 'react';
 
 import { catalogService } from '@/server/catalog/catalog.service';
 import { reviewsService } from '@/server/reviews/reviews.service';
+import { storefrontFactsService } from '@/server/storefront/storefront-facts.service';
 import { AppError } from '@/server/common/errors';
 import { publishedProductSlugs } from '@/app/components/listing-pages';
 import { ProductDetail } from '@/modules/storefront/components/product-detail';
@@ -53,11 +54,22 @@ export default async function ProductDetailPage({ params }: Readonly<PageProps>)
     }
     throw err;
   }
-  const [reviewSummary, initialReviews] = await Promise.all([
+  const primaryCategory = product.categories[0];
+  const [reviewSummary, initialReviews, facts, related] = await Promise.all([
     reviewsService.summaryForProduct(product.id),
     reviewsService.listForProduct(product.id, 10),
+    storefrontFactsService.get(),
+    primaryCategory
+      ? catalogService.listPublicProducts({ categorySlug: primaryCategory.slug, limit: 5 })
+      : null,
   ]);
   return (
-    <ProductDetail product={product} reviewSummary={reviewSummary} initialReviews={initialReviews} />
+    <ProductDetail
+      product={product}
+      reviewSummary={reviewSummary}
+      initialReviews={initialReviews}
+      facts={facts}
+      related={(related?.items ?? []).filter((p) => p.id !== product.id).slice(0, 4)}
+    />
   );
 }

@@ -23,3 +23,8 @@ export function revalidateCatalog({
 export function revalidateProductPage(slug: string): void {
   revalidatePath(`/products/${slug}`);
 }
+
+/** Payment settings feed the storefront facts strip in the shared layout. */
+export function revalidateStorefrontFacts(): void {
+  revalidatePath('/', 'layout');
+}

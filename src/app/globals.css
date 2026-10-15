@@ -37,6 +37,20 @@
   --sidebar-accent-foreground: oklch(0.21 0.006 285.885);
   --sidebar-border: oklch(0.92 0.004 286.32);
   --sidebar-ring: oklch(0.705 0.015 286.067);
+
+  /* Storefront "spec sheet" world: cool paper, ink, solder-mask green. */
+  --sf-paper: oklch(0.968 0.004 140);
+  --sf-surface: oklch(0.995 0.002 140);
+  --sf-field: oklch(0.935 0.007 145);
+  --sf-ink: oklch(0.2 0.012 165);
+  --sf-ink-2: oklch(0.45 0.012 165);
+  --sf-rule: oklch(0.875 0.008 150);
+  --sf-rule-strong: oklch(0.78 0.01 155);
+  --sf-solder: oklch(0.47 0.105 162);
+  --sf-solder-ink: oklch(0.39 0.095 162);
+  --sf-solder-soft: oklch(0.93 0.035 162);
+  --sf-on-solder: oklch(0.985 0.005 160);
+  --sf-sale: oklch(0.53 0.19 28);
 }
 
 .light {
@@ -76,6 +90,68 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.552 0.016 285.938);
+
+  --sf-paper: oklch(0.175 0.008 165);
+  --sf-surface: oklch(0.21 0.009 165);
+  --sf-field: oklch(0.245 0.01 165);
+  --sf-ink: oklch(0.95 0.006 150);
+  --sf-ink-2: oklch(0.74 0.01 155);
+  --sf-rule: oklch(0.32 0.01 165);
+  --sf-rule-strong: oklch(0.42 0.012 165);
+  --sf-solder: oklch(0.72 0.12 162);
+  --sf-solder-ink: oklch(0.8 0.11 162);
+  --sf-solder-soft: oklch(0.3 0.045 162);
+  --sf-on-solder: oklch(0.18 0.03 165);
+  --sf-sale: oklch(0.7 0.16 28);
+}
+
+/*
+ * Storefront scope. Re-points the shadcn tokens at the storefront palette so
+ * shared primitives (Button, Input, Badge, Sheet content) pick it up without
+ * touching the admin dashboard, which keeps the default tokens.
+ */
+.sf {
+  --background: var(--sf-paper);
+  --foreground: var(--sf-ink);
+  --card: var(--sf-surface);
+  --card-foreground: var(--sf-ink);
+  --popover: var(--sf-surface);
+  --popover-foreground: var(--sf-ink);
+  --primary: var(--sf-solder);
+  --primary-foreground: var(--sf-on-solder);
+  --secondary: var(--sf-field);
+  --secondary-foreground: var(--sf-ink);
+  --muted: var(--sf-field);
+  --muted-foreground: var(--sf-ink-2);
+  --accent: var(--sf-field);
+  --accent-foreground: var(--sf-ink);
+  --border: var(--sf-rule);
+  --input: var(--sf-rule-strong);
+  --ring: var(--sf-solder);
+  --radius: 0.375rem;
+  background-color: var(--sf-paper);
+  color: var(--sf-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.sf ::selection {
+  background: var(--sf-solder);
+  color: var(--sf-on-solder);
+}
+
+.sf :focus-visible {
+  outline: 2px solid var(--sf-solder);
+  outline-offset: 2px;
+}
+
+.sf a {
+  text-underline-offset: 0.2em;
+  text-decoration-thickness: 1px;
+}
+
+.sf input,
+.sf textarea {
+  caret-color: var(--sf-solder);
 }
 
 body {
@@ -123,6 +199,20 @@ body {
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+
+  --font-display: var(--font-archivo), var(--font-google-sans), sans-serif;
+  --color-paper: var(--sf-paper);
+  --color-surface: var(--sf-surface);
+  --color-field: var(--sf-field);
+  --color-ink: var(--sf-ink);
+  --color-ink-2: var(--sf-ink-2);
+  --color-rule: var(--sf-rule);
+  --color-rule-strong: var(--sf-rule-strong);
+  --color-solder: var(--sf-solder);
+  --color-solder-ink: var(--sf-solder-ink);
+  --color-solder-soft: var(--sf-solder-soft);
+  --color-on-solder: var(--sf-on-solder);
+  --color-sale: var(--sf-sale);
 }
 
 @layer base {
@@ -158,4 +248,51 @@ body {
 
 .animate-accordion-up {
   animation: accordion-up 0.2s ease-out;
+}
+
+/* Storefront primitives: shadcn parts inside .sf adopt the spec-sheet corners and surfaces. */
+.sf [data-slot='input'],
+.sf [data-slot='textarea'],
+.sf [data-slot='select-trigger'] {
+  background-color: var(--sf-surface);
+}
+
+@layer base {
+  .sf [data-slot='input'],
+  .sf [data-slot='textarea'],
+  .sf [data-slot='select-trigger'],
+  .sf [data-slot='button'],
+  .sf [data-slot='badge'] {
+    border-radius: var(--radius-md);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sf *,
+  .sf *::before,
+  .sf *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@keyframes sf-pop {
+  from {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@layer base {
+  /* Page headings across storefront pages speak in the display face unless a page sets its own. */
+  .sf h1,
+  .sf h2 {
+    font-family: var(--font-display);
+    font-stretch: 112.5%;
+    letter-spacing: -0.015em;
+  }
 }

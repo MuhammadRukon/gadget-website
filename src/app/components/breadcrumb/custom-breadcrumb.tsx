@@ -1,4 +1,3 @@
-import { uppercase } from '@/app/utils/helper';
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -41,15 +40,15 @@ export function buildBreadcrumbJsonLd(items: BreadcrumbItem[], baseUrl: string) 
 export function CustomBreadcrumb({ items }: Readonly<BreadcrumbProps>) {
   return (
     <Breadcrumb>
-      <BreadcrumbList>
+      <BreadcrumbList className="text-[13px] text-ink-2">
         {items.map((item, index) => (
           <React.Fragment key={index}>
             <BreadcrumbItem>
               {index === items.length - 1 ? (
-                <BreadcrumbPage>{uppercase(item.label as string)}</BreadcrumbPage>
+                <BreadcrumbPage className="text-ink">{item.label}</BreadcrumbPage>
               ) : (
-                <BreadcrumbLink href={item.href ?? '#'}>
-                  {uppercase(item.label as string)}
+                <BreadcrumbLink href={item.href ?? '#'} className="hover:text-solder-ink">
+                  {item.label}
                 </BreadcrumbLink>
               )}
             </BreadcrumbItem>

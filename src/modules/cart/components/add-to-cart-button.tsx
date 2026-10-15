@@ -11,6 +11,8 @@ interface AddToCartButtonProps {
   size?: 'default' | 'sm' | 'lg';
   /** Known stock of the variant; guests cannot add past it. */
   maxStock?: number;
+  /** Called after the item is in the cart. */
+  onAdded?: () => void;
 }
 
 export function AddToCartButton({
@@ -20,6 +22,7 @@ export function AddToCartButton({
   className,
   size = 'lg',
   maxStock,
+  onAdded,
 }: AddToCartButtonProps) {
   const { addItem } = useCartMutations();
 
@@ -31,7 +34,7 @@ export function AddToCartButton({
       disabled={!variantId || disabled || addItem.isPending}
       onClick={() => {
         if (!variantId) return;
-        addItem.mutate({ variantId, quantity: 1, maxStock });
+        addItem.mutate({ variantId, quantity: 1, maxStock }, { onSuccess: () => onAdded?.() });
       }}
     >
       {addItem.isPending ? 'Adding...' : label}
