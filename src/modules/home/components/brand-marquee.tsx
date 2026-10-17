@@ -38,7 +38,7 @@ export function BrandMarquee({ brands }: Readonly<{ brands: Brand[] }>) {
                   <Link
                     href={`/brand/${b.slug}`}
                     tabIndex={copy === 1 || i >= brands.length ? -1 : undefined}
-                    className="font-display text-3xl font-bold uppercase tracking-[-0.02em] text-ink/55 transition-colors font-stretch-expanded hover:text-ink md:text-5xl"
+                    className="inline-block py-2 font-display text-3xl font-bold uppercase tracking-[-0.02em] text-ink/55 transition-colors font-stretch-expanded hover:text-ink md:text-5xl"
                   >
                     {b.name}
                   </Link>

@@ -1,5 +1,6 @@
 import { ArrowRight, ArrowUpRight } from 'lucide-react';
 import Link from 'next/link';
+import { preload } from 'react-dom';
 
 import { PAYMENT_METHOD_SHORT_LABEL } from '@/modules/checkout/payment-methods';
 import type { PublicProductSummary } from '@/contracts/catalog';
@@ -45,7 +46,27 @@ async function loadHome() {
     topCategories.map((c) => catalogService.listPublicProducts({ categorySlug: c.slug, limit: 4 })),
   );
   const categories = topCategories.map((c, i) => ({ ...c, page: categoryPages[i] }));
+  // A route is only offered when it leads somewhere: a category with products, or a search that matches.
+  const searchTerms = [...HOME_TILES.map((t) => t.href), HOME_STORY.cta.href]
+    .map((h) => (h.startsWith('/products?q=') ? decodeURIComponent(h.split('q=')[1]) : null))
+    .filter((q): q is string => q !== null);
+  const searchHits = new Map(
+    await Promise.all(
+      [...new Set(searchTerms)].map(
+        async (q) =>
+          [q, (await catalogService.listPublicProducts({ q, limit: 1 })).total > 0] as const,
+      ),
+    ),
+  );
+  const liveCategories = new Set(categories.filter((c) => c.page.total > 0).map((c) => c.slug));
+  const routeLeadsSomewhere = (href: string) => {
+    if (href.startsWith('/category/')) return liveCategories.has(href.slice('/category/'.length));
+    if (href.startsWith('/products?q='))
+      return searchHits.get(decodeURIComponent(href.split('q=')[1])) === true;
+    return true;
+  };
   return {
+    routeLeadsSomewhere,
     newest: newest.items,
     totalProducts: newest.total,
     categories,
@@ -55,7 +76,16 @@ async function loadHome() {
 }
 
 export default async function HomePage() {
-  const { newest, totalProducts, categories, brands, facts } = await loadHome();
+  // The home banner headline and card titles paint in both Archivo faces; other routes discover them via CSS.
+  for (const face of ['expanded-700', 'semiexpanded-600']) {
+    preload(`/fonts/archivo/archivo-${face}.woff2`, {
+      as: 'font',
+      type: 'font/woff2',
+      crossOrigin: 'anonymous',
+    });
+  }
+  const { newest, totalProducts, categories, brands, facts, routeLeadsSomewhere } =
+    await loadHome();
   const featured =
     newest.find((p) => p.isPopular && p.inStock) ?? newest.find((p) => p.inStock) ?? newest[0];
   // A short list should not repeat itself: each product appears once on the page where the catalog allows.
@@ -161,9 +191,9 @@ export default async function HomePage() {
           </section>
         ) : null}
 
-        <ScrollStory story={HOME_STORY} />
+        {routeLeadsSomewhere(HOME_STORY.cta.href) ? <ScrollStory story={HOME_STORY} /> : null}
 
-        <CategoryBento tiles={HOME_TILES} />
+        <CategoryBento tiles={HOME_TILES.filter((t) => routeLeadsSomewhere(t.href))} />
 
         {showcase ? (
           <CategoryShowcase

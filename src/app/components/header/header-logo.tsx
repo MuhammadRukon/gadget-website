@@ -12,7 +12,7 @@ export function HeaderLogo(): JSX.Element {
   return (
     <Link
       href="/"
-      className="group flex shrink-0 items-center rounded-sm"
+      className="group flex min-h-11 min-w-11 shrink-0 items-center rounded-sm"
       aria-label="Ravntech home"
     >
       <Image

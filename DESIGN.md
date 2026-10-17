@@ -191,7 +191,7 @@ Scope: the customer storefront only (everything under the `.sf` scope: home, lis
 
 The shop reads like a well-made product datasheet: exact, calm, measured. Every surface is a sheet of cool paper ruled with hairlines, set in a wide engineering display face, with near-black ink for facts and a single raven-mask blue-gray for the things you act on. Information is the decoration. Prices, stock, delivery fees, warranty terms and payment methods are set as real, ruled facts rather than being hidden behind banners, and nothing is shown that the data does not back.
 
-Density is moderate and even, tuned for phones in bright light on slow networks: generous 44px targets, short line lengths, no heavy imagery beyond the product photos themselves, which sit on tinted fields so a mixed catalogue of white-background shots reads as one set. The world explicitly rejects the category default of a decorative hero banner over identical card grids; the home page opens on a wide headline, a ruled category index and one real product at full scale.
+Density is moderate and even, tuned for phones in bright light on slow networks: generous 44px targets, short line lengths, no heavy imagery beyond the product photos themselves, which sit on tinted fields so a mixed catalogue of white-background shots reads as one set. The world rejects the category default of a decorative hero over identical card grids. The home page opens on one banner (a deliberate owner choice, October 2026) carrying the headline and two real routes, then a ruled category index and one real product at full scale; every route on the page must lead to products that exist.
 
 **Key Characteristics:**
 - Cool paper ground, near-black ink, one raven-blue-gray accent; sale red only on real discounts.
@@ -345,7 +345,7 @@ Short and functional. Arrows nudge 4px right over 300ms ease-out on hover; image
 - **Do** pair every state colour with words or shape (stock dot plus "In stock", strike plus "Out of stock").
 
 ### Don't:
-- **Don't** add a decorative hero banner or a carousel; the home page opens on a headline, the category index and one real product.
+- **Don't** add a carousel or a second hero. The single home banner is the one allowed image; it must be decorative (empty alt) and may not show products the shop does not sell. Never link a tile or story to a category or search with no results.
 - **Don't** show invented proof, counts, delivery times, stock numbers or discounts; every fact on the page is read from data or settings.
 - **Don't** use raven blue-gray for headings, borders or decoration, and don't use sale red for anything except a real price reduction or a validation error.
 - **Don't** wrap groups in bordered or shadowed cards where a hairline will do; shadows belong only to floating layers.

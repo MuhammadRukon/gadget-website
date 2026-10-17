@@ -116,9 +116,9 @@ export function CartLineItem({
           </p>
         )}
         {unavailableReason ? (
-          <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">{unavailableReason}</p>
+          <p className="text-xs text-warn mt-1">{unavailableReason}</p>
         ) : line.quantity > line.stock ? (
-          <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+          <p className="text-xs text-warn mt-1">
             Only {line.stock} in stock.
           </p>
         ) : null}

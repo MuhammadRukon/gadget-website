@@ -29,7 +29,7 @@ export function CartNotices({ lines }: Readonly<{ lines: CartLine[] | undefined 
         </p>
       ) : null}
       {hasUnavailable ? (
-        <p className="text-amber-600 dark:text-amber-400">
+        <p className="text-warn">
           Some items are unavailable. Remove them, or they will be removed automatically when you
           check out.
         </p>

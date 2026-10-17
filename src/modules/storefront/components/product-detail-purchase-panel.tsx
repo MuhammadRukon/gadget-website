@@ -148,7 +148,7 @@ export function ProductDetailPurchasePanel({
           aria-hidden={ctaVisible}
           inert={ctaVisible}
           className={cn(
-            'fixed inset-x-0 bottom-0 z-40 border-t border-rule bg-surface/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_24px_-12px_oklch(0.2_0.02_165/0.2)] transition-transform duration-300 ease-out lg:hidden',
+            'fixed inset-x-0 bottom-0 z-40 border-t border-rule bg-surface/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 shadow-(--sf-shadow-dock) transition-transform duration-300 ease-out lg:hidden',
             ctaVisible ? 'pointer-events-none translate-y-full' : 'translate-y-0',
           )}
         >
@@ -220,7 +220,7 @@ export function ProductDetailPurchasePanel({
             {variant ? (
               <div className="grid grid-cols-[minmax(7rem,38%)_1fr] gap-4 border-b border-rule py-2.5">
                 <dt className="text-ink-2">SKU</dt>
-                <dd className="font-mono text-[13px]">{variant.sku}</dd>
+                <dd className="font-mono text-sm">{variant.sku}</dd>
               </div>
             ) : null}
           </dl>

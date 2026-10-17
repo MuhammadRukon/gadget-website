@@ -192,7 +192,7 @@ export function HeaderFrame({
         data-search={searchOpen}
         className="group/h pointer-events-none sticky top-0 z-50 h-14 md:h-16"
       >
-        <div className="pointer-events-auto relative border-b border-rule bg-paper transition-[box-shadow,border-color] duration-300 group-data-[search=true]/h:border-transparent group-data-[compact=true]/h:shadow-[0_10px_30px_-18px_oklch(0.2_0.02_255/0.35)]">
+        <div className="pointer-events-auto relative border-b border-rule bg-paper transition-[box-shadow,border-color] duration-300 group-data-[search=true]/h:border-transparent group-data-[compact=true]/h:shadow-(--sf-shadow-bar)">
           {children}
           <SearchPanel />
         </div>
@@ -253,7 +253,7 @@ function SearchPanel() {
       aria-modal="true"
       aria-labelledby="header-search-title"
       inert={searchClosing}
-      className={`absolute inset-x-0 top-full border-b border-rule bg-paper pb-10 pt-4 shadow-[0_30px_60px_-40px_oklch(0.2_0.02_255/0.45)] md:pb-14 md:pt-6 ${
+      className={`absolute inset-x-0 top-full border-b border-rule bg-paper pb-10 pt-4 shadow-(--sf-shadow-sheet) md:pb-14 md:pt-6 ${
         searchClosing
           ? 'animate-out fade-out-0 slide-out-to-top-3 fill-mode-forwards duration-200 ease-in'
           : 'animate-in fade-in-0 slide-in-from-top-3 duration-300 ease-out'

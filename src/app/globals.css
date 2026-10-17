@@ -80,6 +80,10 @@
   /* The raven's eye: a small live signal (stock dot, cart count), never text. */
   --sf-eye: oklch(0.7 0.15 235);
   --sf-sale: oklch(0.53 0.19 28);
+  --sf-warn: oklch(0.47 0.1 65);
+  --sf-shadow-bar: 0 10px 30px -18px oklch(0.2 0.02 255 / 0.35);
+  --sf-shadow-sheet: 0 30px 60px -40px oklch(0.2 0.02 255 / 0.45);
+  --sf-shadow-dock: 0 -8px 24px -12px oklch(0.2 0.02 255 / 0.2);
 }
 
 .light {
@@ -133,6 +137,7 @@
   --sf-on-raven: oklch(0.18 0.012 255);
   --sf-eye: oklch(0.76 0.14 235);
   --sf-sale: oklch(0.7 0.16 28);
+  --sf-warn: oklch(0.8 0.12 80);
 }
 
 /*
@@ -243,6 +248,7 @@ body {
   --color-raven-soft: var(--sf-raven-soft);
   --color-on-raven: var(--sf-on-raven);
   --color-sale: var(--sf-sale);
+  --color-warn: var(--sf-warn);
   --color-eye: var(--sf-eye);
 }
 
@@ -298,12 +304,28 @@ body {
   }
 }
 
+/* Reduced motion: movement goes, feedback stays. Fades, colour and focus changes still animate so state changes read. */
 @media (prefers-reduced-motion: reduce) {
   .sf *,
   .sf *::before,
   .sf *::after {
-    animation-duration: 0.01ms !important;
-    transition-duration: 0.01ms !important;
+    transition-property: color, background-color, border-color, text-decoration-color, fill, stroke,
+      opacity, box-shadow !important;
+    scroll-behavior: auto !important;
+  }
+  .sf .animate-in,
+  .sf .animate-out {
+    --tw-enter-translate-x: 0;
+    --tw-enter-translate-y: 0;
+    --tw-exit-translate-x: 0;
+    --tw-exit-translate-y: 0;
+    --tw-enter-scale: 1;
+    --tw-exit-scale: 1;
+    --tw-enter-rotate: 0;
+    --tw-exit-rotate: 0;
+  }
+  .sf [class*='animate-[sf-'] {
+    animation: none !important;
   }
 }
 
