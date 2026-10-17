@@ -8,7 +8,7 @@
   "scripts": {
     "db:guard": "dotenv -e .env.dev -- tsx scripts/assert-db-target.ts",
     "predev": "npm run db:guard",
-    "dev": "dotenv -e .env.dev -- next dev --turbopack",
+    "dev": "dotenv -e .env.dev -- next dev --turbopack -p 3001",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",

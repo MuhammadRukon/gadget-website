@@ -5,6 +5,7 @@ const prisma = vi.hoisted(() => ({
   product: { findMany: vi.fn(), count: vi.fn() },
   category: { findMany: vi.fn() },
   brand: { findMany: vi.fn() },
+  productCategory: { findMany: vi.fn() },
 }));
 const repo = vi.hoisted(() => ({
   createBrand: vi.fn(),
@@ -62,6 +63,10 @@ beforeEach(() => {
   ]);
   prisma.brand.findMany.mockResolvedValue([
     { id: 'b1', name: 'Apple', slug: 'apple', isPopular: true },
+  ]);
+  prisma.productCategory.findMany.mockResolvedValue([
+    { categoryId: 'c1', product: { brandId: 'b1' } },
+    { categoryId: 'c1', product: { brandId: 'b1' } },
   ]);
 });
 afterEach(() => setStoreForTests(undefined));
@@ -160,6 +165,7 @@ describe('getCatalogShell', () => {
     expect(prisma.brand.findMany).toHaveBeenCalledTimes(1);
     expect(a.categories[0].slug).toBe('phones');
     expect(a.brands[0].slug).toBe('apple');
+    expect(a.categoryBrands).toEqual([{ categoryId: 'c1', brandId: 'b1' }]);
   });
 });
 

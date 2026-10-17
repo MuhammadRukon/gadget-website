@@ -14,19 +14,33 @@ import { storefrontFactsService } from '@/server/storefront/storefront-facts.ser
  * page render.
  */
 async function loadMenu(): Promise<MenuCategory[]> {
-  const { categories, brands } = await catalogService.getCatalogShell();
+  const { categories, brands, categoryBrands } = await catalogService.getCatalogShell();
 
-  // For Phase 4 we keep the menu flat: top-level categories with all
-  // brands shown as a flyout. Future phases can refine this with
-  // category/brand affinity (only show brands that actually have
-  // products in that category).
-  const popularCategories = categories.filter((c) => c.parentId === null).slice(0, 8);
-  return popularCategories.map((c) => ({
-    id: c.id,
-    name: c.name,
-    slug: c.slug,
-    brands: brands.slice(0, 12).map((b) => ({ id: b.id, name: b.name, slug: b.slug })),
-  }));
+  // Each top-level category lists only brands that have a published product
+  // in it or in one of its subcategories.
+  const topLevel = categories.filter((c) => c.parentId === null).slice(0, 8);
+  const brandIdsByCategory = new Map<string, Set<string>>();
+  for (const { categoryId, brandId } of categoryBrands) {
+    const set = brandIdsByCategory.get(categoryId) ?? new Set<string>();
+    set.add(brandId);
+    brandIdsByCategory.set(categoryId, set);
+  }
+  return topLevel.map((c) => {
+    const ids = new Set(brandIdsByCategory.get(c.id));
+    for (const child of categories) {
+      if (child.parentId !== c.id) continue;
+      brandIdsByCategory.get(child.id)?.forEach((id) => ids.add(id));
+    }
+    return {
+      id: c.id,
+      name: c.name,
+      slug: c.slug,
+      brands: brands
+        .filter((b) => ids.has(b.id))
+        .slice(0, 12)
+        .map((b) => ({ id: b.id, name: b.name, slug: b.slug })),
+    };
+  });
 }
 
 export default async function PublicLayout({ children }: Readonly<{ children: React.ReactNode }>) {

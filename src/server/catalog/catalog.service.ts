@@ -316,46 +316,48 @@ export const catalogService = {
     ensureUniqueSkus(input.variants);
     const slug = slugify(input.slug || input.name);
     try {
-      return await prisma.$transaction(async (tx) => {
-        const product = await tx.product.create({
-          data: {
-            name: input.name,
-            slug,
-            description: input.description,
-            brandId: input.brandId,
-            status: productStatusOrDefault(input),
-            isPopular: input.isPopular ?? false,
-            warrantyMonths: input.warrantyMonths,
-            metaTitle: input.metaTitle ?? null,
-            metaDescription: input.metaDescription ?? null,
-            categories: {
-              create: input.categoryIds.map((categoryId) => ({ categoryId })),
+      return await invalidatingShell(
+        prisma.$transaction(async (tx) => {
+          const product = await tx.product.create({
+            data: {
+              name: input.name,
+              slug,
+              description: input.description,
+              brandId: input.brandId,
+              status: productStatusOrDefault(input),
+              isPopular: input.isPopular ?? false,
+              warrantyMonths: input.warrantyMonths,
+              metaTitle: input.metaTitle ?? null,
+              metaDescription: input.metaDescription ?? null,
+              categories: {
+                create: input.categoryIds.map((categoryId) => ({ categoryId })),
+              },
+              images: {
+                create: input.images.map((img, idx) => ({
+                  url: img.url,
+                  publicId: img.publicId,
+                  alt: img.alt ?? null,
+                  sortOrder: img.sortOrder ?? idx,
+                })),
+              },
+              variants: {
+                create: input.variants.map((v) => ({
+                  sku: v.sku,
+                  name: v.name ?? null,
+                  attributes: v.attributes ?? {},
+                  buyingPriceCents: v.buyingPriceCents,
+                  sellingPriceCents: v.sellingPriceCents,
+                  discountCents: v.discountCents,
+                  stock: v.stock,
+                  lowStockThreshold: v.lowStockThreshold,
+                  isActive: v.isActive,
+                })),
+              },
             },
-            images: {
-              create: input.images.map((img, idx) => ({
-                url: img.url,
-                publicId: img.publicId,
-                alt: img.alt ?? null,
-                sortOrder: img.sortOrder ?? idx,
-              })),
-            },
-            variants: {
-              create: input.variants.map((v) => ({
-                sku: v.sku,
-                name: v.name ?? null,
-                attributes: v.attributes ?? {},
-                buyingPriceCents: v.buyingPriceCents,
-                sellingPriceCents: v.sellingPriceCents,
-                discountCents: v.discountCents,
-                stock: v.stock,
-                lowStockThreshold: v.lowStockThreshold,
-                isActive: v.isActive,
-              })),
-            },
-          },
-        });
-        return product;
-      });
+          });
+          return product;
+        }),
+      );
     } catch (err) {
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
         const field = uniqueConstraintField(err);
@@ -385,93 +387,95 @@ export const catalogService = {
     const removedVariants = existing.variants.filter((v) => !incomingVariantIds.has(v.id));
 
     try {
-      return await prisma.$transaction(async (tx) => {
-        await tx.product.update({
-          where: { id },
-          data: {
-            name: input.name,
-            slug,
-            description: input.description,
-            brandId: input.brandId,
-            status: productStatusOrDefault(input),
-            isPopular: input.isPopular ?? false,
-            warrantyMonths: input.warrantyMonths,
-            metaTitle: input.metaTitle ?? null,
-            metaDescription: input.metaDescription ?? null,
-          },
-        });
-
-        await tx.productCategory.deleteMany({ where: { productId: id } });
-        if (input.categoryIds.length > 0) {
-          await tx.productCategory.createMany({
-            data: input.categoryIds.map((categoryId) => ({ productId: id, categoryId })),
+      return await invalidatingShell(
+        prisma.$transaction(async (tx) => {
+          await tx.product.update({
+            where: { id },
+            data: {
+              name: input.name,
+              slug,
+              description: input.description,
+              brandId: input.brandId,
+              status: productStatusOrDefault(input),
+              isPopular: input.isPopular ?? false,
+              warrantyMonths: input.warrantyMonths,
+              metaTitle: input.metaTitle ?? null,
+              metaDescription: input.metaDescription ?? null,
+            },
           });
-        }
 
-        await tx.productImage.deleteMany({ where: { productId: id } });
-        if (input.images.length > 0) {
-          await tx.productImage.createMany({
-            data: input.images.map((img, idx) => ({
-              productId: id,
-              url: img.url,
-              publicId: img.publicId,
-              alt: img.alt ?? null,
-              sortOrder: img.sortOrder ?? idx,
-            })),
-          });
-        }
-
-        for (const v of input.variants) {
-          if (v.id) {
-            await tx.productVariant.update({
-              where: { id: v.id },
-              data: {
-                sku: v.sku,
-                name: v.name ?? null,
-                attributes: v.attributes ?? {},
-                buyingPriceCents: v.buyingPriceCents,
-                sellingPriceCents: v.sellingPriceCents,
-                discountCents: v.discountCents,
-                stock: v.stock,
-                lowStockThreshold: v.lowStockThreshold,
-                isActive: v.isActive,
-              },
+          await tx.productCategory.deleteMany({ where: { productId: id } });
+          if (input.categoryIds.length > 0) {
+            await tx.productCategory.createMany({
+              data: input.categoryIds.map((categoryId) => ({ productId: id, categoryId })),
             });
-          } else {
-            await tx.productVariant.create({
-              data: {
+          }
+
+          await tx.productImage.deleteMany({ where: { productId: id } });
+          if (input.images.length > 0) {
+            await tx.productImage.createMany({
+              data: input.images.map((img, idx) => ({
                 productId: id,
-                sku: v.sku,
-                name: v.name ?? null,
-                attributes: v.attributes ?? {},
-                buyingPriceCents: v.buyingPriceCents,
-                sellingPriceCents: v.sellingPriceCents,
-                discountCents: v.discountCents,
-                stock: v.stock,
-                lowStockThreshold: v.lowStockThreshold,
-                isActive: v.isActive,
-              },
+                url: img.url,
+                publicId: img.publicId,
+                alt: img.alt ?? null,
+                sortOrder: img.sortOrder ?? idx,
+              })),
             });
           }
-        }
 
-        for (const removed of removedVariants) {
-          const refCount = await tx.orderItem.count({ where: { variantId: removed.id } });
-          if (refCount > 0) {
-            await tx.productVariant.update({
-              where: { id: removed.id },
-              data: { isActive: false },
-            });
-          } else {
-            await tx.productVariant.delete({ where: { id: removed.id } });
+          for (const v of input.variants) {
+            if (v.id) {
+              await tx.productVariant.update({
+                where: { id: v.id },
+                data: {
+                  sku: v.sku,
+                  name: v.name ?? null,
+                  attributes: v.attributes ?? {},
+                  buyingPriceCents: v.buyingPriceCents,
+                  sellingPriceCents: v.sellingPriceCents,
+                  discountCents: v.discountCents,
+                  stock: v.stock,
+                  lowStockThreshold: v.lowStockThreshold,
+                  isActive: v.isActive,
+                },
+              });
+            } else {
+              await tx.productVariant.create({
+                data: {
+                  productId: id,
+                  sku: v.sku,
+                  name: v.name ?? null,
+                  attributes: v.attributes ?? {},
+                  buyingPriceCents: v.buyingPriceCents,
+                  sellingPriceCents: v.sellingPriceCents,
+                  discountCents: v.discountCents,
+                  stock: v.stock,
+                  lowStockThreshold: v.lowStockThreshold,
+                  isActive: v.isActive,
+                },
+              });
+            }
           }
-        }
 
-        return tx.product.findUnique({
-          where: { id },
-          include: catalogRepo.productInclude,
-        });
-      });
+          for (const removed of removedVariants) {
+            const refCount = await tx.orderItem.count({ where: { variantId: removed.id } });
+            if (refCount > 0) {
+              await tx.productVariant.update({
+                where: { id: removed.id },
+                data: { isActive: false },
+              });
+            } else {
+              await tx.productVariant.delete({ where: { id: removed.id } });
+            }
+          }
+
+          return tx.product.findUnique({
+            where: { id },
+            include: catalogRepo.productInclude,
+          });
+        }),
+      );
     } catch (err) {
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
         const field = uniqueConstraintField(err);
@@ -489,12 +493,32 @@ export const catalogService = {
   /** Categories + brands for the storefront menu/sidebars, one cache entry. */
   async getCatalogShell() {
     return cached({ key: SHELL_KEY(), ttlSec: 300 }, async () => {
-      const [categories, brands] = await Promise.all([
+      const [categories, brands, categoryBrands] = await Promise.all([
         this.listPublicCategories(),
         this.listPublicBrands(),
+        this.listCategoryBrandPairs(),
       ]);
-      return { categories, brands };
+      return { categories, brands, categoryBrands };
     });
+  },
+
+  /** Distinct (categoryId, brandId) pairs backed by at least one published product. */
+  async listCategoryBrandPairs() {
+    const rows = await prisma.productCategory.findMany({
+      where: {
+        product: { status: PublishStatus.PUBLISHED, brand: { status: PublishStatus.PUBLISHED } },
+      },
+      select: { categoryId: true, product: { select: { brandId: true } } },
+    });
+    const seen = new Set<string>();
+    const pairs: { categoryId: string; brandId: string }[] = [];
+    for (const { categoryId, product } of rows) {
+      const key = `${categoryId}:${product.brandId}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      pairs.push({ categoryId, brandId: product.brandId });
+    }
+    return pairs;
   },
 
   async listPublicCategories() {
@@ -852,14 +876,16 @@ export const catalogService = {
   async deleteProduct(id: string) {
     const refs = await prisma.orderItem.count({ where: { productId: id } });
     if (refs > 0) {
-      await prisma.product.update({
-        where: { id },
-        data: { status: PublishStatus.ARCHIVED },
-      });
+      await invalidatingShell(
+        prisma.product.update({
+          where: { id },
+          data: { status: PublishStatus.ARCHIVED },
+        }),
+      );
       return { archived: true as const };
     }
     try {
-      await prisma.product.delete({ where: { id } });
+      await invalidatingShell(prisma.product.delete({ where: { id } }));
       return { archived: false as const };
     } catch (err) {
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
