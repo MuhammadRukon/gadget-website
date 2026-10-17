@@ -75,9 +75,10 @@ export function HeaderSearch({
           id={inputId}
           type="search"
           aria-label="Search products"
-          placeholder="Search Ravyntech"
+          placeholder="Search Ravntech"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
+          autoFocus
           autoComplete="off"
           spellCheck={false}
           aria-describedby={statusId}

@@ -33,9 +33,11 @@ export function BuyingSteps({ steps }: Readonly<{ steps: HomeStep[] }>) {
                 className="flex w-[78vw] max-w-[420px] shrink-0 snap-start flex-col justify-between rounded-2xl border border-rule bg-surface p-6 sm:w-[46vw] lg:h-[420px] lg:w-[420px] lg:p-8"
               >
                 <div>
-                  <p className="font-display text-[5rem] font-bold leading-none tracking-[-0.04em] text-ink/10 tabular-nums font-stretch-expanded lg:text-[7rem]">
-                    {String(i + 1).padStart(2, '0')}
-                  </p>
+                  <p
+                    aria-hidden
+                    data-mark={String(i + 1).padStart(2, '0')}
+                    className="font-display text-[5rem] font-bold leading-none tracking-[-0.04em] text-ink/10 tabular-nums font-stretch-expanded before:content-[attr(data-mark)] lg:text-[7rem]"
+                  />
                   <h3 className="mt-4 font-display text-2xl font-semibold font-stretch-semi-expanded">
                     {step.title}
                   </h3>

@@ -27,7 +27,7 @@ import {
 } from '@/modules/home/home-content';
 
 export const metadata = {
-  title: { absolute: 'Ravyntech - gadgets & electronics in Bangladesh' },
+  title: { absolute: 'Ravntech - gadgets & electronics in Bangladesh' },
   description: 'A short list of phones, laptops and accessories, delivered across Bangladesh.',
   alternates: { canonical: '/' },
 };
@@ -74,7 +74,6 @@ export default async function HomePage() {
         {/* Category index beside one product at full scale. */}
         <section
           aria-label="Featured"
-          data-reveal
           className="mt-20 grid grid-cols-1 gap-8 md:mt-28 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:gap-12"
         >
           <div className="flex min-w-0 flex-col">
@@ -140,7 +139,7 @@ export default async function HomePage() {
         <BrandMarquee brands={brands} />
 
         {rail.length > 0 ? (
-          <section aria-labelledby="new-in" className="mt-16 md:mt-24">
+          <section aria-labelledby="new-in" data-offscreen className="mt-16 md:mt-24">
             <SectionHead
               id="new-in"
               title="New in"
@@ -174,7 +173,12 @@ export default async function HomePage() {
 
         <BuyingSteps steps={HOME_STEPS} />
 
-        <section aria-labelledby="how-buying-works" data-reveal className="mt-16 md:mt-24">
+        <section
+          aria-labelledby="how-buying-works"
+          data-offscreen
+          data-reveal
+          className="mt-16 md:mt-24"
+        >
           <div className="grid gap-x-10 gap-y-6 border-t-2 border-ink pt-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)]">
             <h2
               id="how-buying-works"
@@ -229,7 +233,6 @@ function FeaturedProduct({ product }: Readonly<{ product: PublicProductSummary }
         alt={product.name}
         brand={product.brand.name}
         sizes="(max-width: 1024px) 100vw, 50vw"
-        priority
         className="aspect-[4/3] bg-transparent sm:aspect-auto sm:min-h-72 lg:aspect-[16/11]"
       />
       <div className="flex flex-col gap-3 border-t border-rule bg-surface p-5 sm:border-l sm:border-t-0 lg:border-l-0 lg:border-t md:p-6">

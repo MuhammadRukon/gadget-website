@@ -129,7 +129,7 @@ export function CartLineItem({
             type="button"
             size="icon"
             variant="outline"
-            className={cn(compact ? 'h-7 w-7' : 'h-8 w-8')}
+            className={cn(compact ? 'h-9 w-9' : 'h-11 w-11')}
             onClick={() => changeQuantity(line.quantity - 1)}
             aria-label={`Decrease quantity for ${line.productName}`}
           >
@@ -142,7 +142,7 @@ export function CartLineItem({
             type="button"
             size="icon"
             variant="outline"
-            className={cn(compact ? 'h-7 w-7' : 'h-8 w-8')}
+            className={cn(compact ? 'h-9 w-9' : 'h-11 w-11')}
             onClick={() => changeQuantity(line.quantity + 1)}
             aria-label={`Increase quantity for ${line.productName}`}
           >
@@ -151,7 +151,7 @@ export function CartLineItem({
         </div>
         <Button
           variant="ghost"
-          className="font-normal text-xs p-0 hover:bg-transparent cursor-pointer text-stone-500"
+          className="min-h-11 min-w-11 px-2 font-normal text-xs hover:bg-transparent cursor-pointer text-muted-foreground"
           size="sm"
           onClick={() => removeItem.mutate({ itemId: line.itemId, variantId: line.variantId })}
         >

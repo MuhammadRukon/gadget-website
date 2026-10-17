@@ -40,7 +40,7 @@ export function CartPanel() {
             <span
               aria-hidden
               key={itemCount}
-              className="flex animate-[sf-pop_320ms_cubic-bezier(0.16,1,0.3,1)] items-center justify-center rounded-full bg-eye text-[11px] font-semibold leading-none text-ink tabular-nums absolute right-0 top-0.5 h-[18px] min-w-[18px] px-1"
+              className="flex animate-[sf-pop_320ms_cubic-bezier(0.16,1,0.3,1)] items-center justify-center rounded-full bg-eye text-xs font-semibold leading-none text-ink tabular-nums absolute right-0 top-0.5 h-[18px] min-w-[18px] px-1"
             >
               {itemCount > 99 ? '99+' : itemCount}
             </span>

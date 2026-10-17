@@ -23,14 +23,14 @@ export function ProductGrid({
     return (
       <div className="flex flex-col items-start gap-3 border-y border-rule py-12">
         <p className="font-display text-xl font-semibold font-stretch-semi-expanded">
-          Nothing matches these filters
+          No products found
         </p>
         <p className="max-w-md text-sm text-ink-2">
-          Try a wider price range, another brand, or include out-of-stock items.
+          Check the spelling, try a shorter name, or loosen filters such as price, brand and stock.
         </p>
         {clearHref ? (
           <Link href={clearHref} className="text-sm font-medium text-raven-ink underline">
-            Clear all filters
+            Clear search and filters
           </Link>
         ) : null}
       </div>

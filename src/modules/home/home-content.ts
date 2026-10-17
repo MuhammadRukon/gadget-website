@@ -49,7 +49,7 @@ export interface HomeStep {
 
 export const HOME_BANNER: HomeBanner = {
   image: '/banner.webp',
-  alt: 'Phones, smartwatches and other gadgets arranged on a reflective table',
+  alt: '',
   title: 'Sharp eyes for good tech.',
   subtitle: 'Phones, laptops and accessories with the price, stock and warranty on every page.',
   primary: { label: 'Shop all products', href: '/products' },

@@ -2,6 +2,33 @@
 @import 'tw-animate-css';
 @custom-variant dark (&:is(.dark *));
 
+/*
+ * Storefront display face: Archivo (SIL Open Font License), self-hosted as two
+ * static latin instances (~14 KB each) instead of the 88 KB variable file:
+ * expanded bold for headings, semi-expanded semibold for prices and small titles.
+ * Each face answers both weights so nothing is synthesised, and both are
+ * preloaded by the storefront layout so they are never discovered late.
+ */
+@font-face {
+  font-family: 'Archivo SF';
+  src: url('/fonts/archivo/archivo-expanded-700.woff2') format('woff2');
+  font-weight: 600 700;
+  font-stretch: 125%;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Archivo SF';
+  src: url('/fonts/archivo/archivo-semiexpanded-600.woff2') format('woff2');
+  font-weight: 600 700;
+  font-stretch: 112.5%;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
 :root {
   --font-sans: var(--font-google-sans, Arial, Helvetica, sans-serif);
   --font-mono: var(--font-geist-mono, monospace);
@@ -38,7 +65,7 @@
   --sidebar-border: oklch(0.92 0.004 286.32);
   --sidebar-ring: oklch(0.705 0.015 286.067);
 
-  /* Storefront "spec sheet" world: cool paper, ink, Ravyntech blue-gray (#424952). */
+  /* Storefront "spec sheet" world: cool paper, ink, Ravntech blue-gray (#424952). */
   --sf-paper: oklch(0.968 0.003 250);
   --sf-surface: oklch(0.995 0.002 250);
   --sf-field: oklch(0.935 0.006 250);
@@ -203,7 +230,7 @@ body {
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
-  --font-display: var(--font-archivo), var(--font-google-sans), sans-serif;
+  --font-display: 'Archivo SF', var(--font-google-sans), sans-serif;
   --color-paper: var(--sf-paper);
   --color-surface: var(--sf-surface);
   --color-field: var(--sf-field);
@@ -308,4 +335,56 @@ body {
   to {
     transform: translateX(-50%);
   }
+}
+
+/*
+ * Homepage motion that needs no JavaScript: CSS scroll-driven animations run
+ * on the compositor where supported and are simply absent elsewhere (content
+ * stays fully visible). Pins live in HomeMotion (GSAP, lazy, md+ only).
+ */
+@keyframes sf-rise {
+  from {
+    opacity: 0;
+    transform: translateY(40px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes sf-settle {
+  from {
+    transform: scale(1.16) translateY(-4%);
+  }
+  to {
+    transform: scale(1) translateY(6%);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  @supports (animation-timeline: view()) {
+    .sf [data-reveal],
+    .sf [data-reveal-item] {
+      animation: sf-rise linear both;
+      animation-timeline: view();
+      animation-range: entry 5% entry 70%;
+    }
+
+    .sf [data-banner-frame] {
+      view-timeline-name: --sf-banner;
+    }
+
+    .sf [data-banner-image] {
+      animation: sf-settle linear both;
+      animation-timeline: --sf-banner;
+      animation-range: cover 0% cover 100%;
+    }
+  }
+}
+
+/* Below-the-fold homepage sections skip layout and paint until they near the viewport. */
+.sf [data-offscreen] {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 640px;
 }

@@ -17,7 +17,7 @@ const PLACE = ['col-span-2 md:row-span-2', 'col-span-2', 'col-span-1', 'col-span
 /** Apple-style bento of shopping routes. Tiles without a drawing are set as oversized type. */
 export function CategoryBento({ tiles }: Readonly<{ tiles: HomeTile[] }>) {
   return (
-    <section aria-labelledby="bento" className="mt-20 md:mt-28">
+    <section aria-labelledby="bento" data-offscreen className="mt-20 md:mt-28">
       <h2
         id="bento"
         data-reveal

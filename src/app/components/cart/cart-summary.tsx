@@ -76,7 +76,10 @@ export function CartSummary({
       ) : null}
       {isPanel ? null : (
         <p className="text-xs text-muted-foreground">
-          Delivery fee and coupons are applied at checkout.
+          {toFree === 0
+            ? 'Coupons are applied at checkout.'
+            : 'Delivery fee and coupons are applied at checkout.'}
+          {authenticated ? '' : ' Your cart is kept when you sign in.'}
         </p>
       )}
       {!isPanel && (

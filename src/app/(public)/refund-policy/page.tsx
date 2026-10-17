@@ -1,9 +1,9 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Refund and Return Policy | Ravyntech',
+  title: 'Refund and Return Policy | Ravntech',
   description:
-    'Ravyntech Ltd return window, conditions, and refund timelines — including refunds for bKash, card, and bank-transfer payments.',
+    'Ravntech Ltd return window, conditions, and refund timelines — including refunds for bKash, card, and bank-transfer payments.',
 };
 
 export default function RefundPolicyPage() {

@@ -40,7 +40,7 @@ export function buildBreadcrumbJsonLd(items: BreadcrumbItem[], baseUrl: string) 
 export function CustomBreadcrumb({ items }: Readonly<BreadcrumbProps>) {
   return (
     <Breadcrumb>
-      <BreadcrumbList className="text-[13px] text-ink-2">
+      <BreadcrumbList className="text-xs text-ink-2">
         {items.map((item, index) => (
           <React.Fragment key={index}>
             <BreadcrumbItem>

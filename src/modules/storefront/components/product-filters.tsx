@@ -326,7 +326,7 @@ export function ListingToolbar({
               <SlidersHorizontal aria-hidden className="size-4" />
               Filters
               {chips.length > 0 ? (
-                <span className="rounded-full bg-raven px-1.5 text-[11px] text-on-raven tabular-nums">
+                <span className="rounded-full bg-raven px-1.5 text-xs text-on-raven tabular-nums">
                   {chips.length}
                 </span>
               ) : null}

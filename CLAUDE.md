@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-"Ravyntech" — gadget/electronics e-commerce MVP for the Bangladesh market. Next.js 16 App Router + React 19 + TypeScript, Prisma + PostgreSQL, Auth.js v5 (JWT sessions), TanStack Query + Zustand, Tailwind 4 + shadcn/ui, Cloudinary media, Vitest.
+"Ravntech" — gadget/electronics e-commerce MVP for the Bangladesh market. Next.js 16 App Router + React 19 + TypeScript, Prisma + PostgreSQL, Auth.js v5 (JWT sessions), TanStack Query + Zustand, Tailwind 4 + shadcn/ui, Cloudinary media, Vitest.
 
 Hosted on Vercel free tier + Prisma-hosted Postgres. Cost-sensitive: free tier first, prefer DB-backed solutions over paid infra. Upstash Redis (REST) is an **optional, fail-open** cache/limiter layer (`src/server/common/cache.ts`); enabled by `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` (unset = Redis layer disabled); with them unset or Redis failing, the app falls back to the DB (rate limiting uses the Postgres `RateLimitBucket`; the public IP limiters on cart hydrate and catalog `q` use a per-instance in-memory window instead of Postgres).
 

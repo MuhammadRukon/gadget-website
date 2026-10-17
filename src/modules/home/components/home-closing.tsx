@@ -5,7 +5,12 @@ import type { HOME_CLOSING } from '../home-content';
 /** Closing call: oversized statement, one real contact action. */
 export function HomeClosing({ closing }: Readonly<{ closing: typeof HOME_CLOSING }>) {
   return (
-    <section aria-labelledby="closing" data-reveal className="mt-20 text-center md:mt-28">
+    <section
+      aria-labelledby="closing"
+      data-offscreen
+      data-reveal
+      className="mt-20 text-center md:mt-28"
+    >
       <h2
         id="closing"
         className="mx-auto max-w-4xl font-display text-[clamp(2.6rem,8vw,6.5rem)] font-bold leading-[0.9] tracking-[-0.035em] font-stretch-expanded text-balance"

@@ -14,7 +14,7 @@ A second audience is the shop admin (owner and staff), who run catalog, orders, 
 
 ## Product Purpose
 
-"Ravyntech" is a gadget/electronics e-commerce MVP for the Bangladesh market. Customers browse and filter a catalog, build a guest or logged-in cart, check out with local payment methods, track orders and leave verified-purchase reviews and warranty requests. Success is a real shop that takes orders and payments safely and can be run day to day by a small team.
+"Ravntech" is a gadget/electronics e-commerce MVP for the Bangladesh market. Customers browse and filter a catalog, build a guest or logged-in cart, check out with local payment methods, track orders and leave verified-purchase reviews and warranty requests. Success is a real shop that takes orders and payments safely and can be run day to day by a small team.
 
 ## Positioning
 
@@ -37,7 +37,7 @@ A curated gadget catalog rather than an everything-marketplace. Positioning beyo
 
 ## Brand Commitments
 
-Name: "Ravyntech" (renamed from Cryptech in October 2026; the legal entity is Ravyntech Ltd). Personality: a raven, clever and technical. Mark: the angular raven head in `public/brand/ravyntech-mark.png` (full lockup `public/brand/ravyntech-logo.png`); the wordmark is set as live text, RAVYN in ink and TECH in the brand blue-gray. Brand colour: blue-gray #424952. The bank-transfer account name stays "Gadget Cryptech Ltd." until the bank account itself is renamed. Other assets in `public/`: banner.webp, earphone.svg, smartwatch.svg.
+Name: "Ravntech" (renamed from Cryptech in October 2026; the legal entity is Ravntech Ltd). Personality: a raven, clever and technical. Mark: the angular raven head in `public/brand/ravntech-mark.png` (full lockup `public/brand/ravntech-logo.png`); the wordmark is set as live text, RAVN in ink and TECH in the brand blue-gray. Brand colour: blue-gray #424952. The bank-transfer account name stays "Gadget Cryptech Ltd." until the bank account itself is renamed. Other assets in `public/`: banner.webp, earphone.svg, smartwatch.svg.
 
 ## Evidence on Hand
 

@@ -18,6 +18,7 @@ export function BrandMarquee({ brands }: Readonly<{ brands: Brand[] }>) {
 
   return (
     <section
+      data-offscreen
       aria-label="Brands we carry"
       className="mt-20 border-y border-rule py-6 md:mt-28 md:py-8"
     >
@@ -30,11 +31,14 @@ export function BrandMarquee({ brands }: Readonly<{ brands: Brand[] }>) {
               className="flex shrink-0 gap-14 pr-14"
             >
               {run.map((b, i) => (
-                <li key={`${b.id}-${i}`}>
+                <li
+                  key={`${b.id}-${i}`}
+                  aria-hidden={copy === 0 && i >= brands.length ? true : undefined}
+                >
                   <Link
                     href={`/brand/${b.slug}`}
                     tabIndex={copy === 1 || i >= brands.length ? -1 : undefined}
-                    className="font-display text-3xl font-bold uppercase tracking-[-0.02em] text-ink/20 transition-colors font-stretch-expanded hover:text-ink md:text-5xl"
+                    className="font-display text-3xl font-bold uppercase tracking-[-0.02em] text-ink/55 transition-colors font-stretch-expanded hover:text-ink md:text-5xl"
                   >
                     {b.name}
                   </Link>

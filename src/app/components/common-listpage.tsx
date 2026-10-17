@@ -61,7 +61,10 @@ export default function CommonListPage({
           <ListingSidebar {...filterProps} />
         </Suspense>
 
-        <section aria-label={`${title} results`}>
+        <section aria-labelledby="listing-results">
+          <h2 id="listing-results" className="sr-only">
+            Product list
+          </h2>
           <Suspense fallback={<div className="mb-6 h-[53px] border-b border-rule" />}>
             <ListingToolbar total={page.total} {...filterProps} />
           </Suspense>
@@ -69,7 +72,7 @@ export default function CommonListPage({
           <ProductGrid
             products={page.items}
             clearHref={basePath}
-            priorityCount={4}
+            priorityCount={2}
             className="lg:grid-cols-3"
           />
 

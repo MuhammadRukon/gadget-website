@@ -57,7 +57,9 @@ export function HomeBanner({ banner }: Readonly<{ banner: HomeBannerContent }>) 
             src={banner.image}
             alt={banner.alt}
             fill
-            priority
+            preload
+            loading="eager"
+            fetchPriority="high"
             sizes="(max-width: 1280px) 100vw, 1180px"
             className="object-cover"
           />

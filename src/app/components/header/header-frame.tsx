@@ -12,7 +12,17 @@ import {
 import { Search, X } from 'lucide-react';
 
 import { Container } from '@/app/components/container/container';
-import { HeaderSearch, type QuickLink } from '@/app/components/header/header-search';
+import dynamic from 'next/dynamic';
+
+import type { QuickLink } from '@/app/components/header/header-search';
+
+// The search sheet's code (field, results, preview fetching) loads on first use, not with every page.
+const loadHeaderSearch = () =>
+  import('@/app/components/header/header-search').then((m) => m.HeaderSearch);
+const HeaderSearch = dynamic(loadHeaderSearch, {
+  ssr: false,
+  loading: () => <div className="h-12 md:h-14" aria-hidden />,
+});
 
 interface HeaderState {
   quickLinks: QuickLink[];
@@ -219,7 +229,9 @@ export function SearchToggle() {
       aria-keyshortcuts="/ Control+K"
       title="Search (/)"
       onClick={searchOpen ? closeSearch : openSearch}
-      className="flex size-11 items-center justify-center rounded-md text-ink transition-colors hover:text-raven"
+      onPointerEnter={() => void loadHeaderSearch()}
+      onFocus={() => void loadHeaderSearch()}
+      className="flex size-11 items-center justify-center rounded-md cursor-pointer text-ink transition-colors hover:text-raven"
     >
       {searchOpen ? <X size={19} aria-hidden /> : <Search size={19} aria-hidden />}
     </button>
@@ -250,7 +262,7 @@ function SearchPanel() {
       <Container>
         <div className="mx-auto max-w-3xl">
           <h2 id="header-search-title" className="sr-only">
-            Search Ravyntech
+            Search Ravntech
           </h2>
           <HeaderSearch
             inputId={SEARCH_INPUT_ID}

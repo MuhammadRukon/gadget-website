@@ -1,17 +1,17 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'About Us | Ravyntech',
+  title: 'About Us | Ravntech',
   description:
-    'Ravyntech Ltd is a Dhaka-based gadget and electronics shop offering genuine products, official warranty support, and cash on delivery across Bangladesh.',
+    'Ravntech Ltd is a Dhaka-based gadget and electronics shop offering genuine products, official warranty support, and cash on delivery across Bangladesh.',
 };
 
 export default function AboutPage() {
   return (
     <article className="mx-auto max-w-3xl py-10 text-sm sm:text-base [&>h1]:text-2xl [&>h1]:sm:text-3xl [&>h1]:font-semibold [&>h1]:mb-6 [&>h2]:text-lg [&>h2]:sm:text-xl [&>h2]:font-semibold [&>h2]:mt-8 [&>h2]:mb-3 [&>p]:leading-7 [&>p]:mb-4">
-      <h1>About Ravyntech</h1>
+      <h1>About Ravntech</h1>
       <p>
-        Ravyntech Ltd is a gadget and electronics retailer based in Dhaka, Bangladesh. We sell
+        Ravntech Ltd is a gadget and electronics retailer based in Dhaka, Bangladesh. We sell
         genuine tech products — from chargers and accessories to the latest devices — through our
         online store, with delivery available across the country.
       </p>

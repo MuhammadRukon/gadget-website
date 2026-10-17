@@ -1,3 +1,5 @@
+import { preload } from 'react-dom';
+
 import { Container } from '../components/container/container';
 import { Footer } from '../components/footer/footer';
 import { FactsStrip } from '../components/header/facts-strip';
@@ -30,7 +32,16 @@ async function loadMenu(): Promise<MenuCategory[]> {
 }
 
 export default async function PublicLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  const [menu, facts] = await Promise.all([loadMenu(), storefrontFactsService.get()]);
+  // Storefront display face: both instances are preloaded so neither is discovered late (see globals.css).
+  for (const face of ['expanded-700', 'semiexpanded-600']) {
+    preload(`/fonts/archivo/archivo-${face}.woff2`, {
+      as: 'font',
+      type: 'font/woff2',
+      crossOrigin: 'anonymous',
+    });
+  }
+  const menu = await loadMenu();
+  // const [menu, facts] = await Promise.all([loadMenu(), storefrontFactsService.get()]);
   return (
     <div className="sf flex min-h-dvh flex-col">
       <a
@@ -39,12 +50,12 @@ export default async function PublicLayout({ children }: Readonly<{ children: Re
       >
         Skip to content
       </a>
-      <FactsStrip facts={facts} />
+      {/* <FactsStrip facts={facts} /> */}
       <Header menu={menu} />
       <main id="main" className="flex-1">
         <Container>{children}</Container>
       </main>
-      <Footer menu={menu} facts={facts} />
+      <Footer menu={menu} />
     </div>
   );
 }

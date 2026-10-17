@@ -33,7 +33,9 @@ export function ProductImage({
           alt={alt}
           fill
           sizes={sizes}
-          priority={priority}
+          preload={priority}
+          fetchPriority={priority ? 'high' : undefined}
+          loading={priority ? 'eager' : undefined}
           className="object-contain p-[8%] mix-blend-multiply dark:mix-blend-normal"
         />
       ) : (
@@ -42,10 +44,12 @@ export function ProductImage({
           role="img"
           aria-label={`${alt}, photo coming soon`}
         >
-          <span className="font-display text-[clamp(1.1rem,4vw,1.6rem)] font-semibold uppercase leading-none tracking-[-0.01em] text-ink/15 font-stretch-expanded">
-            {brand}
-          </span>
-          <span className="text-[11px] text-ink-2">Photo coming soon</span>
+          <span
+            aria-hidden
+            data-mark={brand}
+            className="font-display text-[clamp(1.1rem,4vw,1.6rem)] font-semibold uppercase leading-none tracking-[-0.01em] text-ink/15 font-stretch-expanded before:content-[attr(data-mark)]"
+          />
+          <span className="text-xs text-ink-2">Photo coming soon</span>
         </div>
       )}
     </div>

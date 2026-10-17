@@ -1,4 +1,4 @@
-# Ravyntech — Gadget E-commerce (Next.js)
+# Ravntech — Gadget E-commerce (Next.js)
 
 A full-stack e-commerce MVP for gadgets/electronics targeting the Bangladesh market. Customers get catalog browsing, search/filters, guest + logged-in cart, checkout with local payment methods (COD, bKash, SSLCommerz, bank transfer), order tracking, verified-purchase reviews, and warranty claims. Admins get a dashboard for catalog, orders, payment verification, coupons, warranty, users, and analytics.
 

@@ -38,7 +38,7 @@ export function ProductCard({
           )}
         />
         {discount ? (
-          <span className="absolute left-2.5 top-2.5 rounded-sm bg-sale px-1.5 py-0.5 text-[11px] font-semibold text-white tabular-nums">
+          <span className="absolute left-2.5 top-2.5 rounded-sm bg-sale px-1.5 py-0.5 text-xs font-semibold text-white tabular-nums">
             −
             {getDiscountPercentString(product.priceCents, product.originalPriceCents).replace(
               '~',

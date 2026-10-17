@@ -1,5 +1,5 @@
 ---
-name: Ravyntech Storefront
+name: Ravntech Storefront
 description: A gadget shop for Bangladesh that reads like a well-made product datasheet; exact, calm, measured.
 colors:
   paper: "oklch(0.968 0.003 250)"
@@ -181,7 +181,7 @@ components:
     padding: "48px 0"
 ---
 
-# Design System: Ravyntech Storefront
+# Design System: Ravntech Storefront
 
 Scope: the customer storefront only (everything under the `.sf` scope: home, listings, product page, cart, checkout, account, auth, policy pages). The admin dashboard keeps the default shadcn tokens and is not governed by this file.
 
@@ -356,4 +356,4 @@ Short and functional. Arrows nudge 4px right over 300ms ease-out on hover; image
 
 ## Brand update (October 2026)
 
-The shop is now **Ravyntech**: a raven, clever and technical. The action colour is the brand blue-gray **#424952** (`raven`, oklch(0.402 0.018 255)); paper, ink and rules are cool neutrals tinted toward the same hue. **Eye** (`--sf-eye`, oklch(0.7 0.15 235)) is the raven's eye from the logo: a small live signal only (in-stock dot, cart count), never text and never a fill larger than a badge. The mark lives in `public/brand/ravyntech-mark.png`; the wordmark is live Archivo text, RAVYN in ink and TECH in raven.
+The shop is now **Ravntech**: a raven, clever and technical. The action colour is the brand blue-gray **#424952** (`raven`, oklch(0.402 0.018 255)); paper, ink and rules are cool neutrals tinted toward the same hue. **Eye** (`--sf-eye`, oklch(0.7 0.15 235)) is the raven's eye from the logo: a small live signal only (in-stock dot, cart count), never text and never a fill larger than a badge. The mark lives in `public/brand/ravntech-mark.png`; the wordmark is live Archivo text, RAVN in ink and TECH in raven.

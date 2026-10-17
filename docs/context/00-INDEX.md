@@ -26,7 +26,7 @@ Fast orientation for AI assistants and human contributors. Read `01-overview.md`
 
 ## Quick facts
 
-- **Product**: "Ravyntech" — gadget/electronics e-commerce for the Bangladesh market (BDT, bKash/SSLCommerz/COD/bank transfer, Dhaka-based shipping rules).
+- **Product**: "Ravntech" — gadget/electronics e-commerce for the Bangladesh market (BDT, bKash/SSLCommerz/COD/bank transfer, Dhaka-based shipping rules).
 - **Stack**: Next.js 16 (App Router, Turbopack dev) + React 19 + TypeScript, Prisma + PostgreSQL, Auth.js v5 (JWT), TanStack Query + Zustand, Tailwind v4 + shadcn/ui, Cloudinary media, Vitest.
 - **Hosting**: Vercel free tier (frontend + API), Prisma-hosted Postgres, optional Upstash Redis (cache + limiter, fail-open). Cost-sensitive: avoid paid infra; prefer DB-based or free-tier solutions.
 - **Roles**: `CUSTOMER` and `ADMIN` only.

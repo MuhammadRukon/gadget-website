@@ -2,11 +2,18 @@
 
 import { useEffect, useRef, type ReactNode } from 'react';
 
+/** Load GSAP this far ahead of the first pinned section reaching the viewport. */
+const PRELOAD_MARGIN = '150% 0px';
+
 /**
- * Scroll choreography for the homepage, applied to markup the server already
- * rendered (found by data attributes). GSAP loads only on this page, after
- * hydration. Without JS, or with reduced motion, every section is static and
- * fully visible: animations only start from states GSAP sets itself.
+ * Scroll choreography for the homepage pins (the earbuds story and the
+ * "how buying works" rail). The banner zoom and section reveals are CSS
+ * scroll-driven animations (globals.css), so they cost no JavaScript.
+ *
+ * GSAP is only fetched on screens where the pins run (md+ for the story, lg+
+ * for the rail), with motion allowed, and only once a pinned section comes
+ * within reach, so phones and the first paint never pay for it. Without JS,
+ * or with reduced motion, every section is static and fully visible.
  */
 export function HomeMotion({ children }: Readonly<{ children: ReactNode }>) {
   const root = useRef<HTMLDivElement>(null);
@@ -14,15 +21,33 @@ export function HomeMotion({ children }: Readonly<{ children: ReactNode }>) {
   useEffect(() => {
     const el = root.current;
     if (!el) return;
+    const wantsMotion = window.matchMedia(
+      '(min-width: 768px) and (prefers-reduced-motion: no-preference)',
+    );
+    if (!wantsMotion.matches) return;
+
+    const targets = Array.from(el.querySelectorAll<HTMLElement>('[data-story], [data-rail]'));
+    if (targets.length === 0) return;
+
     let cleanup: (() => void) | undefined;
     let cancelled = false;
 
-    void (async () => {
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((e) => e.isIntersecting)) return;
+        io.disconnect();
+        void start();
+      },
+      { rootMargin: PRELOAD_MARGIN },
+    );
+    targets.forEach((t) => io.observe(t));
+
+    async function start() {
       const [{ gsap }, { ScrollTrigger }] = await Promise.all([
         import('gsap'),
         import('gsap/ScrollTrigger'),
       ]);
-      if (cancelled) return;
+      if (cancelled || !el) return;
       gsap.registerPlugin(ScrollTrigger);
 
       const mm = gsap.matchMedia();
@@ -38,52 +63,8 @@ export function HomeMotion({ children }: Readonly<{ children: ReactNode }>) {
         (ctx) => {
           const { motion, md, lg } = ctx.conditions as Record<string, boolean>;
           if (!motion) return;
-          const ease = 'expo.out';
           // Pinned panels start below the header in its compact, scrolled-down shape (a 48px bar).
           const headerOffset = () => 48;
-
-          // Banner: the image settles out of a slow zoom as you scroll past it. The statement
-          // itself never animates: it is the first thing people read and it must not flash.
-          const frame = el.querySelector('[data-banner-frame]');
-          const image = el.querySelector('[data-banner-image]');
-          if (frame && image) {
-            gsap.fromTo(
-              image,
-              { scale: 1.16, yPercent: -4 },
-              {
-                scale: 1,
-                yPercent: 6,
-                ease: 'none',
-                scrollTrigger: {
-                  trigger: frame,
-                  start: 'top bottom',
-                  end: 'bottom top',
-                  scrub: true,
-                },
-              },
-            );
-          }
-
-          // Section reveals.
-          for (const node of q('[data-reveal]')) {
-            gsap.from(node, {
-              y: 40,
-              opacity: 0,
-              duration: 1,
-              ease,
-              scrollTrigger: { trigger: node, start: 'top 85%' },
-            });
-          }
-          for (const group of q('[data-reveal-group]')) {
-            gsap.from(group.querySelectorAll('[data-reveal-item]'), {
-              y: 48,
-              opacity: 0,
-              duration: 1,
-              ease,
-              stagger: 0.07,
-              scrollTrigger: { trigger: group, start: 'top 85%' },
-            });
-          }
 
           // Pinned story: one step at a time while the drawing turns.
           const story = el.querySelector<HTMLElement>('[data-story]');
@@ -151,33 +132,15 @@ export function HomeMotion({ children }: Readonly<{ children: ReactNode }>) {
               });
             }
           }
-
-          // Parallax on anything that opts in.
-          for (const node of q<HTMLElement>('[data-parallax]')) {
-            const amount = Number(node.dataset.parallax) || 10;
-            gsap.fromTo(
-              node,
-              { yPercent: -amount },
-              {
-                yPercent: amount,
-                ease: 'none',
-                scrollTrigger: {
-                  trigger: node,
-                  start: 'top bottom',
-                  end: 'bottom top',
-                  scrub: true,
-                },
-              },
-            );
-          }
         },
       );
 
       cleanup = () => mm.revert();
-    })();
+    }
 
     return () => {
       cancelled = true;
+      io.disconnect();
       cleanup?.();
     };
   }, []);

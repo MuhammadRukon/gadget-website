@@ -13,57 +13,22 @@ const HELP_LINKS: [string, string][] = [
   ['Refund and return policy', '/refund-policy'],
   ['Terms and conditions', '/terms'],
   ['Privacy policy', '/privacy-policy'],
-  ['About Ravyntech', '/about'],
+  ['About Ravntech', '/about'],
 ];
 
 interface FooterProps {
   menu: MenuCategory[];
-  facts: StorefrontFacts;
+  // facts: StorefrontFacts;
 }
 
-export function Footer({ menu, facts }: Readonly<FooterProps>): JSX.Element {
-  const { shipping, methods } = facts;
+export function Footer({ menu }: Readonly<FooterProps>): JSX.Element {
+  // export function Footer({ menu, facts }: Readonly<FooterProps>): JSX.Element {
+  // const { shipping, methods } = facts;
 
   return (
-    <footer className="mt-20 border-t border-rule bg-surface text-sm">
+    <footer data-offscreen className="mt-20 border-t border-rule bg-surface text-sm">
       <Container>
-        <div className="grid gap-x-10 gap-y-10 py-12 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1.2fr]">
-          <div className="space-y-4">
-            <p className="flex items-center gap-2.5 font-display text-2xl font-bold uppercase leading-none font-stretch-expanded">
-              <Image
-                src="/brand/ravyntech-mark-inverted.png"
-                alt=""
-                width={54}
-                height={36}
-                className="h-9 w-auto dark:hidden"
-              />
-              <Image
-                src="/brand/ravyntech-mark.png"
-                alt=""
-                width={54}
-                height={36}
-                className="hidden h-9 w-auto dark:block"
-              />
-              <span>
-                Ravyn<span className="text-raven">tech</span>
-              </span>
-            </p>
-            <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 border-t border-rule pt-4 text-[13px]">
-              <dt className="text-ink-2">Dhaka</dt>
-              <dd className="tabular-nums">{formatBDT(shipping.insideDhakaCents)} delivery</dd>
-              <dt className="text-ink-2">Elsewhere</dt>
-              <dd className="tabular-nums">{formatBDT(shipping.outsideDhakaCents)} delivery</dd>
-              <dt className="text-ink-2">Over {formatBDT(shipping.freeFromCents)}</dt>
-              <dd>Free delivery</dd>
-              {methods.length > 0 ? (
-                <>
-                  <dt className="text-ink-2">Pay by</dt>
-                  <dd>{methods.map((m) => PAYMENT_METHOD_SHORT_LABEL[m]).join(', ')}</dd>
-                </>
-              ) : null}
-            </dl>
-          </div>
-
+        <div className="grid gap-x-10 gap-y-10 py-12 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1.2fr]">
           <nav aria-label="Shop">
             <h2 className="mb-4 text-xs font-semibold text-ink-2">Shop</h2>
             <ul className="">
@@ -135,10 +100,9 @@ export function Footer({ menu, facts }: Readonly<FooterProps>): JSX.Element {
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-rule py-5 text-xs text-ink-2">
-          <p>© {new Date().getFullYear()} Ravyntech Ltd. All rights reserved.</p>
-          <p>All prices in Bangladeshi Taka.</p>
-        </div>
+        <p className="border-t border-rule py-5 text-center text-xs text-ink-2">
+          © {new Date().getFullYear()} Ravntech Ltd. All rights reserved.
+        </p>
       </Container>
     </footer>
   );
