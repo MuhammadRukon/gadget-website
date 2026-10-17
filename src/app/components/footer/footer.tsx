@@ -28,9 +28,9 @@ export function Footer({ menu }: Readonly<FooterProps>): JSX.Element {
   return (
     <footer data-offscreen className="mt-20 border-t border-rule bg-surface text-sm">
       <Container>
-        <div className="grid gap-x-10 gap-y-10 py-12 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1.2fr]">
-          <nav aria-label="Shop">
-            <h2 className="mb-4 text-xs font-semibold text-ink-2">Shop</h2>
+        <div className="grid grid-cols-2 gap-x-6 gap-y-8 py-10 sm:grid-cols-3 sm:gap-x-10 sm:py-12 lg:grid-cols-[1fr_1fr_1.4fr]">
+          <nav aria-label="Shop" className="min-w-0">
+            <h2 className="mb-2 text-xs font-semibold text-ink-2 sm:mb-4">Shop</h2>
             <ul className="">
               <li>
                 <Link
@@ -53,8 +53,8 @@ export function Footer({ menu }: Readonly<FooterProps>): JSX.Element {
             </ul>
           </nav>
 
-          <nav aria-label="Help">
-            <h2 className="mb-4 text-xs font-semibold text-ink-2">Help</h2>
+          <nav aria-label="Help" className="min-w-0">
+            <h2 className="mb-2 text-xs font-semibold text-ink-2 sm:mb-4">Help</h2>
             <ul className="">
               {HELP_LINKS.map(([label, href]) => (
                 <li key={href}>
@@ -69,7 +69,8 @@ export function Footer({ menu }: Readonly<FooterProps>): JSX.Element {
             </ul>
           </nav>
 
-          <div>
+          {/* On phones the contact block leads, full width, with Shop and Help side by side beneath it. */}
+          <div className="col-span-2 order-first min-w-0 border-b border-rule pb-8 sm:order-none sm:col-span-1 sm:border-b-0 sm:pb-0">
             <h2 className="mb-4 text-xs font-semibold text-ink-2">Talk to us</h2>
             <address className="space-y-3 not-italic">
               <p>
